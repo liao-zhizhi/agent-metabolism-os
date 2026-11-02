@@ -1,0 +1,506 @@
+# agent-metabolism-os
+
+A zero-dependency prototype that puts metabolic regulation **outside** a large
+language model, by treating the model as a stateless CPU.
+
+The model has no memory of its own charge. Ask for a long chain of thought on
+the last joule and it will produce one, and the bill arrives after the fact. So
+the constraint has to be somewhere else: in a scheduler that must pay before it
+thinks, and that changes *which* thinking it asks for once the budget gets thin.
+
+And it has no memory of its own mistakes. Ask it to prove the invariant it just
+failed to prove and it will try again with the same confidence. So there is a
+second constraint, outside the model and outside the account: a ledger that
+remembers what the system has cost, and takes capability away when the answer is
+"too much".
+
+## Cross-Audit Evidence
+
+The two claims in that introduction — *it cannot overspend* and *it cannot be
+lied to about its own health* — are each cheap to assert and expensive to
+believe. So they are run against each other: an independent auditor
+([`harness-audit-sidecar`](https://github.com/liao-zhizhi/harness-audit-sidecar))
+watches a tool call, contradicts it with a git witness, and this system is then
+required to act on the contradiction.
+
+**→ [`FINAL_AUDIT_REPORT.md`](FINAL_AUDIT_REPORT.md)** — the full transcript, with
+every figure read back out of a live object after the run.
+
+```bash
+python3 final_audit.py    # ~8s, writes the report; exits 2 if any link breaks
+```
+
+A false completion is injected, the auditor returns `FAIL / no_file_drift`, the
+ledger charges 5.0 × 10.0 = 50, and capability is taken away:
+
+| stage | charge | ledger | L3 regime | concurrent | new writes | L2 beat |
+|:--|--:|:--|:--|--:|:--|:--|
+| baseline | 90% | HEALTHY | **GROW** | 5 | allowed | SLP |
+| after the `FAIL` | 90% | CRITICAL | **EMERGENCY** | 1 | **refused** | OXPHOS |
+| after 12 verified passes | 88% | WARNING | **CONSERVE** | 1 | allowed | SLP |
+
+The charge never drops more than two points. Every restriction in the middle row
+is attributable to the ledger, not to the account — which is the whole argument:
+a full battery is not a permission slip.
+
+Two figures that a report like this usually asserts are deliberately **not**
+asserted here, because they would have been false:
+
+- Trust does not fall to zero. It falls 100.0 → 75.0; the state is `CRITICAL`
+  because the *fine* crossed 40.0. A metric pinned at zero could not show the
+  climb back, which is the point of having two of them.
+- The two projects are not both zero-dependency. This one is; the auditor is not,
+  and should not be — its rules are YAML policy files so that changing audit
+  policy leaves a diff instead of requiring a code release.
+
+The auditor is run against this repository, not shipped with it, and it is
+deliberately *not* wired into CI: 388 unit tests run on every change, and the
+cross-audit is a heavier manual gate for release candidates.
+
+Six layers, standard library only:
+
+| Layer | File | What it regulates |
+|:--|:--|:--|
+| **L1** | `agent_metabolism/energy.py` | A finite charge. Below 30% the high-cost beat is forbidden; below 10% the account funds nothing. |
+| **L2** | `agent_metabolism/scheduler.py` | Two beats: `OXPHOS` (fast, 1× energy) and `SLP` (slow, 5× energy, 2× wall clock). A `CRITICAL` ledger forbids the slow beat at any charge. |
+| **L3** | `agent_metabolism/regime.py` | How much of the organism runs: `GROW` (5 agents), `CONSERVE` (1), `EMERGENCY` (interrupt). A `CRITICAL` ledger forces `EMERGENCY` at any charge. |
+| **L4** | `agent_metabolism/channel.py` | A shared substrate pool. Agents trade keys, not payloads. |
+| **L6** | `agent_metabolism/circadian.py` | Night mode compresses the day's context into content-addressed memory. |
+| **L7** | `agent_metabolism/compartment.py` | Membrane-bounded units. A failing unit is lysed; its neighbours keep their memory. |
+
+Plus one component that is not a layer, because it measures a different axis:
+
+| Component | File | What it measures |
+|:--|:--|:--|
+| **PenaltyLedger** | `agent_metabolism/penalty.py` | Accumulated damage: a fine and a trust score. Read by L3 (concurrency, new writes) and L2 (slow beat), so a failure can stop a system that still has energy. |
+
+## Run it
+
+```bash
+python3 -m unittest discover tests -v   # 164 tests, ~0.05s
+python3 demo.py                         # the full lifecycle
+python3 integration_demo.py             # audit -> charge -> next-day shutdown
+```
+
+No install step, no dependencies, no network. Python 3.9+.
+
+## What the demo shows
+
+```
+  #  complexity beat   mode  energy               state     tokens latency
+  1  0.92       SLP    slow  100.0 → 65.0 ( 65%)  GROW      82        312ms
+  2  0.88       SLP    slow   65.0 → 30.0 ( 30%)  GROW      94        336ms
+  3  0.95       OXPHOS fast   30.0 → 23.0 ( 23%)  CONSERVE  21        153ms
+  4  0.91       OXPHOS fast   23.0 → 16.0 ( 16%)  CONSERVE  22        156ms
+  5  0.25       OXPHOS fast   16.0 →  9.0 (  9%)  EXHAUSTED 15        135ms
+  6  0.97       --     --    refused              EXHAUSTED --     --
+```
+
+Task 3 is as complex as task 1. It gets the fast beat anyway, because the
+account no longer contains the price of the slow one. **The mode followed the
+budget, not the difficulty** — that is the whole design.
+
+## L1: the account is a constraint, not a counter
+
+```python
+from agent_metabolism import EnergyAccount
+
+account = EnergyAccount(100.0)   # budget
+account.consume(75.0)
+account.state                    # 'CONSERVE'
+account.ratio                    # 0.25
+```
+
+Two failure modes, kept distinct on purpose:
+
+- `InsufficientEnergy` — this cost is larger than the charge. A pricing problem:
+  run something cheaper.
+- `EnergyExhausted` — the account is below 10%, so it funds **nothing**, even
+  with charge left on the clock. A policy floor: refill or stop.
+
+Thresholds are strict (`ratio < 0.30`), so an account sitting on exactly 30.0%
+is still `GROW`. That is not rounding pedantry; it is what lets the demo show
+the precise moment the account arrives at the boundary, and lets a test assert
+the two sides differ.
+
+## L2: two beats, chosen before the call
+
+```python
+from agent_metabolism import DualBeatScheduler
+
+scheduler = DualBeatScheduler(account, base_cost=7.0)   # slow costs 35.0
+response = scheduler.execute("prove the invariant", complexity_score=0.95)
+response.mode, response.energy_cost, response.degraded
+```
+
+The slow beat runs only when `complexity > 0.7` **and** the account is `GROW`
+**and** the ledger does not say `CRITICAL`. When it deserves the slow beat but
+cannot have it, the scheduler **degrades rather than overdraws**: it runs fast
+and records *why*, so the decision is visible afterwards instead of showing up
+as a negative balance or an unexplained quality drop.
+
+```python
+response.degraded          # True  -- wanted SLP, did not get it
+response.degraded_reason   # 'insufficient_energy'  or  'penalty_critical'
+response.trust_blocked     # True only for the second
+```
+
+`degraded` alone would be a lie of omission. "I ran out of joules" and "I am not
+trusted with the expensive sentence" call for different responses — refill the
+account, or do cheap verifiable work — so the cause is a field, not something a
+caller has to re-derive from context.
+
+`latency_ms` is modelled, never slept. That keeps the tests at ~10 ms and
+deterministic, and it is why the demo can afford to be honest about the numbers
+being a model rather than a measurement.
+
+## L3: how much of the organism runs
+
+```python
+from agent_metabolism import RegimeSwitch, EnergyAccount
+
+switch = RegimeSwitch(EnergyAccount(100.0))
+switch.evaluate()                       # 'GROW' -- 5 agents may explore
+switch.feedback(success=False, critical=True)
+switch.feedback(success=False, critical=True)
+switch.evaluate()                       # 'EMERGENCY' -- interrupt long tasks
+```
+
+Two inputs, worst-wins. Budget alone would keep the system confident while it
+is failing, so the regime is a function of charge **and** recent error feedback:
+
+1. `charge < 30%` or `2 consecutive major failures` → `EMERGENCY`
+2. `charge > 70%` and `error rate <= 30%` → `GROW` (5 concurrent agents)
+3. otherwise → `CONSERVE` (1 agent, divergent thinking off)
+
+Pass a `penalty_ledger` and a third input joins, and it is the one that cannot
+be refilled:
+
+```python
+switch = RegimeSwitch(EnergyAccount(100.0), penalty_ledger=ledger)
+switch.evaluate()                 # 'GROW'
+ledger.record_violation("FALSE_COMPLETION")
+switch.evaluate()                 # 'EMERGENCY' -- at 100% charge
+switch.plan().reason              # 'penalty ledger is CRITICAL (fine 50.0, ...)'
+```
+
+`penalty CRITICAL → EMERGENCY` and `penalty WARNING → at best CONSERVE`. The
+direction is fixed: damage can **tighten** the regime and never loosen it. No
+amount of trust turns a spent account back into `GROW`, because the alternative
+— a system that trades accumulated trust for energy — is a way to argue with
+the audit.
+
+The plan is data, not branches: `RegimePlan` carries `max_concurrent_agents`,
+`allow_divergent_thinking`, `interrupt_long_tasks` and `allows_new_writes`, so
+what a regime permits is reviewable in one place. `allows_new_writes` exists so
+that "refuses to write" is structural rather than narration — `integration_demo`
+checks the directory afterwards and finds nothing there.
+
+**L3 cuts at 70% / 30%; L1 cuts at 30% / 10%.** That is not a contradiction.
+L1 asks whether *one call* may think slowly; L3 asks *how many* run at once. A
+cell with ample ATP for a reaction can still be too stressed to divide, so an
+account at 65% is legitimately `GROW` for L1 and `CONSERVE` for L3.
+
+**Three layers, one ledger, three different punishments.** The same `CRITICAL`
+state removes concurrency (L3), removes the slow beat (L2), and removes the
+new-write permission (L3 plan). They are not redundant: L3 stops the system from
+multiplying, L2 stops it from thinking expensively, and `allows_new_writes`
+stops it from leaving a mark. A system can be wrong in exactly one of those ways
+at a time, which is why the answer is granted per-permission rather than by one
+global "healthy" flag.
+
+## L4: hand over a key, not a payload
+
+```python
+from agent_metabolism import SubstrateChannel, AgentProxy
+
+channel = SubstrateChannel()
+key = producer.publish(diff_text, key="patch_1")   # 48 KB of diff
+body = producer.send_substrate(consumer, key)      # 'substrate:patch_1'
+len(body)                                          # 17 bytes on the wire
+consumer.receive_substrate(key) is diff_text       # the real object
+```
+
+The membrane (L7) carries the key; the channel carries the payload. Neither has
+to know the other's job, and the token cost of a handover stops depending on the
+size of what is handed over. In the demo: **48,035 bytes → 17 bytes (0.035%)**,
+and the transcript keeps only the reference.
+
+One hazard is stated rather than hidden: `get` returns the *live* object, so two
+agents holding a key hold the same list, and mutation is immediately visible to
+both. That is a shared substrate, not an isolated compartment — the distinction
+between L4 and L7. `get_snapshot()` deep-copies; `put(..., copy_data=True)`
+protects the sender. The default is the fast shared behaviour, because a channel
+that silently copied everything would reintroduce the cost it exists to remove.
+
+## L6: the day accumulates, the night consolidates
+
+```python
+from agent_metabolism import CircadianScheduler
+
+cycle = CircadianScheduler(manager, "long_term_memory.json")
+cycle.is_daytime()                # False at 02:00
+report = cycle.run_offline_mode()  # 3 compartments -> 3 fragments
+cycle.run_offline_mode()           # 0 created, 3 skipped: idempotent
+```
+
+Two boundaries, both easy to get wrong:
+
+- **L6 only reads.** It never mutates a compartment's `local_context`.
+  Consolidation that pruned its sources would delete the day's record on a
+  schedule, which is the opposite of what an audit trail is for.
+- **Idempotence is by construction.** A fragment's id is a digest of the exact
+  messages it summarises, so a second pass appends nothing. Content addressing
+  does the work a "have I already summarised this?" flag would otherwise do, and
+  it cannot fall out of sync because it *is* the content.
+
+Running it during the day raises rather than quietly doing the work: a
+consolidation pass that can fire at any moment is not a night cycle. The output
+is labelled `method: "structural-digest"` — it deduplicates, counts and ranks
+repeated terms; it does not understand the transcript and never claims to.
+
+## L7: the membrane is structural
+
+```python
+from agent_metabolism import CompartmentManager
+
+manager = CompartmentManager(anomaly_threshold=3)
+planner, coder = manager.create("planner"), manager.create("coder")
+
+planner.send_message("coder", "spec v1")
+coder.local_context        # () -- it arrived, it was not admitted
+coder.inbox_depth          # 1
+coder.receive()            # only the recipient can admit
+len(coder.local_context)   # 1
+```
+
+Three guarantees, all tested:
+
+1. `local_context` is a `tuple`. `other.local_context.append(...)` raises
+   `AttributeError` instead of quietly editing someone else's memory.
+2. The only cross-compartment path is `send_message`, which writes to the
+   **inbox**, never the context. Admission is the recipient's own call.
+3. Three consecutive anomalies lyse the compartment: memory discarded, routing
+   refused, neighbours untouched. A replacement can be created and the system
+   keeps running.
+
+Honest limitation: Python has no access control, and `_context` is reachable if
+someone insists on reaching for it. The boundary here is an immutable public
+view plus one private delivery path — real, and enforced by convention at the
+last millimetre rather than by the interpreter.
+
+## The penalty ledger: damage outranks supply
+
+Every other layer measures *supply* — charge left, agents allowed, context still
+readable. None of them measures *damage*. A system can sit at 100% charge with a
+clean error window and still have shipped three false completions, and L1, L2
+and L3 would all report health, because none of them is about what the system
+already broke.
+
+```python
+from agent_metabolism import EnergyAccount, PenaltyLedger, RegimeSwitch
+
+ledger = PenaltyLedger()
+switch = RegimeSwitch(EnergyAccount(100.0), penalty_ledger=ledger)
+switch.evaluate()                                  # 'GROW'
+
+ledger.record_violation("FALSE_COMPLETION")        # weight 5.0 -> fine 50.0
+ledger.trust_score                                 # 75.0
+switch.evaluate()                                  # 'EMERGENCY'
+switch.plan().allows_new_writes                    # False
+```
+
+Two numbers, because one number would have to answer the wrong question. The
+**fine** is the accumulated cost and it amortises; the **trust score** is how
+much benefit of the doubt remains, and only verified successes buy it back.
+
+The recovery is deliberately asymmetric: a fine decays 2% per clean pass while
+trust climbs a flat 2.0. One false completion (fine 50) therefore keeps the
+system out of `CRITICAL` for about twelve verified passes and out of `WARNING`
+for about sixty. A clean pass amortises the fine; it does not retract the
+verdict — which is the point, because a lie that five good afternoons can erase
+was never being priced at all.
+
+`demo.py` runs the loop with the charge held still, so nothing that moves can be
+blamed on the account:
+
+```
+                         charge  regime       agents  slow beat ledger
+  morning, clean           100%  GROW              5  yes       HEALTHY
+  after a slow task         90%  GROW              5  yes       HEALTHY
+  after the conviction      90%  EMERGENCY         1  NO        CRITICAL
+  after 12 clean passes     88%  CONSERVE          1  yes       WARNING
+  after 60 clean passes     88%  GROW              5  yes       HEALTHY
+```
+
+The charge falls by two points across the whole sequence. The regime falls from
+`GROW` to `EMERGENCY` and back, and the slow beat goes with it — because the
+ledger, not the account, decided.
+
+`integration_demo.py` runs the same idea against the real sidecar:
+
+```
+[5] penalty ledger  -- the failure now costs something
+  violation : FALSE_COMPLETION
+  weight    : 5.0  ->  fine 50.0 (base 10.0)
+
+                          trust          fine  state
+  before                  100.0           0.0  HEALTHY
+  after                    75.0          50.0  CRITICAL
+  信任受损，触发风险熔断
+
+[8] next morning  -- full account, no permission
+  energy account : 100%  (never touched by the failed write)
+  regime         : EMERGENCY
+  new writes     : REFUSED
+  morning write  : REFUSED
+  on disk        : False
+```
+
+That last line is the assertion, not the narration: `DaytimeWriter` consults
+`plan.allows_new_writes` before it opens a file, so the demo checks the
+directory afterwards and finds nothing.
+
+Honest limitation: the weights are policy, not measurement. Nothing here
+computes what a false completion actually costs; it records that one happened
+and charges a price the operator chose. That is the same trade as L1's energy
+figures, and the same caveat applies.
+
+## Design decisions
+
+Thirteen choices look like arbitrary constants until you know what they buy. Each one
+is pinned by a named test, so the behaviour cannot drift silently — but a test
+that goes red only says *what broke*, not *why it mattered*. This section is the
+why.
+
+**The thresholds are strict (`ratio < 0.30`), so exactly 30.0% is still `GROW`.**
+A task that lands precisely on the boundary keeps the expensive beat. Rounding
+conventions would hide that moment; an off-by-a-hair threshold would spend the
+demo's most instructive row. The boundary is a description of the charge, not a
+tolerance. (`test_exactly_thirty_percent_is_still_grow`)
+
+**When the slow beat is unaffordable, the scheduler degrades instead of
+overdrawing.** There is a gap the spec does not name: the account is still
+`GROW`, the task is genuinely complex, and the slow beat costs more than the
+charge holds. Borrowing would make the balance lie; raising would turn a budget
+constraint into an outage. Running fast and setting `degraded=True` keeps the
+system serving while making the compromise *visible afterwards* — the record
+says a richer account would have thought harder. That is resilience, not
+shortfall, and the flag is the distinction.
+(`test_degrades_rather_than_overdrawing`)
+
+**A withheld slow beat records *why*, not just that.** `degraded=True` now comes
+with `degraded_reason`, because the two causes want opposite fixes: a poor
+account needs a refill, a distrusted one needs cheap verified work. Collapsing
+them into one boolean is the same mistake as collapsing `EnergyExhausted` into
+`InsufficientEnergy`, and it would have the same cost — every caller parsing a
+message string to decide what to do. When both apply the refusal blames trust,
+because the charge is refillable and the trust is the part nobody can top up.
+(`test_the_reason_distinguishes_trust_from_poverty`)
+
+**`EnergyExhausted` and `InsufficientEnergy` are separate exceptions.** One is
+a policy floor ("below 10% I fund nothing, even with charge left"), the other is
+a pricing problem ("this costs more than I have"). Callers must react
+differently — refill versus run something cheaper — so collapsing them into one
+type would force every caller to parse a message string to decide. The type
+carries the decision. (`test_exhausted_and_insufficient_are_different_failures`)
+
+**L3's thresholds (70/30) differ from L1's (30/10) on purpose.** They regulate
+different quantities: how many agents may run versus whether one call may think
+slowly. Unifying them into one scale would be tidier and wrong — it would tie
+concurrency to per-call affordability, so a system with plenty of charge for one
+expensive call would also conclude it can afford five parallel explorations. The
+overlap is real and intended: at 25% both layers contract, one by refusing the
+slow beat and the other by refusing to expand.
+(`test_middling_budget_conserves_even_without_errors`)
+
+**A shared substrate is shared by reference, and that is the point.** L4 exists
+to avoid re-serialising a large payload into two context windows; a channel that
+deep-copied on every `get` would pay the cost it was built to remove. So the
+hazard is documented, the safe path is opt-in (`get_snapshot`), and the danger
+is pinned by a test rather than left as a comment:
+`test_get_returns_the_live_object_so_mutation_is_shared`. Note this is the exact
+opposite of L7's guarantee, which is why they are separate layers — a membrane
+isolates, a channel deliberately does not.
+
+**Consolidation is idempotent by content address, not by a flag.** A boolean
+"already summarised" marker drifts: it survives a file edit, or dies with the
+process. Deriving the fragment id from the digest of its source messages cannot
+drift, because the identity *is* the content. Running night mode five times
+appends exactly what running it once does.
+(`test_second_pass_appends_nothing`, `test_idempotence_survives_a_new_scheduler_instance`)
+
+**Night mode refuses to run during the day.** The alternative — running whenever
+called — turns a scheduled consolidation into a background thread that can
+capture a half-written transcript and call it knowledge. Raising makes the state
+transition explicit and keeps the output reproducible.
+(`test_consolidating_during_the_day_is_refused`)
+
+**The penalty boundaries belong to the *worse* side — the opposite of L1's.**
+Exactly 30% charge is still `GROW`, but a fine of exactly 40.0 is already
+`CRITICAL`. The asymmetry is not sloppiness in one of the two: charge is a
+resource being consumed, so standing on the line is not yet a problem, while
+damage is a fact being recorded, so standing on the line is already the damage.
+Rounding a *damage* threshold in the system's own favour is how a ledger stops
+being a ledger. (`test_the_boundary_belongs_to_the_worse_side`)
+
+**The penalty can tighten the regime and never loosen it.** A `CRITICAL` ledger
+forces `EMERGENCY` at 100% charge; a `WARNING` one demotes `GROW` to `CONSERVE`;
+but no amount of trust turns a spent account back into `GROW`. The rule is
+one-directional because the alternative — a system that can trade accumulated
+trust for energy — is a way to argue with the audit, and an audit you can argue
+with is a suggestion. (`test_penalty_only_tightens_never_loosens`,
+`test_a_penalty_cannot_upgrade_an_emergency`)
+
+**An unknown violation type must state its own weight.** Known types carry a
+default severity, but `record_violation("SOMETHING_NEW")` raises rather than
+charging a guessed price. Guessing is how a novel failure gets under-reported,
+and the first occurrence of a new failure mode is exactly when the price matters
+most. (`test_an_unknown_type_must_state_its_severity`)
+
+**The slow beat is withheld for `CRITICAL` but not for `WARNING`.** A caution
+and a ban should not be the same thing, or `WARNING` becomes `CRITICAL` with a
+nicer name and the middle tier stops meaning anything. At `WARNING` L3 already
+refuses expansion; taking the slow beat away as well would make the two
+thresholds indistinguishable in practice while keeping them distinct in the
+code. (`test_warning_is_not_enough_to_take_the_beat_away`)
+
+**Withholding the slow beat makes recovery harder, and that is intended.** A
+distrusted system now does its *worst* work at the exact moment it most needs to
+prove itself — a genuine trap, not an oversight. It is the point: trust is
+earned by cheap, checkable work, not by an expensive essay nobody can verify.
+The consequence is worth stating because it makes the weights load-bearing: a
+severity that keeps the system `CRITICAL` for a hundred passes is also a
+decision to keep it shallow for a hundred passes.
+(`test_critical_ledger_forbids_the_slow_beat_despite_full_energy`)
+
+## On the numbers
+
+The energy figures are policy, not measurement, `quality` is a fixed constant
+per beat, and the "48 KB → 17 bytes" figure is a byte count rather than a claim
+about your tokenizer's arithmetic. Nothing here calls a model, measures a joule,
+or times a token. The penalty weights are the same kind of number: a policy
+price, not a measured cost of a shipped lie.
+
+What is real is the *structure*: a budget that can refuse, a beat selection that
+must consult it, a concurrency limit that answers to failures, a ledger whose
+arithmetic decides which capabilities come back and when, a handover whose cost
+does not scale with the payload, and a consolidation pass that cannot duplicate
+itself. The constants are where a real system would put its own measurements.
+
+## Tests
+
+```
+Ran 164 tests in ~0.05s
+OK
+```
+
+Organised by invariant rather than by module, because the interesting cases span
+layers: a poor account cannot buy the slow beat (L1→L2), a handover crosses the
+membrane as a key while the payload stays in the channel (L4+L7), a night pass
+reads its sources without clearing them (L6+L7), a lysis cannot disturb the
+neighbours (L7), and a false completion stops a system that still has 100%
+charge — no concurrency (penalty→L3) and no slow beat (penalty→L2) at once. Two
+tests check the zero-dependency claim itself: one parses every import with `ast`
+against `sys.stdlib_module_names`, the other asserts `dependencies = []` in the
+metadata.
