@@ -21,6 +21,13 @@ recomputation -- not by a comparison this class performs and could be persuaded
 to skip. Every grant, denial and verdict goes through the membrane, so the log
 has one author.
 
+**A refusal is not a failure.** A request stopped before it ran says the defence
+worked; it says nothing about the work. Those are opposite signals, so they get
+opposite records: a pre-execution refusal is a ``deny`` entry that never enters
+the damage count, while an effect that landed without a warrant is a ``FAIL``.
+Collapsing the two made a system under attack inflame itself through its own
+successful blocks -- see :meth:`MembraneAgent._deny`.
+
 **A note on ordering that cannot be avoided.** The tool must run before its
 output can be hashed; that is physics, not policy. What the design guarantees is
 that the *expectation* precedes the act. The gap between them -- the tool runs
@@ -274,6 +281,9 @@ class MembraneAgent:
                 tool_name,
                 getattr(problem, "reason", "WARRANT_REFUSED"),
                 "the membrane refused the warrant: {}".format(problem),
+                # The tool already ran and the artefact already changed. A gate
+                # that closed afterwards is a breach, not an interception.
+                executed=True,
             )
 
         redeemer = getattr(self._membrane, "redeem", None)
@@ -285,6 +295,7 @@ class MembraneAgent:
                     tool_name,
                     getattr(problem, "reason", "WARRANT_REFUSED"),
                     "the membrane refused to redeem the warrant: {}".format(problem),
+                    executed=True,
                 )
 
         self._record(
@@ -298,13 +309,71 @@ class MembraneAgent:
 
     # -- helpers ----------------------------------------------------------
 
-    def _deny(self, tool_name: str, reason: str, message: str):
-        """Record the refusal, then raise. Never returns."""
+    def _deny(self, tool_name: str, reason: str, message: str, *, executed: bool = False):
+        """Record the refusal, then raise. Never returns.
+
+        ``executed`` is the load-bearing argument, and it is not cosmetic.
+
+        A refusal that happens *before* the tool runs is a success of the
+        defence. Recording it as ``FAIL`` -- which this method used to do for
+        every refusal -- made "the agent was stopped" and "the agent produced the
+        wrong thing" the same event. The immune layer advances on verdicts, so a
+        blocked request inflated the danger counter, and a system under attack
+        became *inflamed by its own successful defence*: exactly backwards, and
+        worst at the moment it was working best.
+
+        So the two cases are split:
+
+        * ``executed=False`` -> a denial record (``record_type="deny"``). It is
+          kept in the trail, because "I refused" is evidence, but it is not a
+          verdict about the work and does not enter the damage count.
+        * ``executed=True`` -> a ``FAIL``. The effect landed without a warrant,
+          which is real damage: the tool wrote, and nobody sanctioned it.
+        """
         self._denials += 1
-        self._record(tool_name, "FAIL", expected=None, reason="{}: {}".format(reason, message))
+        if executed:
+            self._record(
+                tool_name,
+                "FAIL",
+                expected=None,
+                reason="{}: {}".format(reason, message),
+            )
+        else:
+            self._record_denial(tool_name, reason, message)
         if reason == "NO_EXPECTED_HASH":
             raise MissingPromiseError(reason, message)
         raise AgentWarrantError(reason, message)
+
+    def _record_denial(self, tool_name: str, reason: str, message: str) -> None:
+        """Log a pre-execution refusal without entering the damage count."""
+        payload: Dict[str, Any] = {
+            "agent": self._name,
+            "capability": self._capability,
+            "detail": message,
+        }
+        recorder = getattr(self._membrane, "append_denial", None)
+        if callable(recorder):
+            try:
+                recorder(tool_name, reason, **payload)
+                return
+            except TypeError:
+                # A membrane with the narrower signature still satisfies the
+                # contract; fall through to the compatible path below.
+                pass
+            except Exception:  # pragma: no cover - a broken log must not mask it
+                return
+
+        # Fallback for membranes that only expose ``append_call``. The verdict
+        # is "NOT RUN" rather than "INVALID" or "FAIL" on purpose: nothing was
+        # executed, so no witness could have been wrong, and a reader that
+        # counts verdicts will ignore NOT RUN instead of billing it as damage.
+        payload["outcome"] = "DENIED"
+        try:
+            self._membrane.append_call(tool_name, "NOT RUN", **payload)
+        except TypeError:
+            self._membrane.append_call(tool_name, "NOT RUN", extra=payload)
+        except Exception:  # pragma: no cover - a broken log must not mask the refusal
+            pass
 
     def _record(self, tool_name: str, verdict: str, *, expected, reason=None, **extra):
         """All logging goes through the membrane, so the log has one author."""

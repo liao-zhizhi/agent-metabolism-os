@@ -34,7 +34,14 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from .energy import EXHAUSTED, EnergyError, EnergyExhausted
-from .scheduler import FAST, SLOW, DualBeatScheduler, LLMResponse
+from .scheduler import (
+    FAST,
+    SLOW,
+    TIER_INNATE,
+    TIERS,
+    DualBeatScheduler,
+    LLMResponse,
+)
 
 __all__ = [
     "LLMProxy",
@@ -84,6 +91,10 @@ class ProxyResult:
     degraded: bool
     degraded_reason: Optional[str]
     quality: float
+    #: Witness class this call was billed at, and the part of ``energy_cost``
+    #: spent on verification rather than on the answer.
+    tier: str = TIER_INNATE
+    tier_surcharge: float = 0.0
     record: Optional[Dict[str, Any]] = None
 
     @property
@@ -173,15 +184,34 @@ class LLMProxy:
 
     # -- the call ---------------------------------------------------------
 
-    def generate(self, prompt: str, complexity_score: float) -> ProxyResult:
+    def generate(
+        self,
+        prompt: str,
+        complexity_score: float,
+        *,
+        tier: str = TIER_INNATE,
+    ) -> ProxyResult:
         """Pay for one model call, run it on the chosen beat, and record it.
 
+        Args:
+            tier: witness class for this call. Passed straight through to the
+                scheduler, which charges the adaptive surcharge, so escalation
+                is paid for out of the same account that funds the thinking.
+                Defaults to the cheap tier: a proxy that escalated by default
+                would make the *safe* path the expensive one, and operators
+                turn those off.
+
         Raises:
+            ValueError: ``tier`` is not one of ``TIERS``.
             EnergyExhausted: the account cannot fund even the fast beat, or it
                 is already at the exhausted floor. The model is never reached.
             LedgerLockedError: the call ran and its record could not be written;
                 the result is carried on the exception.
         """
+        if tier not in TIERS:
+            raise ValueError(
+                "tier must be one of {}, got {!r}".format(TIERS, tier)
+            )
         # Pre-flight, deliberately duplicated from the scheduler. The scheduler
         # raises on EXHAUSTED anyway, but the message here can name the *gate*
         # that refused, which is what an operator needs at 3am. A duplicate
@@ -195,7 +225,9 @@ class LLMProxy:
                 )
             )
 
-        response: LLMResponse = self._scheduler.execute(prompt, complexity_score)
+        response: LLMResponse = self._scheduler.execute(
+            prompt, complexity_score, tier=tier
+        )
         self._calls += 1
 
         record = None
@@ -214,6 +246,8 @@ class LLMProxy:
                     "degraded": response.degraded,
                     "degraded_reason": response.degraded_reason,
                     "account_state": response.state_after,
+                    "tier": response.tier,
+                    "tier_surcharge": response.tier_surcharge,
                 }
             )
         else:
@@ -231,6 +265,8 @@ class LLMProxy:
             degraded=response.degraded,
             degraded_reason=response.degraded_reason,
             quality=response.quality,
+            tier=response.tier,
+            tier_surcharge=response.tier_surcharge,
             record=record,
         )
 

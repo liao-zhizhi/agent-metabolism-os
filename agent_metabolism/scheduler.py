@@ -39,6 +39,7 @@ from .penalty import CRITICAL as PENALTY_CRITICAL
 from .penalty import PenaltyLedger
 
 __all__ = [
+    "ADAPTIVE_SURCHARGE",
     "DEGRADED_ENERGY",
     "DEGRADED_TRUST",
     "FAST",
@@ -49,6 +50,9 @@ __all__ = [
     "SLOW_ENERGY_MULTIPLIER",
     "SLOW_LATENCY_MULTIPLIER",
     "SLOW_QUALITY",
+    "TIER_ADAPTIVE",
+    "TIER_INNATE",
+    "TIERS",
     "DualBeatScheduler",
 ]
 
@@ -57,6 +61,25 @@ SLOW = "slow"
 
 OXPHOS = "OXPHOS"
 SLP = "SLP"
+
+#: Witness class for a call. Two tiers, because a cheap existence check and a
+#: full change-set diff do not cost the same, and a scheduler that billed them
+#: identically would make escalation free -- which is to say, would make it a
+#: policy nobody has to budget for.
+#:
+#: The strings match ``audit_sidecar.immune_state.TIER_INNATE`` /
+#: ``TIER_ADAPTIVE`` by *contract*, not by import: this package keeps
+#: ``dependencies = []`` and never imports the auditor. The agreement is pinned
+#: by a test rather than assumed, because two modules independently deciding that
+#: "tier2" means the expensive one is exactly the kind of coincidence that
+#: silently stops holding.
+TIER_INNATE = "tier1"
+TIER_ADAPTIVE = "tier2"
+TIERS = (TIER_INNATE, TIER_ADAPTIVE)
+
+#: Extra charge for the adaptive check: a ``git diff`` plus a content read.
+#: Policies, not measurements -- the same caveat as ``DEFAULT_BASE_COST``.
+ADAPTIVE_SURCHARGE = 10.0
 
 # Why a task that wanted the slow beat ran fast. Two distinct causes, kept
 # distinct for the same reason EnergyExhausted and InsufficientEnergy are
@@ -94,6 +117,12 @@ class LLMResponse:
     quality: float     # simulated
     text: str
     degraded_reason: Optional[str] = None   # DEGRADED_ENERGY / DEGRADED_TRUST
+    #: Witness class this call was billed at, and the part of ``energy_cost``
+    #: that bought the adaptive check rather than the answer. Reported
+    #: separately so "what did the escalation cost" is answerable from the
+    #: record instead of inferred by subtracting two numbers.
+    tier: str = TIER_INNATE
+    tier_surcharge: float = 0.0
 
     @property
     def thinking_seconds(self) -> float:
@@ -176,6 +205,21 @@ class DualBeatScheduler:
         """The ledger's verdict, or ``None`` when no ledger is attached."""
         return None if self._penalty is None else self._penalty.get_state()
 
+    def surcharge_for(self, tier: str) -> float:
+        """Extra charge a witness class costs on top of the beat.
+
+        Raises:
+            ValueError: ``tier`` is not one of :data:`TIERS`. An unknown tier is
+                rejected rather than billed as cheap: a typo must not be able to
+                buy the expensive check for free, and it must not silently skip
+                a charge the caller believes it is paying.
+        """
+        if tier not in TIERS:
+            raise ValueError(
+                "tier must be one of {}, got {!r}".format(TIERS, tier)
+            )
+        return ADAPTIVE_SURCHARGE if tier == TIER_ADAPTIVE else 0.0
+
     @property
     def slow_thinking_allowed(self) -> bool:
         """False once trust is bankrupt, whatever the charge says.
@@ -189,13 +233,27 @@ class DualBeatScheduler:
 
     # -- execution --------------------------------------------------------
 
-    def execute(self, prompt: str, complexity_score: float) -> LLMResponse:
+    def execute(
+        self,
+        prompt: str,
+        complexity_score: float,
+        *,
+        tier: str = TIER_INNATE,
+    ) -> LLMResponse:
         """Run one task, choosing the beat and paying for it.
 
+        Args:
+            tier: the witness class the caller needs. ``TIER_ADAPTIVE`` adds
+                :data:`ADAPTIVE_SURCHARGE` on top of whichever beat runs,
+                because the cost of proving what happened is part of what the
+                call costs -- not a bookkeeping detail kept outside the account
+                that is supposed to be enforcing scarcity.
+
         Raises:
-            ValueError: empty prompt, or complexity outside ``[0, 1]``.
-            EnergyExhausted: the account is below the floor, or even the fast
-                beat cannot be paid for.
+            ValueError: empty prompt, complexity outside ``[0, 1]``, or an
+                unknown tier.
+            EnergyExhausted: the account is below the floor, or the chosen beat
+                plus its surcharge cannot be paid for.
         """
         if not isinstance(prompt, str):
             raise TypeError("prompt must be a str, got {!r}".format(type(prompt).__name__))
@@ -206,6 +264,7 @@ class DualBeatScheduler:
             raise ValueError(
                 "complexity_score must lie in [0, 1], got {!r}".format(complexity_score)
             )
+        surcharge = self.surcharge_for(tier)
 
         state = self._account.state
         if state == EXHAUSTED:
@@ -217,6 +276,8 @@ class DualBeatScheduler:
             )
 
         before = self._account.current_energy
+        slow_price = self.slow_cost + surcharge
+        fast_price = self.fast_cost + surcharge
         wants_slow = complexity > self._slow_threshold and state == GROW
         # Why the slow beat is unavailable, if it is. Checked before the
         # account so that a system which is both poor and distrusted is told
@@ -226,14 +287,14 @@ class DualBeatScheduler:
         if wants_slow:
             if not self.slow_thinking_allowed:
                 blocked_by = DEGRADED_TRUST
-            elif not self._account.can_afford(self.slow_cost):
+            elif not self._account.can_afford(slow_price):
                 blocked_by = DEGRADED_ENERGY
 
         degraded = False
         degraded_reason = None
         if wants_slow and blocked_by is None:
             mode = SLOW
-            cost = self.slow_cost
+            cost = slow_price
             self._account.consume(cost)
         else:
             # Three ways to arrive here, and they mean different things:
@@ -246,12 +307,15 @@ class DualBeatScheduler:
             #                           it. Also recorded, and also not a debt.
             degraded = wants_slow
             degraded_reason = blocked_by
-            cost = self.fast_cost
+            cost = fast_price
             if not self._account.can_afford(cost):
                 raise EnergyExhausted(
-                    "cannot fund even the fast beat: {:.2f} needed, {:.2f} "
+                    "cannot fund even the fast beat{}: {:.2f} needed, {:.2f} "
                     "remains ({:.1f}% of budget)".format(
-                        cost, self._account.current_energy, self._account.ratio * 100.0
+                        " plus the adaptive check" if surcharge else "",
+                        cost,
+                        self._account.current_energy,
+                        self._account.ratio * 100.0,
                     )
                 )
             mode = FAST
@@ -273,6 +337,8 @@ class DualBeatScheduler:
             quality=SLOW_QUALITY if mode == SLOW else FAST_QUALITY,
             text=self._text(prompt, mode, tokens),
             degraded_reason=degraded_reason,
+            tier=tier,
+            tier_surcharge=surcharge,
         )
 
     # -- modelling --------------------------------------------------------

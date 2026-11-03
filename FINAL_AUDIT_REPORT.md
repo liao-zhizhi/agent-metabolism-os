@@ -2,7 +2,7 @@
 
 ```
   audit     : sidecar (immune system) vs metabolism (the audited system)
-  started   : 2026-11-02T17:31:08+08:00
+  started   : 2026-11-03T13:19:55+08:00
   result    : PASS  -- the loop closed at every link
   report    : FINAL_AUDIT_REPORT.md
 ```
@@ -15,11 +15,11 @@
 
 | project | suite | tests | wall clock | result |
 |:--|:--|--:|--:|:--|
-| `harness-audit-sidecar` | `tests/` (8 files) | 224 | 6.92s | OK |
-| `agent-metabolism-os` | `tests/` (3 files) | 164 | 0.14s | OK |
-| **total** | | **388** | | **388/388 green** |
+| `harness-audit-sidecar` | `tests/` (8 files) | 445 | 9.31s | OK |
+| `agent-metabolism-os` | `tests/` (3 files) | 249 | 0.25s | OK |
+| **total** | | **694** | | **694/694 green** |
 
-Both suites match the brief exactly (224 + 164 = 388).
+Both suites match the brief exactly (445 + 249 = 694).
 
 ## 2. Dependency audit
 
@@ -88,6 +88,7 @@ telling the agent it was caught would let it route around the audit.
   "effect_observed": false,
   "exit_code": 1,
   "id": 1,
+  "immune_state": "NORMAL",
   "intent": "modify file memories/long_term_memory.json",
   "missing_expected": [
     "memories/long_term_memory.json"
@@ -103,9 +104,12 @@ telling the agent it was caught would let it route around the audit.
   "rules_violated": [
     "no_file_drift"
   ],
+  "tier": "tier2",
   "tool": "write_file",
   "unexpected_changes": [],
-  "verdict": "FAIL"
+  "verdict": "FAIL",
+  "witness_mtime": null,
+  "witness_scope": "full"
 }
 ```
 
@@ -262,7 +266,7 @@ returned everything at once would make the two thresholds one threshold.
 ---
 
 ```
-  audited : agent-metabolism-os (164 tests, zero dependencies)
-  auditor : harness-audit-sidecar (224 tests, PyYAML for rule policy)
+  audited : agent-metabolism-os (249 tests, zero dependencies)
+  auditor : harness-audit-sidecar (445 tests, PyYAML for rule policy)
   trace   : 13 record(s), durable, fsynced per call
 ```

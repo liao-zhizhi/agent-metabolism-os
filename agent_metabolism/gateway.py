@@ -235,6 +235,8 @@ class MetabolicGateway:
         energy = self._energy()
         regime = self._regime(energy) if energy["measured"] else {"current": None}
         current = regime.get("current")
+        penalty = self._penalty()
+        brake = self._brake()
         return {
             "L1_Energy": {
                 "current": energy["current"],
@@ -248,6 +250,14 @@ class MetabolicGateway:
                 "measured": regime.get("measured", energy["measured"]),
             },
             "heavy_work_allowed": current == GROW,
+            # L3's write gate, reported as a decision rather than left for the
+            # caller to re-derive from two vocabularies. It is the same rule the
+            # membrane enforces -- a CRITICAL ledger or a tripped brake closes
+            # writes -- stated once here so a router and the gate cannot drift.
+            "writes_allowed": not (
+                penalty.get("penalty_state") == "CRITICAL"
+                or brake.get("tripped") is True
+            ),
         }
 
     # -- per-law readers ---------------------------------------------------
@@ -426,13 +436,16 @@ class MetabolicGateway:
         if self._scheduler is None:
             return {
                 "measured": False,
-                "state": None,
+                "penalty_state": None,
                 "reason": "no penalty ledger attached",
             }
         state = self._scheduler.penalty_state
         return {
             "measured": state is not None,
-            "state": state,
+            # Named ``penalty_state``, not ``state``: L5's key is the immune
+            # state, and one shared name for two vocabularies is how a CRITICAL
+            # ledger got read as a calm brake.
+            "penalty_state": state,
             "reason": "measured" if state is not None else "no penalty ledger attached",
         }
 

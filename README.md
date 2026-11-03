@@ -147,6 +147,22 @@ is why they live outside the regulator rather than inside it.
 The two halves agree on one rule: **a quantity that cannot be witnessed is
 reported as unmeasured, not estimated.**
 
+### A refusal is not a failure
+
+`MembraneAgent._deny` distinguishes *when* a request was stopped, because the two
+cases are opposite evidence:
+
+| When | Record | Counts as damage? |
+|---|---|---|
+| Stopped before the tool ran | `record_type="deny"`, `outcome="DENIED"`, no verdict | **No** — the gate held |
+| Effect landed, no warrant | `FAIL` verdict | **Yes** — unsanctioned write |
+
+Recording both as `FAIL` made a system inflame itself through its own successful
+blocks: two attacks and it was in inflammation, one whole scenario before any
+real false completion. The denial stays in the hash chain, so "I refused" is
+still provable — it simply is not a verdict about work, because none was
+witnessed.
+
 ## Cross-Audit Evidence
 
 The two claims in that introduction — *it cannot overspend* and *it cannot be
@@ -161,6 +177,15 @@ every figure read back out of a live object after the run.
 
 ```bash
 python3 final_audit.py    # ~8s, writes the report; exits 2 if any link breaks
+```
+
+**→ [`FINAL_ECOSYSTEM_AUDIT.md`](FINAL_ECOSYSTEM_AUDIT.md)** — the adversarial
+run: five ways an agent tries to cheat, each checked against a control. Its first
+execution found four defects, three of which are now repaired and re-verified
+there (`F2` remains open by choice — see the report).
+
+```bash
+python3 final_ecosystem_audit.py    # writes FINAL_ECOSYSTEM_AUDIT.md, exits 0
 ```
 
 A false completion is injected, the auditor returns `FAIL / no_file_drift`, the
@@ -210,7 +235,7 @@ Plus one component that is not a layer, because it measures a different axis:
 ## Run it
 
 ```bash
-python3 -m unittest discover -s tests -p 'test_*.py'   # 229 tests, ~0.1s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 249 tests, ~0.1s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 ```
@@ -286,6 +311,29 @@ caller has to re-derive from context.
 `latency_ms` is modelled, never slept. That keeps the tests at ~10 ms and
 deterministic, and it is why the demo can afford to be honest about the numbers
 being a model rather than a measurement.
+
+### What the witness tier costs
+
+The beat is only half of what a call costs. Proving what happened -- a `git diff`
+plus a content read, rather than a `stat` -- costs work too, and a scheduler that
+billed both tiers the same would make escalation free, which is to say it would
+make escalation a policy nobody has to budget for.
+
+```python
+scheduler.execute("rename a variable", 0.2, tier=TIER_INNATE)    # 7.0
+scheduler.execute("rename a variable", 0.2, tier=TIER_ADAPTIVE)  # 17.0
+```
+
+`ADAPTIVE_SURCHARGE` is added on top of whichever beat runs, is affordability
+checked like any other charge, and can therefore refuse a call outright: at 13%
+charge a tier-2 call raises `EnergyExhausted` and charges nothing. Unknown tiers
+are rejected rather than treated as cheap, and the default is the **cheap** tier
+-- a proxy that escalated by default would make the safe path the expensive one.
+
+The two packages cannot import each other (`dependencies = []`), so the tier
+vocabulary matches by contract, and a test pins that agreement. Two modules
+independently deciding that `"tier2"` means the expensive one is a coincidence
+until something asserts it.
 
 ## L3: how much of the organism runs
 
@@ -453,6 +501,26 @@ system out of `CRITICAL` for about twelve verified passes and out of `WARNING`
 for about sixty. A clean pass amortises the fine; it does not retract the
 verdict — which is the point, because a lie that five good afternoons can erase
 was never being priced at all.
+
+### Where the ledger actually bites
+
+`allows_new_writes` is only worth having if something acts on it. It did not:
+`evaluate_regime` computed `EMERGENCY` at 10% charge with a `CRITICAL` ledger and
+every write went through, because the regime was a *report* and the membrane only
+read the immune brake. That is now wired:
+
+```python
+gateway = MembraneGateway(ledger, immune_state=immune, penalty_ledger=penalty)
+gateway.request_action_warrant(witness, "write")
+# MembraneRejectError: PENALTY_CRITICAL
+```
+
+The two inputs stay separate because they answer different questions with
+different lifetimes — inflammation heals after enough passes, damage does not —
+and the gate reports which one refused. `State` on this ledger is named
+`penalty_state` precisely so that a duck-typed gate cannot read `CRITICAL` as if
+it were `INFLAMED`: the two vocabularies share no word, and wiring one into the
+other's slot raises `TypeError` instead of returning a calm answer.
 
 `demo.py` runs the loop with the charge held still, so nothing that moves can be
 blamed on the account:
@@ -624,7 +692,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 229 tests in ~0.1s
+Ran 249 tests in ~0.1s
 OK
 ```
 

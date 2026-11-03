@@ -488,8 +488,16 @@ class TestMembraneAgentAgainstTheRealMembrane(unittest.TestCase):
             agent.execute_tool_with_warrant("write_file", {"path": target, "body": "x\n"}, None)
         self.assertEqual(ran, [])
         self.assertEqual(gateway.verify()["status"], "PASS")
-        denials = [e for e in gateway.ledger.entries() if e.get("verdict") == "FAIL"]
-        self.assertEqual(len(denials), 1)
+        # The refusal is recorded, but as a deny -- not as a FAIL verdict. A
+        # blocked request is the defence working; scoring it as damage made the
+        # system inflame itself through its own successful blocks.
+        denies = [e for e in gateway.ledger.entries() if e.get("record_type") == "deny"]
+        self.assertEqual(len(denies), 1)
+        self.assertEqual(denies[0]["outcome"], "DENIED")
+        self.assertEqual(denies[0]["reason"], "NO_EXPECTED_HASH")
+        self.assertNotIn("verdict", denies[0])
+        failed = [e for e in gateway.ledger.entries() if e.get("verdict") == "FAIL"]
+        self.assertEqual(failed, [], "a refusal is not a failure verdict")
 
     def test_promise_kept_lands_a_pass_in_the_chain(self):
         gateway, agent, _ = self.make_agent()
@@ -546,8 +554,12 @@ class TestUnifiedGateway(unittest.TestCase):
 
     def test_routing_view_reports_charge_and_headroom_only(self):
         view = MetabolicGateway(scheduler=self.scheduler).routing_view()
-        self.assertEqual(set(view), {"L1_Energy", "L3_Regime", "heavy_work_allowed"})
+        self.assertEqual(
+            set(view),
+            {"L1_Energy", "L3_Regime", "heavy_work_allowed", "writes_allowed"},
+        )
         self.assertTrue(view["heavy_work_allowed"])
+        self.assertTrue(view["writes_allowed"])
         self.assertEqual(view["L3_Regime"]["current"], GROW)
 
     def test_heavy_work_is_disallowed_once_the_charge_falls(self):

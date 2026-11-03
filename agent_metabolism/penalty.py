@@ -206,7 +206,16 @@ class PenaltyLedger:
         return self._trust
 
     @property
-    def state(self) -> str:
+    def penalty_state(self) -> str:
+        """``HEALTHY`` / ``WARNING`` / ``CRITICAL``.
+
+        Deliberately *not* called ``state``. Two safety layers read a ``state``
+        string and compare it to a different vocabulary -- this ledger says
+        ``CRITICAL``, the immune sidecar says ``INFLAMED`` -- so an attribute
+        named ``state`` on both made a duck-typed brake accept a penalty ledger
+        and read "not INFLAMED" from a ledger at its worst. A distinct name
+        makes the mix-up a loud ``AttributeError`` instead of a quiet "healthy".
+        """
         return self.get_state()
 
     @property
@@ -338,14 +347,14 @@ class PenaltyLedger:
         return {
             "total_penalty": self._penalty,
             "trust_score": self._trust,
-            "state": self.get_state(),
+            "penalty_state": self.get_state(),
             "violations": len(self._violations),
             "successes": self._successes,
             "penalty_base": self._base,
         }
 
     def __repr__(self) -> str:
-        return "PenaltyLedger(penalty={:.2f}, trust={:.1f}, state={})".format(
+        return "PenaltyLedger(penalty={:.2f}, trust={:.1f}, penalty_state={})".format(
             self._penalty, self._trust, self.get_state()
         )
 

@@ -86,8 +86,12 @@ RULE_ID = "no_file_drift"
 
 # What the brief asked for. Compared against what is measured; a mismatch is
 # reported as a discrepancy rather than quietly rounded to the requested figure.
-CLAIMED_SIDECAR_TESTS = 224
-CLAIMED_METABOLISM_TESTS = 164
+# Updated whenever the suites grow, so a stale constant here does not manufacture
+# a permanent "discrepancy" that readers learn to ignore -- which is the failure
+# mode of a check nobody believes.
+CLAIMED_SIDECAR_TESTS = 445
+CLAIMED_METABOLISM_TESTS = 249
+CLAIMED_TOTAL_TESTS = CLAIMED_SIDECAR_TESTS + CLAIMED_METABOLISM_TESTS
 
 RECOVERY_PASSES = 12
 WIDTH = 78
@@ -789,12 +793,16 @@ def render_report(
         metabolism_suite["count"], metabolism_suite["seconds"],
         "OK" if metabolism_suite["ok"] else "FAILED"))
     add("| **total** | | **{}** | | **{}** |".format(
-        total_tests, "388/388 green" if total_tests == 388 else "see note"))
+        total_tests,
+        "{}/{} green".format(total_tests, CLAIMED_TOTAL_TESTS)
+        if total_tests == CLAIMED_TOTAL_TESTS else "see note"))
     add("")
     if sidecar_delta == 0 and metabolism_delta == 0:
-        add("Both suites match the brief exactly (224 + 164 = 388).")
+        add("Both suites match the brief exactly ({} + {} = {}).".format(
+            CLAIMED_SIDECAR_TESTS, CLAIMED_METABOLISM_TESTS, CLAIMED_TOTAL_TESTS))
     else:
-        add("**Discrepancy against the brief:** expected 224 + 164 = 388, measured")
+        add("**Discrepancy against the brief:** expected {} + {} = {}, measured".format(
+            CLAIMED_SIDECAR_TESTS, CLAIMED_METABOLISM_TESTS, CLAIMED_TOTAL_TESTS))
         add("{} + {} = {}. The measured figures are used throughout.".format(
             sidecar_suite["count"], metabolism_suite["count"], total_tests))
     add("")

@@ -90,19 +90,24 @@ from .regime import (
     evaluate_regime,
 )
 from .scheduler import (
+    ADAPTIVE_SURCHARGE,
     DEGRADED_ENERGY,
     DEGRADED_TRUST,
     FAST,
     OXPHOS,
     SLOW,
     SLP,
+    TIER_ADAPTIVE,
+    TIER_INNATE,
+    TIERS,
     DualBeatScheduler,
     LLMResponse,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 __all__ = [
+    "ADAPTIVE_SURCHARGE",
     "ALIVE",
     "AgentWarrantError",
     "ArtefactMismatchError",
@@ -163,6 +168,9 @@ __all__ = [
     "SubstrateChannel",
     "SubstrateEntry",
     "SubstrateKeyError",
+    "TIER_ADAPTIVE",
+    "TIER_INNATE",
+    "TIERS",
     "ToolOutcome",
     "UnknownCompartment",
     "UnknownViolationType",

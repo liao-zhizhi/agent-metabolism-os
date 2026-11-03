@@ -139,7 +139,11 @@ class TestPenaltyLedger(unittest.TestCase):
         ledger = PenaltyLedger()
         ledger.record_violation("FALSE_COMPLETION")
         snap = ledger.snapshot()
-        self.assertEqual(snap["state"], CRITICAL)
+        # ``penalty_state``, not ``state``: the immune sidecar's ``state`` is a
+        # different vocabulary, and a shared key name let a CRITICAL ledger be
+        # read as a calm brake.
+        self.assertEqual(snap["penalty_state"], CRITICAL)
+        self.assertNotIn("state", snap)
         snap["total_penalty"] = 0.0
         self.assertEqual(ledger.total_penalty, 50.0)
 
@@ -314,7 +318,7 @@ class TestRegimePenaltyIntegration(unittest.TestCase):
         self.ledger.record_violation("FALSE_COMPLETION")
         snap = self.switch.snapshot()
         self.assertEqual(snap["regime"], EMERGENCY)
-        self.assertEqual(snap["penalty"]["state"], CRITICAL)
+        self.assertEqual(snap["penalty"]["penalty_state"], CRITICAL)
         self.assertEqual(snap["allows_new_writes"], False)
 
     def test_transition_is_detected_when_the_ledger_collapses(self):
