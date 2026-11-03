@@ -49,6 +49,21 @@ from .compartment import (
     Message,
     UnknownCompartment,
 )
+from .double_entry import (
+    # The canonical verdict values, exported once. `lean_auditor` repeats the
+    # same three strings under LEAN_* names because that module also carries a
+    # severity table; both spellings must stay identical to the lattice.
+    FAIL,
+    INVALID,
+    PASS,
+    AgentLocked,
+    DoubleEntryError,
+    DoubleEntryLedger,
+    Receipt,
+    Transaction,
+    digest_file,
+    verdict_for,
+)
 from .energy import (
     CONSERVE,
     EXHAUSTED,
@@ -124,10 +139,14 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 __all__ = [
     "ADAPTIVE_SURCHARGE",
+    "FAIL",
+    "INVALID",
+    "PASS",
+    "AgentLocked",
     "ALIVE",
     "COMPILER",
     "CUSTOM_AXIOM",
@@ -165,6 +184,8 @@ __all__ = [
     "CompartmentManager",
     "ConsolidationReport",
     "CompileReport",
+    "DoubleEntryError",
+    "DoubleEntryLedger",
     "DualBeatScheduler",
     "EnergyAccount",
     "EnergyError",
@@ -198,6 +219,7 @@ __all__ = [
     "PenaltyError",
     "PenaltyLedger",
     "ProxyResult",
+    "Receipt",
     "RegimeError",
     "RegimePlan",
     "RegimeSwitch",
@@ -208,12 +230,15 @@ __all__ = [
     "TIER_INNATE",
     "TIERS",
     "ToolOutcome",
+    "Transaction",
     "UnavailableCompiler",
     "UnknownCompartment",
     "UnknownViolationType",
     "Violation",
     "__version__",
+    "digest_file",
     "evaluate_regime",
     "mask_source",
+    "verdict_for",
     "state_for",
 ]

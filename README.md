@@ -212,7 +212,7 @@ asserted here, because they would have been false:
   policy leaves a diff instead of requiring a code release.
 
 The auditor is run against this repository, not shipped with it, and it is
-deliberately *not* wired into CI: 388 unit tests run on every change, and the
+deliberately *not* wired into CI: 371 unit tests run on every change, and the
 cross-audit is a heavier manual gate for release candidates.
 
 Six layers, standard library only:
@@ -285,13 +285,98 @@ are asymmetric (one `INVALID`, two `FAIL`), so leaving holes would have hurt
 python3 demo_lean_fake_proof.py    # exits non-zero if the cheat is not caught
 ```
 
+## Double-entry validation: who is actually working
+
+A single-entry book records what the agent says happened, so the only witness in
+it is the party being audited. [`agent_metabolism/double_entry.py`](agent_metabolism/double_entry.py)
+books the claim and the evidence as two separate lines and refuses to call an
+entry settled until the two agree — the whole rule is one line:
+
+```python
+if witness is None:  return INVALID      # nobody looked
+if check is witness: return PASS         # the books agree
+return FAIL                              # the books contradict
+```
+
+`check is witness` is not `check and witness`. Two `False` values balance too: an
+agent that reports failure and is confirmed to have failed has filed an *accurate*
+report, and charging it would train agents to hide failures — the behaviour the
+ledger exists to catch.
+
+| claim | evidence | verdict | consequence |
+|---|---|---|---|
+| success | matches | `PASS` | verified work; buys trust back |
+| success | contradicts | `FAIL` | false completion; charged |
+| success | not inspected | `INVALID` | the book stays open; agent locked |
+| failure | confirmed | `PASS` | honest news; recorded, earns nothing |
+| failure | contradicts | `FAIL` | under-claim; charged at a lesser weight |
+
+**Two failures in a row stop the agent.** The first `FAIL` is a charge, because a
+single wrong report is a normal day and stopping on it would be the
+over-accusation this design avoids. A second *consecutive* `FAIL` locks the book
+until a human intervenes. A `PASS` of either kind clears the streak, so an
+accurate bad report never creeps toward a stop — only sustained dishonesty
+accumulates.
+
+The rule exists because the alternative was measured. With the lock on `INVALID`
+alone, a liar survived five attempts (trust to 0, penalty `CRITICAL`, still
+operational) while an agent that merely omitted its witness was stopped on its
+second. The cheapest path to *staying operational* was to lie, which makes a
+ledger worse than none: it manufactures the appearance of accountability while
+selecting for the opposite.
+
+The second `FAIL` is still booked and still returns a receipt — the caller has to
+be told what happened, so only the entries *after* it are refused. `unlock()`
+does not reset the streak either: the operator unblocked the *book*, not the
+record, and an agent whose first act after a second chance is another false
+completion has shown the intervention changed nothing. The two locks stay
+distinguishable (`lock_kind` is `"unwitnessed"` or `"repeat_fail"`) because an
+operator deciding whether to unlock needs to know which one they face.
+
+The lock is bookkeeping, not punishment: a closed book with a loss blocks
+nothing, but an *open* entry means the books cannot be reconciled, so the next
+entry may not be opened. Neither lock is reachable from `record_transaction` — an
+agent able to clear its own lock by filing a `PASS` would hold exactly the power
+the lock withholds — and `unlock()` does not erase the entry, because history is
+not a draft.
+
+Only verified work buys trust back. An honest failure is booked and earns
+nothing: paying for accurate bad news makes failing cheap.
+
+**Reconciliation.** Hand the ledger an L1 `EnergyAccount` and it checks that
+every unit charged against the account also appears in the journal. An account
+that moves without an entry is exactly the out-of-band write double-entry exists
+to reveal, and it is the one thing a single-entry book cannot notice:
+
+```
+  journal energy    : 27.0
+  account energy    : 52.0
+  reconciled        : NO -- the books do not balance
+  difference        : 25.0 unaccounted
+```
+
+**What it does not do.** It does not establish the witness: `witness=True` is a
+claim by the caller, and if the caller is the agent's own harness this is a
+self-certification with extra steps. The honest path is `digest_file()` plus a
+comparison against a digest promised *before* the work ran — the same ordering
+constraint the membrane enforces. Its guarantee is narrower and should be stated
+narrowly: both sides are recorded together, the contradiction is charged, and the
+totals reconcile. It is also process-local, and not tamper-evident by itself
+(that belongs to the membrane's hash chain, and duplicating it here would mean
+two chains to verify).
+
+```bash
+python3 demo_one_person_company.py      # 3 agents, 1 liar, exits non-zero if it lies uncaught
+```
+
 ## Run it
 
 ```bash
-PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 302 tests, ~2s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 371 tests, ~2s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 python3 demo_lean_fake_proof.py         # a Riemann "proof" that is not one
+python3 demo_one_person_company.py      # three agents, one liar, one balance sheet
 ```
 
 No install step, no dependencies, no network. Python 3.9+.
@@ -746,7 +831,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 302 tests in ~2s
+Ran 371 tests in ~2s
 OK
 ```
 

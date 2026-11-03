@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-metabolism-os"
-version = "0.5.3"
+version = "0.5.4"
 description = "Metabolic regulation for agent harnesses: an energy account, a dual-beat scheduler, compartmental isolation, and a penalty ledger that takes capability away when trust is broken."
 readme = "README.md"
 requires-python = ">=3.9"
