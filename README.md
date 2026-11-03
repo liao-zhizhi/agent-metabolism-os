@@ -232,12 +232,66 @@ Plus one component that is not a layer, because it measures a different axis:
 |:--|:--|:--|
 | **PenaltyLedger** | `agent_metabolism/penalty.py` | Accumulated damage: a fine and a trust score. Read by L3 (concurrency, new writes) and L2 (slow beat), so a failure can stop a system that still has energy. |
 
+## Formal QC for machine-written proofs
+
+A new verification domain: Lean 4. Nobody on this side of the membrane can check
+a Riemann proof, and that is the point of a formal language — an artifact either
+elaborates or it does not, and that judgement needs no understanding of the
+mathematics (see [`agent_metabolism/lean_auditor.py`](agent_metabolism/lean_auditor.py)).
+
+Three witnesses, composed by worst-wins, where no witness may ever loosen
+another:
+
+| Witness | Sees | Verdict |
+|---|---|---|
+| Placeholder | `sorry`, `admit` in code — not in comments or strings | `FAIL` |
+| Axiom | `axiom` declarations, and `#print axioms` naming non-standard ones | `FAIL` |
+| Compiler | the real toolchain: exit code, plus `#print axioms thm` | `PASS` / `FAIL` / unavailable |
+
+The compiler cannot be the only witness, and this was **measured** on Lean
+4.33.1 rather than assumed:
+
+```
+theorem t : (1:Nat) = 1 := by sorry     ->  exit 0, warning only
+axiom riemann : True
+theorem u : True := riemann             ->  exit 0, no output at all
+```
+
+Both cheats compile. A gate that trusted `returncode == 0` would report a
+sorry-riddled, axiom-smuggling file as a complete proof — a false completion
+committed by the auditor. `#print axioms` is the stronger half: `sorry`
+elaborates to `sorryAx`, so it catches a hidden hole, and it names a smuggled
+axiom directly.
+
+The converse rule also holds: **`PASS` requires that something actually
+elaborated.** A clean text scan with no toolchain available is `INVALID`, never
+`PASS`, because a regex cannot tell a proof from a file with a syntax error.
+
+Two near-misses are deliberately *not* failures. `constant` is Lean 3 spelling
+and does not parse. A bare `opaque x : T` looks like `axiom x : T` with one token
+changed, but Lean requires `T` to be inhabited — `opaque boom : False` is
+rejected — so it cannot manufacture a false proposition. It is reported as an
+advisory note that is structurally incapable of changing a verdict. The first
+version of this auditor failed it; the false accusation was found by running it.
+
+A hole and an axiom are one offence, not two: in both cases the agent said the
+proof was complete and the code disagrees. Both score `FAIL`, both are charged as
+`FALSE_COMPLETION`, and two of either inflames the immune layer. Scoring a hole
+`INVALID` — the earlier design — inverted the incentive, because the thresholds
+are asymmetric (one `INVALID`, two `FAIL`), so leaving holes would have hurt
+*more* than smuggling an axiom.
+
+```bash
+python3 demo_lean_fake_proof.py    # exits non-zero if the cheat is not caught
+```
+
 ## Run it
 
 ```bash
-PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 249 tests, ~0.1s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 302 tests, ~2s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
+python3 demo_lean_fake_proof.py         # a Riemann "proof" that is not one
 ```
 
 No install step, no dependencies, no network. Python 3.9+.
@@ -692,7 +746,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 249 tests in ~0.1s
+Ran 302 tests in ~2s
 OK
 ```
 
