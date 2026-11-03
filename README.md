@@ -602,7 +602,7 @@ ledger, not the account, decided.
                           trust          fine  state
   before                  100.0           0.0  HEALTHY
   after                    75.0          50.0  CRITICAL
-  信任受损，触发风险熔断
+  trust damaged, risk circuit-breaker tripped
 
 [8] next morning  -- full account, no permission
   energy account : 100%  (never touched by the failed write)
