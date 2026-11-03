@@ -212,7 +212,7 @@ asserted here, because they would have been false:
   policy leaves a diff instead of requiring a code release.
 
 The auditor is run against this repository, not shipped with it, and it is
-deliberately *not* wired into CI: 371 unit tests run on every change, and the
+deliberately *not* wired into CI: 446 unit tests run on every change, and the
 cross-audit is a heavier manual gate for release candidates.
 
 Six layers, standard library only:
@@ -369,10 +369,72 @@ two chains to verify).
 python3 demo_one_person_company.py      # 3 agents, 1 liar, exits non-zero if it lies uncaught
 ```
 
+## Boundary auditing: an interface is a constraint, not an API
+
+A function signature is *made* by someone and can be any shape they like.
+Between physical layers there is no author. The interface is the set of
+conditions under which both sides can hold at once, and it is often narrow for
+reasons nobody negotiated.
+
+[`agent_metabolism/boundary_auditor.py`](agent_metabolism/boundary_auditor.py)
+measures that set. Two layers, each internally consistent, and a conflict about
+*requirements* rather than facts:
+
+| layer | provides | needs |
+|:--|:--|:--|
+| `Theory_Quantum` | ~1e-12 s of electronic coherence at 300 K | — |
+| `Theory_Bio` | — | ~1 s of functional continuity at 300 K, in water |
+
+The gap is a factor of 1e12: twelve orders of magnitude. It is not one wall but
+four axes — lifetime, temperature, medium, reliability — and they are crossed
+together or not at all. That intersection is why "quantum biology at room
+temperature" is not a single hard question.
+
+**What the audit can decide.** Not whether a mechanism works — there is no
+spectrometer here, and pretending otherwise would be the false completion this
+package exists to catch, committed by the auditor. It decides two things:
+
+1. **Is the claim falsifiable?** "Uses quantum effects" names a domain. A domain
+   cannot be measured, so it cannot be wrong — which makes it an unsuitable
+   witness rather than a weak one. `INVALID`, not `FAIL`.
+2. **Do the filing's own numbers close the gap?** A stated suppression factor of
+   `1e3` against a required `1e12` refutes itself. `FAIL`, and the contradiction
+   is the filing's, not the auditor's. The cheapest real defect is arithmetic
+   that does not multiply out: `1e12` protection *and* a microsecond lifetime
+   contradicts itself twice.
+
+```
+verdict      : INVALID
+coherence gap      : 1.0e12x  (12.0 decades of magnitude)
+  [NO_MECHANISM] 'quantum_effect_generic' names a domain, not a mechanism.
+  [NO_STRUCTURE] no structural parameters. ... there is no scaffold, only
+                 the word for one.
+```
+
+A `PASS` means, precisely: **the claim is falsifiable, its numbers internally
+consistent, and its own arithmetic sufficient.** It does not mean the invention
+works. That sentence travels in a field on the result, because a verdict quoted
+without its scope becomes a lie by citation.
+
+The failure mode worth understanding is the cryogenic one: a filing that reaches
+a ten-second coherence time at 4 K has solved the coherence problem and abandoned
+the layer it was addressing. Water is ice, proteins do not fold, and the organism
+that needed the battery is gone. Stronger coherence is not a crossing.
+
+`find_blind_boundaries()` compares the loaded registry against the axes and
+reports `blind` (nobody looked), `unproven` (looked, fell short) and `crossed`.
+The three are distinct, and conflating the first two loses the map. It describes
+the registry, not the field — an empty registry makes all of physics look blind,
+which is why every row says so.
+
+```bash
+python3 demo_boundary_audit.py          # 4 filings, 3 verdicts, 17 self-checks
+```
+
 ## Run it
 
 ```bash
-PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 371 tests, ~2s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 446 tests, ~2s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 python3 demo_lean_fake_proof.py         # a Riemann "proof" that is not one
@@ -831,7 +893,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 371 tests in ~2s
+Ran 446 tests in ~2s
 OK
 ```
 

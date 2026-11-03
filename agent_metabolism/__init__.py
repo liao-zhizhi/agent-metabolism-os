@@ -11,11 +11,29 @@ to live outside it, which is what this package is.
     L6  circadian.py     night mode compresses the day's context into memory
     L7  compartment.py   membrane-bounded units; one can lyse without the rest
     --  penalty.py       accumulated damage: a fine and a trust score, read by L2/L3
+    --  double_entry.py  a claim and its evidence, booked twice and reconciled
+    --  lean_auditor.py  holes in a machine-written proof, judged without reading it
+    --  boundary_auditor.py  claims of crossing between physical layers, judged
+                        on falsifiability and arithmetic, never on truth
 
 Standard library only. The energy figures are policy, not measurement, and the
 latencies are modelled rather than slept.
 """
 
+from .boundary_auditor import (
+    DEFAULT_INVENTIONS,
+    DEFAULT_LAYERS,
+    MECHANISMS,
+    MIN_STRUCTURAL_PARAMETERS,
+    Boundary,
+    BoundaryAudit,
+    BoundaryAuditor,
+    BoundaryAxis,
+    BoundaryError,
+    Invention,
+    Layer,
+    WitnessFault,
+)
 from .channel import (
     AgentProxy,
     ChannelError,
@@ -139,9 +157,21 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.5.4"
+__version__ = "0.5.5"
 
 __all__ = [
+    "DEFAULT_INVENTIONS",
+    "DEFAULT_LAYERS",
+    "MECHANISMS",
+    "MIN_STRUCTURAL_PARAMETERS",
+    "Boundary",
+    "BoundaryAudit",
+    "BoundaryAuditor",
+    "BoundaryAxis",
+    "BoundaryError",
+    "Invention",
+    "Layer",
+    "WitnessFault",
     "ADAPTIVE_SURCHARGE",
     "FAIL",
     "INVALID",
