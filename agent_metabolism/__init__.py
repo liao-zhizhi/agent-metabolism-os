@@ -52,6 +52,7 @@ from .energy import (
     InsufficientEnergy,
     LedgerEntry,
 )
+from .gateway import LAWS as METABOLIC_LAWS, MetabolicGateway
 from .penalty import (
     CRITICAL as PENALTY_CRITICAL,
     DEFAULT_WEIGHTS,
@@ -84,7 +85,7 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "ALIVE",
@@ -124,8 +125,10 @@ __all__ = [
     "KnowledgeFragment",
     "LLMResponse",
     "LedgerEntry",
+    "METABOLIC_LAWS",
     "MemoryFileError",
     "Message",
+    "MetabolicGateway",
     "MissingSubstrate",
     "PenaltyError",
     "PenaltyLedger",

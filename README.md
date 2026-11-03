@@ -14,6 +14,48 @@ second constraint, outside the model and outside the account: a ledger that
 remembers what the system has cost, and takes capability away when the answer is
 "too much".
 
+## Bio-Inspired Architecture
+
+This package is one half of a two-layer design: **internal regulation follows
+eight laws, external interface follows five**. The split is deliberate. The
+metabolic system decides *what may run*; the immune system decides *what may be
+believed*.
+
+**Internal — eight laws (L1–L7 plus the penalty ledger).** Reported in a single
+read-only call by `MetabolicGateway.get_current_laws_status()`:
+
+| Law | Layer | Reported as |
+|---|---|---|
+| L1 | Energy account | `L1_Energy` — remaining charge, budget, ratio |
+| L2 | Dual-beat scheduler | `L2_Beat` — OXPHOS or SLP, observed when a response is supplied |
+| L3 | Regime switch | `L3_Regime` — GROW / CONSERVE / EMERGENCY |
+| L4 | Substrate channel | `L4_Channel` — keys, not payloads (no gauge to read) |
+| L5 | Saturation brake | `L5_Brake` — **hosted externally**, by the immune sidecar |
+| L6 | Circadian pass | `L6_Circadian` — consolidation is not tracked here |
+| L7 | Compartment | `L7_Compartment` — how many units are still alive |
+| — | Penalty ledger | `Penalty` — accumulated damage and trust |
+
+L5 is the seam. This package does **not** import the sidecar, and the gateway
+does not answer `tripped: False` for a brake it cannot see: with nothing
+attached it reports `attached: False` and `tripped: None`. A brake that reads
+the regulated system's own accounting can be tripped by the same defect that
+corrupts the accounting, so it is hosted where the contradiction is observed.
+
+Every law carries a `measured` / `attached` / `observed` flag, and `_witness`
+names in words what was actually read. A layer with no instrumentation reports
+`None`, never a healthy-looking default.
+
+**External — five laws (ecology interface).** Served by the companion
+repository, `harness-audit-sidecar`, as three stdlib-only pure functions in
+`audit_sidecar/tools/eco_api.py`: energy gradient, edge-to-mainstream
+succession, and waste recycling (plus a keystone-source and a carrying-capacity
+reading). Those laws concern how a *neighbouring* system decides whether to
+route work here, trust a claim from here, or mine this system's failures — which
+is why they live outside the regulator rather than inside it.
+
+The two halves agree on one rule: **a quantity that cannot be witnessed is
+reported as unmeasured, not estimated.**
+
 ## Cross-Audit Evidence
 
 The two claims in that introduction — *it cannot overspend* and *it cannot be
