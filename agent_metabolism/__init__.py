@@ -24,6 +24,13 @@ from .channel import (
     SubstrateEntry,
     SubstrateKeyError,
 )
+from .agent_sdk import (
+    AgentWarrantError,
+    ArtefactMismatchError,
+    MembraneAgent,
+    MissingPromiseError,
+    ToolOutcome,
+)
 from .circadian import (
     CONSOLIDATION_METHOD,
     CircadianError,
@@ -53,6 +60,14 @@ from .energy import (
     LedgerEntry,
 )
 from .gateway import LAWS as METABOLIC_LAWS, MetabolicGateway
+from .llm_proxy import (
+    LLM_BEAT_FAST,
+    LLM_BEAT_SLOW,
+    LLM_RECORD_TYPE,
+    LLMProxy,
+    LedgerLockedError,
+    ProxyResult,
+)
 from .penalty import (
     CRITICAL as PENALTY_CRITICAL,
     DEFAULT_WEIGHTS,
@@ -85,10 +100,12 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "ALIVE",
+    "AgentWarrantError",
+    "ArtefactMismatchError",
     "CONSERVE",
     "CONSOLIDATION_METHOD",
     "CRITICAL_ERROR_LIMIT",
@@ -123,21 +140,30 @@ __all__ = [
     "EnergyExhausted",
     "InsufficientEnergy",
     "KnowledgeFragment",
+    "LLM_BEAT_FAST",
+    "LLM_BEAT_SLOW",
+    "LLM_RECORD_TYPE",
+    "LLMProxy",
     "LLMResponse",
     "LedgerEntry",
+    "LedgerLockedError",
     "METABOLIC_LAWS",
+    "MembraneAgent",
     "MemoryFileError",
     "Message",
     "MetabolicGateway",
+    "MissingPromiseError",
     "MissingSubstrate",
     "PenaltyError",
     "PenaltyLedger",
+    "ProxyResult",
     "RegimeError",
     "RegimePlan",
     "RegimeSwitch",
     "SubstrateChannel",
     "SubstrateEntry",
     "SubstrateKeyError",
+    "ToolOutcome",
     "UnknownCompartment",
     "UnknownViolationType",
     "Violation",

@@ -84,6 +84,8 @@ class MetabolicGateway:
         last_response: Any = None,
         recent_error_rate: float = 0.0,
         critical_errors: int = 0,
+        llm_proxy: Any = None,
+        agents: Any = None,
     ) -> None:
         if scheduler is not None and not isinstance(scheduler, DualBeatScheduler):
             raise TypeError("scheduler must be a DualBeatScheduler or None")
@@ -91,6 +93,12 @@ class MetabolicGateway:
             raise TypeError("account must be an EnergyAccount or None")
         if compartments is not None and not isinstance(compartments, CompartmentManager):
             raise TypeError("compartments must be a CompartmentManager or None")
+        if llm_proxy is not None and not callable(getattr(llm_proxy, "lock_status", None)):
+            raise TypeError(
+                "llm_proxy must expose lock_status(), got {!r}".format(
+                    type(llm_proxy).__name__
+                )
+            )
 
         self._scheduler = scheduler
         self._account = account if account is not None else (
@@ -101,6 +109,8 @@ class MetabolicGateway:
         self._last_response = last_response
         self._recent_error_rate = recent_error_rate
         self._critical_errors = critical_errors
+        self._llm_proxy = llm_proxy
+        self._agents = list(agents) if agents is not None else []
 
     # -- the single public call -------------------------------------------
 
@@ -154,6 +164,8 @@ class MetabolicGateway:
         penalty = self._penalty()
         witness["Penalty"] = penalty["reason"]
 
+        external = self._external()
+
         return {
             "L1_Energy": energy,
             "L2_Beat": beat,
@@ -163,7 +175,79 @@ class MetabolicGateway:
             "L6_Circadian": circadian,
             "L7_Compartment": compartment,
             "Penalty": penalty,
+            "External": external,
             "_witness": witness,
+        }
+
+    # -- external interfaces ------------------------------------------------
+
+    def _external(self) -> Dict[str, Any]:
+        """The state of the two outbound interfaces, as scalars.
+
+        Reported here so a router has one place to look, and reported as counts
+        rather than objects so that having the status of the model proxy does not
+        confer the ability to call it.
+        """
+        proxy = self._llm_proxy
+        if proxy is None:
+            llm = {"attached": False, "reason": "no LLM proxy attached"}
+        else:
+            try:
+                status = proxy.lock_status()
+            except Exception:  # pragma: no cover - a broken proxy is not "fine"
+                llm = {"attached": True, "reason": "the proxy's lock status is unreadable"}
+            else:
+                llm = {
+                    "attached": True,
+                    "locked": bool(status.get("locked")),
+                    "calls": status.get("calls"),
+                    "unlocked_calls": status.get("unlocked_calls"),
+                    "reason": status.get("reason"),
+                }
+
+        agents = []
+        for agent in self._agents:
+            agents.append(
+                {
+                    "name": getattr(agent, "name", "unknown"),
+                    "calls": getattr(agent, "calls", None),
+                    "denials": getattr(agent, "denials", None),
+                }
+            )
+        return {
+            "llm_proxy": llm,
+            "agents": agents,
+            "reason": (
+                "both interfaces attached" if proxy is not None and agents
+                else "at least one interface is not attached"
+            ),
+        }
+
+    def routing_view(self) -> Dict[str, Any]:
+        """The only thing an external router may read: charge and headroom.
+
+        Deliberately narrow. A router needs to know how much is left and whether
+        heavy work is currently allowed; it does not need the ledger, the account
+        object, or a way to change either. Everything here is a scalar, and there
+        is no setter anywhere on this class -- the surface is read-only because
+        there is nothing to write with, not because a caller promised not to.
+        """
+        energy = self._energy()
+        regime = self._regime(energy) if energy["measured"] else {"current": None}
+        current = regime.get("current")
+        return {
+            "L1_Energy": {
+                "current": energy["current"],
+                "budget": energy["budget"],
+                "ratio": energy["ratio"],
+                "state": energy["state"],
+                "measured": energy["measured"],
+            },
+            "L3_Regime": {
+                "current": current,
+                "measured": regime.get("measured", energy["measured"]),
+            },
+            "heavy_work_allowed": current == GROW,
         }
 
     # -- per-law readers ---------------------------------------------------

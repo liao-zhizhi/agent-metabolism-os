@@ -16,6 +16,97 @@ remembers what the system has cost, and takes capability away when the answer is
 
 ## Bio-Inspired Architecture
 
+### The two outside interfaces
+
+The internal layers regulate what a call may do. They are not, on their own, an
+interface: they never touch the two things this system actually borders on. Every
+crossing to a model, or to an agent's tools, goes through one of these two, and
+each carries a potential difference -- something must be paid before the inside
+will act.
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │            MetabolicGateway              │
+                    │  one read-only surface, no setters:      │
+                    │  L1 charge · L3 headroom · 8 laws        │
+                    └───────────────▲──────────────┬───────────┘
+                                    │ status       │ routing_view()
+                                    │              ▼
+   ┌────────────┐          ┌────────┴─────────┐      ┌──────────────┐
+   │    LLM     │◄────────►│ agent_metabolism │◄────►│    Agent     │
+   │ (OpenAI /  │          │                  │      │ (framework / │
+   │ Anthropic) │          │  L1 .. L7        │      │  your code)  │
+   └────────────┘          │  + penalty       │      └──────────────┘
+        ▲                  └────────┬─────────┘             ▲
+        │                           │                       │
+        │  LLMProxy                 │                       │  MembraneAgent
+        │  · charge paid first      │                       │  · promise first
+        │  · beat chosen, degrade   │                       │  · hash must match
+        │    is labelled           │                       │  · mismatch = FAIL
+        │  · every call recorded    │                       │
+        │                           ▼                       │
+        │              ┌────────────────────────┐           │
+        └──────────────┤  AppendOnlyLedger      ├───────────┘
+           cost record │  sha256-linked chain   │  verdict record
+                       │  + head anchor         │
+                       └────────────▲───────────┘
+                                    │ tamper → chain breaks
+                            ┌───────┴────────┐
+                            │  verify_chain  │
+                            └────────────────┘
+```
+
+Read the diagram as three claims, not as boxes:
+
+1. **Into the model costs charge.** `LLMProxy.generate` pays through the energy
+   account *before* the call. An account that cannot fund it raises
+   `EnergyExhausted` and the model is never reached. When it can fund the cheap
+   beat but not the expensive one, the answer is degraded and labelled
+   `degraded=True` -- a cheap answer that reads like an expensive one is a false
+   completion in the layer above.
+
+2. **Into a tool costs a promise.** `MembraneAgent.execute_tool_with_warrant`
+   requires `expected_artifact_hash` and registers it *before* the tool runs, so
+   the agent commits while it still cannot know the outcome. The produced
+   artefact is then hashed and offered to the membrane, which recomputes it
+   independently. A mismatch is a recorded `FAIL`, not a retry.
+
+3. **Both leave one trail.** Neither interface writes its own log. Costs and
+   verdicts land in the same SHA256-linked chain, within one head anchor, so
+   "what did this cost" and "what did it claim" cannot be edited separately.
+
+The ordering in (2) has an unavoidable asymmetry worth stating: the tool must run
+before its output can be hashed. What is guaranteed is that the *expectation*
+precedes the act. The gap between them is exactly what the `FAIL` record is for.
+
+```python
+account   = EnergyAccount(100.0)
+scheduler = DualBeatScheduler(account)
+ledger    = AppendOnlyLedger("audit.jsonl", anchor_path="audit.jsonl.head")
+proxy     = LLMProxy(scheduler, ledger)          # L1 + L2 + one-way lock
+
+gateway = MembraneGateway("audit.jsonl")         # the membrane itself
+agent   = MembraneAgent(gateway, tools={"write_file": write_file})
+
+answer = proxy.generate("prove the invariant", complexity_score=0.95)
+agent.execute_tool_with_warrant(
+    "write_file",
+    {"path": "spec.yaml", "body": rendered},
+    expected_artifact_hash="sha256:...",          # promised in advance
+)
+ledger.verify_chain()["status"]                   # "PASS"
+```
+
+### Where the membrane lives, and why this package does not import it
+
+`MembraneGateway` and `AppendOnlyLedger` are in the companion repository,
+`harness-audit-sidecar`. This package imports neither: it duck-types them, so
+`pip install agent-metabolism-os` keeps its `dependencies = []` promise and the
+auditor stays a separate trust domain. The cost of that choice is honest -- a
+membrane that is not injected is a membrane that is not there, and
+`MembraneAgent` refuses to be constructed without one rather than running
+ungated.
+
 This package is one half of a two-layer design: **internal regulation follows
 eight laws, external interface follows five**. The split is deliberate. The
 metabolic system decides *what may run*; the immune system decides *what may be
@@ -119,7 +210,7 @@ Plus one component that is not a layer, because it measures a different axis:
 ## Run it
 
 ```bash
-python3 -m unittest discover tests -v   # 164 tests, ~0.05s
+python3 -m unittest discover -s tests -p 'test_*.py'   # 229 tests, ~0.1s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 ```
@@ -533,7 +624,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 164 tests in ~0.05s
+Ran 229 tests in ~0.1s
 OK
 ```
 
@@ -546,3 +637,9 @@ charge — no concurrency (penalty→L3) and no slow beat (penalty→L2) at once
 tests check the zero-dependency claim itself: one parses every import with `ast`
 against `sys.stdlib_module_names`, the other asserts `dependencies = []` in the
 metadata.
+
+`tests/test_external_interfaces.py` covers the two outside crossings. The
+cross-package tests reach `harness-audit-sidecar` through `sys.path` and **skip**
+when the adjacent checkout is absent, so the suite never acquires a hard
+dependency on it; a small in-test double pins the protocol those tests rely on,
+so a change on either side fails here instead of silently agreeing with itself.
