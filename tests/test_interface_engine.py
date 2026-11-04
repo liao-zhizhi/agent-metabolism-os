@@ -30,6 +30,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent_metabolism.double_entry import FAIL, INVALID, PASS  # noqa: E402
 from agent_metabolism.interface_engine import (  # noqa: E402
     DEFAULT_AMPLIFICATION,
+    EXPANSIVE,
+    NARROW,
+    NarrowCondition,
+    REPLICATION_CEILING,
+    magnitude_gap,
     NARROW_THRESHOLD,
     NESTING_RATIO,
     PLACEHOLDER_CONDITIONS,
@@ -474,11 +479,30 @@ class TestNoFreeReach(unittest.TestCase):
         with self.assertRaises(InterfaceError):
             evolver.cross_interface(stale, _witness())
 
-    def test_amplification_cannot_be_lowered(self):
+    def test_a_supersession_must_buy_more(self):
+        """On an open gap the declared multiplier is a default; once crossed it
+        is a claim, and a replacement that buys less is indistinguishable from
+        the thing it replaces."""
         evolver = _evolver()
         evolver.seed(_air())
+        evolver.cross_interface(("Mind", "World", 0), _witness("language", "g"))
         with self.assertRaises(InterfaceError):
-            evolver.cross_interface(("Mind", "World", 0), _witness(), amplification=2.0)
+            evolver.cross_interface(
+                ("Mind", "World", 0), _witness("writing", "p"), amplification=2.0
+            )
+
+    def test_a_first_crossing_may_buy_less_than_the_default(self):
+        """A mechanism dearer than assumed is a fact, not a lie."""
+        evolver = _evolver()
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0), _witness(), amplification=2.0
+        )
+        self.assertEqual(result["verdict"], PASS)
+        self.assertEqual(result["span_after"], 4.0)
+        self.assertIn("BELOW_NOMINAL", [f["kind"] for f in result["faults"]])
+        nominal = next(f for f in result["faults"] if f["kind"] == "BELOW_NOMINAL")
+        self.assertFalse(nominal["decisive"])
 
     def test_amplification_below_one_is_refused(self):
         evolver = _evolver()
@@ -867,6 +891,288 @@ class TestFormatSpan(unittest.TestCase):
     def test_infinity_is_named_rather_than_printed(self):
         self.assertEqual(format_span(float("inf")), "unbounded")
         self.assertEqual(format_span(float("nan")), "unbounded")
+
+
+# ---------------------------------------------------------------------------
+# narrow conditions
+# ---------------------------------------------------------------------------
+
+
+class TestNarrowCondition(unittest.TestCase):
+    def test_a_condition_needs_a_name(self):
+        with self.assertRaises(InterfaceError):
+            NarrowCondition("", "m", "e", amplification=2.0)
+
+    def test_amplification_must_exceed_one(self):
+        for bad in (1.0, 0.5, 0.0, -1):
+            with self.assertRaises(InterfaceError):
+                NarrowCondition("n", "m", "e", amplification=bad)
+
+    def test_cost_must_be_a_unit_interval(self):
+        for bad in (-0.1, 1.1, "cheap"):
+            with self.assertRaises(InterfaceError):
+                NarrowCondition("n", "m", "e", amplification=2.0, cost=bad)
+
+    def test_replicable_must_be_a_bool(self):
+        with self.assertRaises(InterfaceError):
+            NarrowCondition("n", "m", "e", amplification=2.0, replicable="yes")
+
+    def test_satisfies_must_be_a_bool(self):
+        with self.assertRaises(InterfaceError):
+            NarrowCondition("n", "m", "e", amplification=2.0, satisfies="yes")
+
+    def test_a_condition_round_trips(self):
+        condition = NarrowCondition("n", "m", "e", 2.0, replicable=False, cost=0.9)
+        self.assertEqual(condition.as_dict()["replicable"], False)
+        self.assertEqual(condition.as_dict()["amplification"], 2.0)
+
+
+class TestStatus(unittest.TestCase):
+    """Verdict answers "did it hold"; status answers "how far did it carry"."""
+
+    def _cross(self, amplification, replicable=True):
+        evolver = _evolver()
+        evolver.seed(_air())
+        return evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("c", "mechanism", "artifact-1", amplification,
+                            replicable=replicable, cost=0.5),
+        )
+
+    def test_a_small_amplification_is_narrow(self):
+        result = self._cross(2.0)
+        self.assertEqual(result["verdict"], PASS)
+        self.assertEqual(result["status"], NARROW)
+
+    def test_a_large_amplification_is_expansive(self):
+        result = self._cross(10_000.0)
+        self.assertEqual(result["status"], EXPANSIVE)
+
+    def test_the_ceiling_is_the_boundary_between_them(self):
+        self.assertEqual(
+            self._cross(REPLICATION_CEILING)["status"], NARROW
+        )
+        self.assertEqual(
+            self._cross(REPLICATION_CEILING * 1.01)["status"], EXPANSIVE
+        )
+
+    def test_an_unreplicable_mechanism_is_always_narrow(self):
+        """Even a large amplification cannot make a laboratory non-local."""
+        result = self._cross(5.0, replicable=False)
+        self.assertEqual(result["status"], NARROW)
+
+    def test_an_uncrossed_gap_has_no_status(self):
+        evolver = _evolver()
+        evolver.seed(_air())
+        self.assertEqual(evolver.chain()[0].status, "")
+
+    def test_an_unknown_status_is_refused(self):
+        with self.assertRaises(InterfaceError):
+            Interface("A", "B", "c", span=1, difficulty=0.9, status="MAYBE")
+
+    def test_the_status_is_visible_on_the_interface(self):
+        evolver = _evolver()
+        evolver.seed(_air())
+        evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("c", "m", "artifact-1", 1000.0),
+        )
+        self.assertEqual(evolver.chain()[0].status, EXPANSIVE)
+
+
+class TestUnreplicableReach(unittest.TestCase):
+    def test_a_lab_bound_mechanism_cannot_claim_scale(self):
+        """The contradiction is the filing's, and it is decisive."""
+        evolver = _evolver()
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("cryostat", "m", "artifact-1", 10_000.0,
+                            replicable=False),
+        )
+        self.assertEqual(result["verdict"], FAIL)
+        kinds = [f["kind"] for f in result["faults"]]
+        self.assertIn("UNREPLICABLE_REACH", kinds)
+
+    def test_a_lab_bound_mechanism_may_claim_a_little(self):
+        evolver = _evolver()
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("cryostat", "m", "artifact-1", 2.0, replicable=False),
+        )
+        self.assertEqual(result["verdict"], PASS)
+
+    def test_an_undeclared_replicability_is_not_a_claim_of_scale(self):
+        """Unspecified is not the same as false; the benefit of the doubt applies."""
+        evolver = _evolver()
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0), _witness(), amplification=10_000.0
+        )
+        self.assertEqual(result["verdict"], PASS)
+        self.assertNotIn("UNREPLICABLE_REACH", [f["kind"] for f in result["faults"]])
+
+    def test_the_ceiling_is_configurable(self):
+        evolver = _evolver(replication_ceiling=100.0)
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("c", "m", "artifact-1", 5_000.0, replicable=False),
+        )
+        self.assertEqual(result["verdict"], FAIL)
+
+    def test_an_out_of_range_ceiling_is_refused(self):
+        for bad in (1.0, 0.5, -2):
+            with self.assertRaises(InterfaceError):
+                _evolver(replication_ceiling=bad)
+
+
+class TestSupersession(unittest.TestCase):
+    """Cryogenics crossed the gap first; a protein crossed it wider."""
+
+    def _crossed(self):
+        evolver = _evolver()
+        evolver.seed(_air())
+        evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("cryostat", "cooling", "lab-114", 2.0, replicable=False),
+        )
+        return evolver
+
+    def test_a_different_mechanism_may_supersede(self):
+        evolver = self._crossed()
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("protein", "scaffold", "3EML", 10_000.0),
+        )
+        self.assertEqual(result["verdict"], PASS)
+        self.assertTrue(result["superseding"])
+
+    def test_the_same_mechanism_is_still_refused(self):
+        """Reach is not a counter, and a supersession is not a loophole."""
+        evolver = self._crossed()
+        with self.assertRaises(InterfaceError):
+            evolver.cross_interface(
+                ("Mind", "World", 0),
+                NarrowCondition("cryostat", "cooling", "lab-114", 500.0),
+            )
+
+    def test_a_supersession_that_buys_less_is_refused(self):
+        evolver = self._crossed()
+        with self.assertRaises(InterfaceError):
+            evolver.cross_interface(
+                ("Mind", "World", 0),
+                NarrowCondition("worse", "other", "id-1", 1.5),
+            )
+
+    def test_reach_is_recomputed_from_the_origin_not_compounded(self):
+        """Otherwise two mechanisms would multiply each other."""
+        evolver = self._crossed()
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("protein", "scaffold", "3EML", 10_000.0),
+        )
+        self.assertEqual(result["origin_span"], 2.0)
+        self.assertEqual(result["span_after"], 20_000.0)
+
+    def test_a_supersession_replaces_the_next_gap(self):
+        """The old interior belonged to a laboratory, not to a biosphere."""
+        evolver = self._crossed()
+        evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("protein", "scaffold", "3EML", 10_000.0),
+            next_condition="biomimetic structure",
+        )
+        self.assertEqual(len(evolver.frontier()), 1)
+        self.assertEqual(evolver.frontier()[0].condition, "biomimetic structure")
+
+    def test_the_origin_span_survives_the_supersession(self):
+        evolver = self._crossed()
+        evolver.cross_interface(
+            ("Mind", "World", 0),
+            NarrowCondition("protein", "scaffold", "3EML", 10_000.0),
+        )
+        self.assertEqual(evolver.chain()[0].origin_span, 2.0)
+
+
+class TestSloganEvidence(unittest.TestCase):
+    def test_a_slogan_is_not_evidence(self):
+        for slogan in ("it obviously works", "trust me", "common sense", "It works."):
+            evolver = _evolver()
+            evolver.seed(_air())
+            result = evolver.cross_interface(
+                ("Mind", "World", 0),
+                {"mechanism": "language", "evidence": slogan},
+            )
+            self.assertEqual(result["verdict"], INVALID, slogan)
+            self.assertIn(
+                "ASSERTION_NOT_EVIDENCE",
+                [f["kind"] for f in result["faults"]],
+                slogan,
+            )
+
+    def test_a_locator_is_accepted(self):
+        evolver = _evolver()
+        evolver.seed(_air())
+        result = evolver.cross_interface(
+            ("Mind", "World", 0),
+            {"mechanism": "language", "evidence": "lab notebook L-114"},
+        )
+        self.assertEqual(result["verdict"], PASS)
+
+    def test_the_blacklist_is_exported_and_finite(self):
+        """A closed set of slogans, not a quality test of evidence."""
+        from agent_metabolism.interface_engine import PLACEHOLDER_EVIDENCE
+
+        self.assertTrue(PLACEHOLDER_EVIDENCE)
+        self.assertTrue(all(isinstance(item, str) for item in PLACEHOLDER_EVIDENCE))
+
+
+# ---------------------------------------------------------------------------
+# declared magnitudes
+# ---------------------------------------------------------------------------
+
+
+class TestMagnitudeGap(unittest.TestCase):
+    def _layers(self, first, second, quantity="coherence_s"):
+        return (
+            Layer("A", "A", measured={quantity: first}),
+            Layer("B", "B", measured={quantity: second}),
+        )
+
+    def test_the_ratio_is_twelve_decades_for_a_picosecond(self):
+        quantum, macro = self._layers(1e-12, 1.0)
+        ratio, decades = magnitude_gap(quantum, macro, "coherence_s")
+        self.assertAlmostEqual(ratio, 1e12, delta=1.0)
+        self.assertAlmostEqual(decades, 12.0, places=9)
+
+    def test_the_ratio_is_direction_free(self):
+        quantum, macro = self._layers(1e-12, 1.0)
+        self.assertEqual(
+            magnitude_gap(quantum, macro, "coherence_s"),
+            magnitude_gap(macro, quantum, "coherence_s"),
+        )
+
+    def test_equal_quantities_have_no_gap(self):
+        a, b = self._layers(1.0, 1.0)
+        ratio, decades = magnitude_gap(a, b, "coherence_s")
+        self.assertEqual((ratio, decades), (1.0, 0.0))
+
+    def test_a_missing_quantity_is_an_error(self):
+        a, b = self._layers(1.0, 2.0)
+        with self.assertRaises(InterfaceError):
+            magnitude_gap(a, b, "temperature_k")
+
+    def test_a_zero_measurement_is_refused_at_construction(self):
+        """A zero would make every ratio against it meaningless."""
+        for bad in (0, -1, float("inf")):
+            with self.assertRaises(InterfaceError):
+                Layer("A", "A", measured={"coherence_s": bad})
+
+    def test_a_layer_round_trips_with_measurements(self):
+        layer = Layer("A", "A", measured={"coherence_s": 1e-12})
+        self.assertEqual(Layer(**layer.as_dict()), layer)
 
 
 # ---------------------------------------------------------------------------

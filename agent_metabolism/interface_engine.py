@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
@@ -69,21 +70,41 @@ from .double_entry import FAIL, INVALID, PASS
 
 __all__ = [
     "DEFAULT_AMPLIFICATION",
+    "EXPANSIVE",
     "FractalEvolver",
     "Interface",
     "InterfaceError",
     "Layer",
+    "NARROW",
     "NARROW_THRESHOLD",
     "NESTING_RATIO",
+    "NarrowCondition",
+    "REPLICATION_CEILING",
     "SPAN_HORIZON",
     "VERDICTS",
     "format_span",
+    "magnitude_gap",
 ]
 
 #: The three verdicts are imported from the package's own lattice rather than
 #: restated. Two spellings of PASS that could drift apart is the bug the lattice
 #: exists to prevent; a fourth value here would be a private arithmetic.
 VERDICTS = (PASS, FAIL, INVALID)
+
+#: A crossing's *status*, which is a separate question from its verdict. A
+#: cryostat really does cross the macro/quantum gap -- it is correct physics, not
+#: a failure -- but it crosses it for one laboratory. ``NARROW`` records what a
+#: crossing bought, never whether it happened. Conflating the two would either
+#: flatter the cryostat or slander it, and both readings get the engineering
+#: wrong: the cryostat is the proof that the gap closes, and the protein is the
+#: proof that closing it can be cheap.
+NARROW = "NARROW"
+EXPANSIVE = "EXPANSIVE"
+
+#: At or below this amplification a crossing is NARROW; above it, EXPANSIVE. Ten
+#: is the line between "a few more people can now reach" and "a different class
+#: of reach exists". It is a policy number and the only one of its kind here.
+REPLICATION_CEILING = 10.0
 
 #: A gap whose condition is easier than this is not a boundary. Anyone can cross
 #: open space; the thing worth naming is the opening that only one narrow
@@ -132,6 +153,30 @@ PLACEHOLDER_CONDITIONS = frozenset(
 )
 
 
+#: Evidence strings that assert consensus instead of naming an artefact. This is
+#: a **blacklist, not a quality test**, and the difference matters: nothing here
+#: can tell whether "crystal structure 3EML" is a real deposition or a confident
+#: fabrication. What it can catch is the small set of phrases that are not even
+#: trying to name something checkable, because a reviewer who reads "it obviously
+#: works" learns nothing and a reviewer who reads "3EML" at least knows what to
+#: look up. A fabricated citation is the stronger failure and is out of scope.
+PLACEHOLDER_EVIDENCE = frozenset(
+    {
+        "as everyone knows",
+        "common sense",
+        "everybody knows",
+        "it obviously works",
+        "it works",
+        "obviously works",
+        "obvious",
+        "self evident",
+        "self-evident",
+        "trust me",
+        "widely known",
+    }
+)
+
+
 class InterfaceError(ValueError):
     """The chain, the request, or the interface cannot be honoured as given."""
 
@@ -142,11 +187,18 @@ class InterfaceError(ValueError):
 
 
 def format_span(span: float) -> str:
-    """A span as a human reads it: grouped below 10^7, scientific above."""
+    """A number as a human reads it: grouped in the middle, scientific outside.
+
+    Both ends are scientific on purpose. A coherence lifetime of 1e-12 printed as
+    ``0.00`` is a falsehood produced by a formatting default, and it would sit in
+    a table next to a number twelve decades larger while looking like nothing.
+    """
     if span != span or span in (float("inf"), float("-inf")):
         return "unbounded"
-    if span >= 1.0e7:
-        return "{:.0e}".format(span).replace("e+", "e")
+    if span == 0:
+        return "0"
+    if abs(span) >= 1.0e7 or abs(span) < 1.0e-3:
+        return "{:.0e}".format(span).replace("e+", "e").replace("e-0", "e-")
     if float(span).is_integer():
         return "{:,}".format(int(span))
     return "{:,.2f}".format(span)
@@ -165,22 +217,162 @@ class Layer:
     *scale of description* that some other layer bounds. All the structure that
     matters lives on the :class:`Interface` between two of them, because the
     interface is where the engineering actually is.
+
+    ``measured`` holds declared physical quantities, keyed by name and expressed
+    in whatever unit the key names (``coherence_s`` is seconds). They are
+    declarations, not measurements: there is no spectrometer here. What the
+    module does with them is arithmetic -- :func:`magnitude_gap` divides two of
+    them and reports the ratio in decades, which is exactly the kind of claim a
+    paper can make without a bench.
     """
 
     key: str
     name: str
     domain: str = ""
     description: str = ""
+    measured: Mapping[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.key:
             raise InterfaceError("a layer needs a key")
+        if not isinstance(self.measured, Mapping):
+            raise InterfaceError(
+                "measured must be a mapping of quantity -> value, got {!r}".format(
+                    type(self.measured).__name__
+                )
+            )
+        for quantity, value in self.measured.items():
+            if _positive(value) is None:
+                raise InterfaceError(
+                    "{}.{} = {!r} is not a positive finite quantity; a layer's "
+                    "measurements feed ratios, and a zero or an infinity would "
+                    "make every ratio against it meaningless".format(
+                        self.key, quantity, value
+                    )
+                )
+
+    def value(self, quantity: str) -> float:
+        try:
+            return float(self.measured[quantity])
+        except KeyError:
+            raise InterfaceError(
+                "layer {!r} declares no {!r}; it declares: {}".format(
+                    self.key, quantity, ", ".join(sorted(self.measured)) or "(nothing)"
+                )
+            )
 
     def as_dict(self) -> Dict[str, Any]:
         return {
             "key": self.key,
             "name": self.name,
             "domain": self.domain,
+            "description": self.description,
+            "measured": dict(self.measured),
+        }
+
+
+def magnitude_gap(source: Layer, target: Layer, quantity: str) -> Tuple[float, float]:
+    """The ratio between two declared measurements, and its size in decades.
+
+    Direction-free on purpose: a coherence lifetime is not better when longer in
+    every context, so "which side wins" is the scientist's question, not this
+    function's. What it answers is the thing that makes a boundary hard -- how
+    many orders of magnitude sit between the two sides -- and it answers it with
+    arithmetic rather than an adjective.
+
+    Returns ``(ratio, decades)`` with ``ratio`` always ``>= 1``.
+    """
+    first = source.value(quantity)
+    second = target.value(quantity)
+    ratio = max(first, second) / min(first, second)
+    return ratio, math.log10(ratio)
+
+
+# ---------------------------------------------------------------------------
+# narrow conditions
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NarrowCondition:
+    """One way of fitting through a gap, priced as a candidate rather than a fact.
+
+    A gap is not crossed by a gap-crosser in the abstract. It is crossed by
+    something specific -- a cryostat, a protein -- and *which* specific thing it
+    was decides almost everything about what the crossing is worth. Two
+    conditions can both be true and differ by four orders of magnitude in reach,
+    because one runs in a laboratory and the other runs everywhere.
+
+    So a condition carries its own economics:
+
+    ``replicable``
+        whether the condition can be instantiated at the target layer *at scale*.
+        A cryostat is a real crossing that cannot be repeated a billion times;
+        a protein is a real crossing that can. This is the field that decides
+        whether a large amplification claim is honest, and the engine refuses
+        the claim rather than shrinking it silently.
+    ``cost``
+        declared, per instance, in ``[0, 1]``. The engine does **not** judge it
+        -- there is no economy here to measure it against -- but it is reported,
+        because a crossing that costs everything and buys 2x is a different
+        engineering fact from one that costs nothing and buys 10,000x, and a
+        table that hid the difference would be a table of ranges only.
+
+    ``satisfies`` exists so that a condition one has *brought* but not *met* is
+    expressible. Defaulting it to True is right: an implementation handed to the
+    audit is an implementation being asserted.
+    """
+
+    name: str
+    mechanism: str
+    evidence: str
+    amplification: float
+    replicable: bool = True
+    cost: float = 0.5
+    satisfies: bool = True
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise InterfaceError("a narrow condition needs a name")
+        if not isinstance(self.replicable, bool):
+            raise InterfaceError(
+                "replicable must be a bool, got {!r}".format(
+                    type(self.replicable).__name__
+                )
+            )
+        if not isinstance(self.satisfies, bool):
+            raise InterfaceError(
+                "satisfies must be a bool, got {!r}".format(
+                    type(self.satisfies).__name__
+                )
+            )
+        amplification = _positive(self.amplification)
+        if amplification is None or amplification <= 1.0:
+            raise InterfaceError(
+                "amplification must exceed 1.0, got {!r}; a condition that buys "
+                "nothing is a restatement of the gap".format(self.amplification)
+            )
+        cost = _unit(self.cost)
+        if cost is None:
+            raise InterfaceError(
+                "cost must be in [0, 1], got {!r}".format(self.cost)
+            )
+
+    @property
+    def is_cheap(self) -> bool:
+        """Below half of the cost scale. A display convenience, not a gate."""
+        return self.cost < 0.5
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "mechanism": self.mechanism,
+            "evidence": self.evidence,
+            "amplification": self.amplification,
+            "replicable": self.replicable,
+            "cost": self.cost,
+            "satisfies": self.satisfies,
             "description": self.description,
         }
 
@@ -226,6 +418,16 @@ class Interface:
     parent: Optional[Tuple[str, str, int]] = None
     crossed_by: Optional[str] = None
     rationale: str = ""
+    #: How much the crossing bought: ``NARROW`` or ``EXPANSIVE``, or ``""`` while
+    #: the gap is open. Orthogonal to the verdict, because "did it hold" and "how
+    #: far did it carry" are different questions and answering them with one
+    #: word is how a cryostat gets filed as a failure.
+    status: str = ""
+    #: The span this gap started with. Kept so a *supersession* -- a second,
+    #: better mechanism on the same gap -- can be computed from the same origin
+    #: instead of compounding on the first crossing's result. Without it, reach
+    #: would be a counter again, just with extra steps.
+    base_span: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not self.source or not self.target:
@@ -263,6 +465,12 @@ class Interface:
                 "sub_interfaces must be a tuple; a list would be mutable and this "
                 "object is meant to be a value"
             )
+        if self.status not in ("", NARROW, EXPANSIVE):
+            raise InterfaceError(
+                "unknown status {!r}; known: {}, {} or unset".format(
+                    self.status, NARROW, EXPANSIVE
+                )
+            )
 
     # -- identity ---------------------------------------------------------
 
@@ -280,6 +488,16 @@ class Interface:
     @property
     def is_crossed(self) -> bool:
         return self.condition_met
+
+    @property
+    def origin_span(self) -> float:
+        """The span before any crossing of this gap. The base for every mechanism.
+
+        Compounding would let two mechanisms on one gap multiply each other, so
+        the second crossing would inherit the first's reach and then double it.
+        That is a counter wearing a mechanism's name.
+        """
+        return float(self.base_span) if self.base_span is not None else float(self.span)
 
     # -- traversal --------------------------------------------------------
 
@@ -324,6 +542,8 @@ class Interface:
             "parent": list(self.parent) if self.parent else None,
             "crossed_by": self.crossed_by,
             "rationale": self.rationale,
+            "status": self.status,
+            "origin_span": self.origin_span,
         }
         if depth > 0:
             payload["sub_interfaces"] = [
@@ -394,30 +614,85 @@ def _worst(faults: Sequence[Mapping[str, Any]]) -> str:
     return winner
 
 
-def _read_implementation(raw: Any) -> Tuple[str, str, Optional[bool]]:
-    """Normalise a condition implementation into (mechanism, evidence, satisfies).
+@dataclass(frozen=True)
+class _Spec:
+    """A normalised condition implementation, before it is judged.
 
-    Accepts a mapping or a bare string. A bare string is a mechanism with no
-    evidence, which is a claim and not a witness -- it parses, and then fails the
-    evidence check rather than crashing.
+    ``replicable`` is ``None`` when the caller declared nothing. That is not the
+    same as ``True``: an undeclared claim gets the benefit of the doubt for the
+    *verdict*, because failing a caller for an unasked question would be
+    inventing a requirement. What it does not get is permission to assert a
+    large unreplicable amplification. ``replicable=False`` is a positive claim
+    that the mechanism cannot be repeated at scale, and that claim is what the
+    reach is checked against.
+    """
+
+    mechanism: str
+    evidence: str
+    satisfies: Optional[bool]
+    replicable: Optional[bool]
+    amplification: Optional[float]
+    cost: Optional[float]
+    name: str
+
+
+def _read_implementation(raw: Any) -> _Spec:
+    """Normalise a condition implementation.
+
+    Accepts a :class:`NarrowCondition`, a mapping, or a bare string. A bare
+    string is a mechanism with no evidence, which is a claim and not a witness --
+    it parses, and then fails the evidence check rather than crashing.
     """
     if raw is None:
-        return "", "", None
+        return _Spec("", "", None, None, None, None, "")
+    if isinstance(raw, NarrowCondition):
+        return _Spec(
+            mechanism=raw.mechanism,
+            evidence=raw.evidence,
+            satisfies=raw.satisfies,
+            replicable=raw.replicable,
+            amplification=raw.amplification,
+            cost=raw.cost,
+            name=raw.name,
+        )
     if isinstance(raw, str):
-        return raw.strip(), "", None
+        return _Spec(raw.strip(), "", None, None, None, None, raw.strip())
     if isinstance(raw, Mapping):
         mechanism = _text(raw.get("mechanism") or raw.get("condition"))
         evidence = _text(raw.get("evidence") or raw.get("witness"))
+        name = _text(raw.get("name")) or mechanism
         satisfies = raw.get("satisfies")
         if satisfies is not None and not isinstance(satisfies, bool):
             raise InterfaceError(
                 "satisfies must be a bool, got {!r}".format(type(satisfies).__name__)
             )
-        return mechanism, evidence, satisfies
-    raise InterfaceError(
-        "a condition implementation must be a mapping or a string, got {!r}".format(
-            type(raw).__name__
+        replicable = raw.get("replicable")
+        if replicable is not None and not isinstance(replicable, bool):
+            raise InterfaceError(
+                "replicable must be a bool, got {!r}".format(
+                    type(replicable).__name__
+                )
+            )
+        amplification = raw.get("amplification")
+        if amplification is not None:
+            checked = _positive(amplification)
+            if checked is None or checked <= 1.0:
+                raise InterfaceError(
+                    "amplification must exceed 1.0, got {!r}".format(amplification)
+                )
+            amplification = checked
+        cost = raw.get("cost")
+        if cost is not None:
+            cost = _unit(cost)
+            if cost is None:
+                raise InterfaceError("cost must be in [0, 1], got {!r}".format(
+                    raw.get("cost")))
+        return _Spec(
+            mechanism, evidence, satisfies, replicable, amplification, cost, name
         )
+    raise InterfaceError(
+        "a condition implementation must be a NarrowCondition, a mapping, or a "
+        "string, got {!r}".format(type(raw).__name__)
     )
 
 
@@ -427,6 +702,11 @@ def _text(value: Any) -> str:
     if isinstance(value, str):
         return " ".join(value.split())
     return str(value).strip()
+
+
+def _norm(value: Any) -> str:
+    """Lower-cased, whitespace-collapsed. Identifier comparison, not prose."""
+    return _text(value).lower()
 
 
 def _digest(payload: Mapping[str, Any]) -> str:
@@ -465,6 +745,7 @@ class FractalEvolver:
         narrow_threshold: float = NARROW_THRESHOLD,
         nesting_ratio: float = NESTING_RATIO,
         span_horizon: float = SPAN_HORIZON,
+        replication_ceiling: float = REPLICATION_CEILING,
     ) -> None:
         threshold = _unit(narrow_threshold)
         if threshold is None or not 0.0 < threshold < 1.0:
@@ -482,6 +763,13 @@ class FractalEvolver:
         horizon = _positive(span_horizon)
         if horizon is None:
             raise InterfaceError("span_horizon must be a positive number")
+        ceiling = _positive(replication_ceiling)
+        if ceiling is None or ceiling <= 1.0:
+            raise InterfaceError(
+                "replication_ceiling must exceed 1.0, got {!r}; at 1.0 every "
+                "crossing would be NARROW and the distinction would vanish"
+                .format(replication_ceiling)
+            )
         if membrane is not None and not callable(getattr(membrane, "append_call", None)):
             raise InterfaceError(
                 "membrane must expose append_call(), got {!r}".format(
@@ -496,6 +784,7 @@ class FractalEvolver:
         self._threshold = threshold
         self._ratio = ratio
         self._horizon = horizon
+        self._replication_ceiling = ceiling
         for layer in layers or ():
             self.add_layer(layer)
 
@@ -651,24 +940,37 @@ class FractalEvolver:
         of the same shape is spawned one generation deeper.
 
         FAIL means the gap was measured and the claim refuted: the condition was
-        not satisfied, or the gap was too wide to be a boundary at all. INVALID
-        means nothing was offered that could be refuted. The distinction matters
-        because "I brought the wrong witness" and "I brought no witness" call for
-        different work.
+        not satisfied, the gap was too wide to be a boundary, or the amplification
+        claimed more reach than the mechanism can be replicated to carry. INVALID
+        means nothing was offered that could be refuted.
+
+        **Supersession.** An already-crossed gap may be crossed again only by a
+        *different mechanism* that buys more reach. That is not a loophole in the
+        no-re-crossing rule; it is the same rule read correctly. Re-running the
+        same mechanism is a counter and is still refused. Finding a better
+        mechanism for the same gap is what happens when a science matures --
+        cryogenics crossed the macro/quantum gap first, and protein scaffolds
+        crossed the same gap thousands of times wider. Recomputing from
+        ``origin_span`` rather than from the previous result is what keeps a
+        supersession from compounding like a counter.
         """
         root, live = self._locate(interface)
+        spec = _read_implementation(condition_implementation)
+
+        superseding = False
         if live.condition_met:
-            raise InterfaceError(
-                "{} is already crossed by {!r}. Reach is not a counter: re-crossing "
-                "would multiply the span without satisfying a new condition. Cross "
-                "its sub-interface instead.".format(
-                    list(live.key), live.crossed_by
+            if _norm(spec.mechanism) == _norm(live.crossed_by or ""):
+                raise InterfaceError(
+                    "{} is already crossed by {!r}. Reach is not a counter: "
+                    "re-running the same mechanism would multiply the span "
+                    "without satisfying a new condition. Cross its sub-interface "
+                    "instead, or bring a different mechanism that buys more."
+                    .format(list(live.key), live.crossed_by)
                 )
-            )
-        mechanism, evidence, satisfies = _read_implementation(condition_implementation)
+            superseding = True
 
         faults: List[Dict[str, Any]] = []
-        lowered = mechanism.strip().lower()
+        lowered = spec.mechanism.strip().lower()
         if not lowered:
             faults.append(
                 _fault(
@@ -685,10 +987,10 @@ class FractalEvolver:
                     INVALID,
                     "{!r} is not a condition. It cannot be measured, so it cannot "
                     "be wrong, which is what makes it an unsuitable witness rather "
-                    "than a weak one.".format(mechanism),
+                    "than a weak one.".format(spec.mechanism),
                 )
             )
-        if not evidence:
+        if not spec.evidence:
             faults.append(
                 _fault(
                     "NO_EVIDENCE",
@@ -697,7 +999,18 @@ class FractalEvolver:
                     "work; evidence is what lets someone else check that it did.",
                 )
             )
-        if satisfies is False:
+        elif _norm(spec.evidence).rstrip(".") in PLACEHOLDER_EVIDENCE:
+            faults.append(
+                _fault(
+                    "ASSERTION_NOT_EVIDENCE",
+                    INVALID,
+                    "{!r} asserts that something is so instead of naming anything "
+                    "a third party could look up. Consensus is not an artefact; a "
+                    "reader who accepts it learns nothing they could re-check."
+                    .format(spec.evidence),
+                )
+            )
+        if spec.satisfies is False:
             faults.append(
                 _fault(
                     "CONDITION_NOT_SATISFIED",
@@ -719,7 +1032,65 @@ class FractalEvolver:
                 )
             )
 
+        # The multiplier is resolved before the verdict, because whether the
+        # claim is even possible depends on it: a mechanism that cannot be
+        # instantiated at scale cannot buy global reach, and that contradiction
+        # belongs in the fault list rather than in a comment.
+        multiplier = (
+            amplification
+            if amplification is not None
+            else (spec.amplification if spec.amplification is not None
+                  else live.amplification)
+        )
+        checked = _positive(multiplier)
+        if checked is None or checked <= 1.0:
+            raise InterfaceError(
+                "amplification must exceed 1.0, got {!r}".format(multiplier)
+            )
+        if checked < live.amplification and not live.condition_met:
+            # The interface's amplification before it is crossed is a *default*,
+            # not a commitment. A mechanism that buys less than the nominal
+            # multiplier has not lied; it has told us the gap is dearer than the
+            # default assumed, and that is worth recording without rejecting it.
+            faults.append(
+                _fault(
+                    "BELOW_NOMINAL",
+                    None,
+                    "this mechanism buys {:.2f}x against a nominal {:.2f}x. The "
+                    "reach recorded is what was actually bought, and the status "
+                    "follows that rather than the default.".format(
+                        checked, live.amplification
+                    ),
+                )
+            )
+        if superseding and checked <= live.amplification:
+            raise InterfaceError(
+                "a supersession must buy more reach than the mechanism it "
+                "replaces ({:.2f}x); {:.2f}x would make the better mechanism "
+                "indistinguishable from the worse one".format(
+                    live.amplification, checked
+                )
+            )
+        if spec.replicable is False and checked > self._replication_ceiling:
+            faults.append(
+                _fault(
+                    "UNREPLICABLE_REACH",
+                    FAIL,
+                    "{!r} declares itself not replicable at the target layer, yet "
+                    "claims {:.0f}x reach. A condition that cannot be instantiated "
+                    "at scale cannot buy scale; the claim contradicts itself, and "
+                    "the contradiction is the filing's, not the auditor's.".format(
+                        spec.name or spec.mechanism, checked
+                    ),
+                )
+            )
+
         verdict = _worst(faults)
+        status = (
+            NARROW
+            if checked <= self._replication_ceiling or spec.replicable is False
+            else EXPANSIVE
+        )
         if verdict != PASS:
             result = {
                 "interface": list(live.key),
@@ -729,57 +1100,54 @@ class FractalEvolver:
                 "difficulty": round(live.difficulty, 6),
                 "generation": live.generation,
                 "span_before": live.span,
+                "origin_span": live.origin_span,
                 "span_after": live.span,
                 "amplification": None,
                 "sub_interface": None,
                 "escalated": False,
-                "condition_met": False,
+                "condition_met": live.condition_met,
+                "status": live.status,
+                "superseding": superseding,
+                "cost": spec.cost,
+                "replicable": spec.replicable,
                 "message": "the gap is not broken",
             }
             self._record(result)
             return result
 
-        multiplier = live.amplification if amplification is None else amplification
-        checked = _positive(multiplier)
-        if checked is None or checked <= 1.0:
-            raise InterfaceError(
-                "amplification must exceed 1.0, got {!r}".format(multiplier)
-            )
-        if checked < live.amplification:
-            raise InterfaceError(
-                "amplification {:.2f} is below this interface's {:.2f}; a crossing "
-                "that connects less than the thing it replaces is not a crossing"
-                .format(checked, live.amplification)
-            )
-
-        span_after = min(live.span * checked, self._horizon)
+        span_after = min(live.origin_span * checked, self._horizon)
         crossed = live.evolve(
             condition_met=True,
             span=span_after,
+            base_span=live.origin_span,
             amplification=checked,
-            crossed_by=mechanism,
+            crossed_by=spec.mechanism,
+            status=status,
         )
 
-        child: Optional[Interface] = None
         spawn = next_condition if next_condition is not None else ""
-        if isinstance(spawn, str):
-            child = Interface(
-                source=crossed.source,
-                target=crossed.target,
-                condition=spawn.strip(),
-                span=span_after,
-                difficulty=_next_difficulty(crossed.difficulty, self._ratio),
-                generation=crossed.generation + 1,
-                parent=crossed.key,
-                amplification=crossed.amplification,
-                rationale=(
-                    "the gap inside the space just connected; same shape, "
-                    "narrower opening"
-                ),
-            )
-            crossed = crossed.evolve(sub_interfaces=crossed.sub_interfaces + (child,))
-        else:
+        if not isinstance(spawn, str):
             raise InterfaceError("next_condition must be a string or None")
+        child = Interface(
+            source=crossed.source,
+            target=crossed.target,
+            condition=spawn.strip(),
+            span=span_after,
+            difficulty=_next_difficulty(crossed.difficulty, self._ratio),
+            generation=crossed.generation + 1,
+            parent=crossed.key,
+            amplification=crossed.amplification,
+            rationale=(
+                "the gap inside the space just connected; same shape, "
+                "narrower opening"
+            ),
+        )
+        # A supersession *replaces* the next gap rather than adding a second one.
+        # The cryostat revealed a gap inside a laboratory; the protein revealed a
+        # gap inside a biosphere. Those are not two interiors, they are the same
+        # interior seen after a wider crossing, so appending would describe a
+        # space nobody is in.
+        crossed = crossed.evolve(sub_interfaces=(child,))
 
         escalated = span_after >= self._horizon
         result = {
@@ -790,28 +1158,35 @@ class FractalEvolver:
             "difficulty": round(crossed.difficulty, 6),
             "generation": crossed.generation,
             "span_before": live.span,
+            "origin_span": live.origin_span,
             "span_after": span_after,
             "amplification": checked,
-            "sub_interface": child.as_dict(depth=0) if child else None,
+            "sub_interface": child.as_dict(depth=0),
             "escalated": escalated,
             "condition_met": True,
-            "mechanism": mechanism,
-            "evidence": evidence,
+            "mechanism": spec.mechanism,
+            "evidence": spec.evidence,
+            "status": status,
+            "superseding": superseding,
+            "cost": spec.cost,
+            "replicable": spec.replicable,
             "message": (
                 "the gap is broken and the reach is {}. It is now infrastructure."
                 .format(format_span(span_after))
                 if escalated
-                else "the gap is broken; the reach is {} and the next gap is "
-                "{}".format(
+                else "the gap is broken {}x; the reach is {} and the next gap is {}"
+                .format(
+                    "{:.0f}".format(checked),
                     format_span(span_after),
-                    "narrower" if child and child.named else "not yet named",
+                    "narrower" if child.named else "not yet named",
                 )
             ),
         }
         self._record(result, digest_payload={
             "interface": list(crossed.key),
-            "mechanism": mechanism,
-            "evidence": evidence,
+            "mechanism": spec.mechanism,
+            "evidence": spec.evidence,
+            "amplification": checked,
         })
         self._install(root, crossed)
         return result

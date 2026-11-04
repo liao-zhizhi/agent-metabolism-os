@@ -458,17 +458,27 @@ against the chain as it actually stands. Crossing is the only door upward —
 `FractalEvolver.cross_interface` is the sole method that raises `condition_met`,
 multiplies a span, or spawns a sub-interface.
 
-Four things the engine refuses, each because allowing it would make the ladder a
+Six things the engine refuses, each because allowing it would make the ladder a
 poster rather than a model:
 
 * **A gap anything can cross** is `FAIL` (`NOT_A_BOUNDARY`). Crediting it would
   let a caller multiply reach by satisfying nothing.
 * **A placeholder condition** is `INVALID`. `magic` cannot be measured, so it
   cannot be wrong.
-* **Re-crossing** raises. Reach is not a counter; a loop would manufacture
-  unbounded span without ever satisfying a new condition.
-* **A falling amplification** raises. A crossing that connects less than the thing
-  it replaces is not a crossing.
+* **Re-running the same mechanism** raises. Reach is not a counter; a loop would
+  manufacture unbounded span without ever satisfying a new condition.
+* **A supersession that buys less** raises. A second mechanism that connects less
+  than the one it replaces is indistinguishable from it.
+* **A slogan as evidence** is `INVALID` (`ASSERTION_NOT_EVIDENCE`). *"It obviously
+  works"* names nothing a third party could look up. This is a blacklist, not a
+  quality test: it cannot catch a fabricated citation, and says so.
+* **An unreplicable mechanism claiming scale** is `FAIL` (`UNREPLICABLE_REACH`).
+  A condition that cannot be instantiated at scale cannot buy scale; the claim
+  contradicts itself.
+
+An open gap's `amplification` is a **default**, not a commitment. A mechanism that
+buys less than the default gets a non-decisive `BELOW_NOMINAL` note, because the
+reach recorded should be what was bought rather than what was assumed.
 
 The third reach saturates at a finite horizon instead of becoming `inf`.
 Infinity cannot be multiplied, compared, or printed, and a quantity that breaks
@@ -480,15 +490,55 @@ notice, in the words the design used.
 python3 demo_fractal_interfaces.py      # 2 -> 100 -> 1e6 -> 1e12, 22 self-checks
 ```
 
+### Verdict is not status
+
+One gap can be crossed by two mechanisms that are both true and differ by four
+orders of magnitude in what they buy. Recording them with one word erases the
+only distinction an engineer cares about, so the engine separates:
+
+* **verdict** — did the claim hold? `PASS` / `FAIL` / `INVALID`
+* **status** — how far did it carry? `NARROW` (≤ 10×, or lab-bound) / `EXPANSIVE`
+
+### The worked example: biology consuming quantum coherence
+
+A photosynthetic complex at 300 K is wet, warm and noisy; the electronic coherence
+it runs on lasts about a picosecond in bulk. That is **12 decades**, and no
+vocabulary closes it. Two mechanisms do, and they are not interchangeable:
+
+| mechanism | verdict | status | buys | reach | cost |
+|:--|:--|:--|--:|--:|--:|
+| `Cryogenic_Cooling` | PASS | NARROW | 2× | 10 → 20 | 0.95 |
+| `Protein_Scaffold` | PASS | EXPANSIVE | 10,000× | 10 → 100,000 | 0.02 |
+
+The cryostat is not a failure. It is the **proof that the gap closes** — and it
+buys a laboratory. The protein does not remove the noise; it arranges a structure
+in which the noise does not destroy the phase before it is used, which is why it
+costs almost nothing and works everywhere a cell works.
+
+Crossing that gap spawns the next one, and it is strictly narrower: *humans*
+crossing it is a different problem from *biology* crossing it — how to build the
+structure instead of growing it. Evolution had a billion years and a population
+to search with; a laboratory has neither. The sub-interface is printed **unnamed
+and uncrossed**, because it is.
+
+`Protein_Scaffold` does not compound on the cryostat's 2×. Reach is recomputed
+from the span the gap started with (10), so two mechanisms cannot multiply each
+other into a number nobody earned.
+
+```bash
+python3 demo_bio_quantum_fractal.py     # 12 decades, 2× vs 10,000×, 24 self-checks
+```
+
 ## Run it
 
 ```bash
-PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 545 tests, ~2s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 594 tests, ~2s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 python3 demo_lean_fake_proof.py         # a Riemann "proof" that is not one
 python3 demo_one_person_company.py      # three agents, one liar, one balance sheet
 python3 demo_fractal_interfaces.py      # three generations, 2 -> 1e12
+python3 demo_bio_quantum_fractal.py     # 2x vs 10,000x through the same gap
 ```
 
 No install step, no dependencies, no network. Python 3.9+.
@@ -943,7 +993,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 545 tests in ~2s
+Ran 594 tests in ~2s
 OK
 ```
 
