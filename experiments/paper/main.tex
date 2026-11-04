@@ -198,6 +198,28 @@ can coexist at all), and a narrow condition whose satisfaction multiplies the
 span. Crossing is not free and not symmetric: it buys reach at the cost of
 satisfying something almost nothing satisfies.
 
+\subsection{Relation to prior work}
+\label{sec:related}
+
+The claim that apparent capability jumps are an artefact of the metric is now
+well established \cite{schaeffer2023,du2024,zhao2025}, and the emergence claim it
+answers was stated explicitly \cite{wei2022}. Fractal structure has been used as
+an analytic lens on language and on training dynamics
+\cite{alabdulmohsin2025,torkamandi2025}, an agent's self-report is studied as a
+control problem under subversion \cite{greenblatt2023,vanderweij2024}, and the
+economics of when a claim is worth verifying at all already has a frontier of its
+own \cite{gill2026}. None of these models the interface itself: none gives a
+crossing a difficulty, a span and a narrowing condition, and none derives a reach
+law from them. To our knowledge this is the first account in which the fractal
+interface supplies the exponent and the causal label supplies the verdict, so that
+``it works'' and ``it says it works'' are separated by construction rather than
+by a better judge. Our $B^{*}$ is not the first verification threshold---%
+\cite{gill2026} derives one on claim value---but it is a threshold on
+\emph{depth}, and it moves only when the compiled regime pays a premium the
+unlabelled one does not (\S\ref{sec:criticalbudget}); the compile-once,
+check-cheaply economy that we later formalise as $\kappa$ is older than this paper
+\cite{necula1997}, and we say so where we use it.
+
 \subsection{Why biology is the test case}
 
 Photosynthetic pigment--protein complexes are the best-documented candidate for a
@@ -1305,7 +1327,8 @@ witness but a different kind of object: a judgement that is a function of the
 evidence the audited party produces about itself, and which therefore cannot be
 made correct by making the judge better.
 
-Pearl's distinction between observing and intervening is usually illustrated with
+Pearl's distinction \cite{pearl2009} between observing and intervening is usually
+illustrated with
 a graph. Experiment~G executes it. We built \cgTasks{} agent tasks in a real working
 tree with a real git repository, drew \cgFalseCompletionPct\% of them as false
 completions---the tool layer reports success and nothing is written---and
@@ -1795,7 +1818,10 @@ B^{*}(S,\rho,c_d)
 \end{equation}
 finite and positive \emph{iff} $c_d<p\,a$ --- which is exactly the detector
 break-even of \S\ref{sec:solidification}, read as a budget statement rather than a
-price statement. Four consequences, in order of how easily they can be checked.
+price statement. It is a threshold on \emph{depth}; the verification frontier of
+\cite{gill2026} prices a different margin---which claims are worth verifying at
+all---and the two should not be conflated. Four consequences, in order of how
+easily they can be checked.
 
 First, $B^{*}$ is \textbf{affine in $S$} with intercept $c_v$ and slope
 $G_\infty/(G_\infty-1)=$\cbSlopePredicted. The slope exceeds one, so a unit of

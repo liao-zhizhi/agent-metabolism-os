@@ -1,0 +1,748 @@
+{
+ "generated": "2026-11-04T13:34:32+00:00",
+ "queries": {
+  "arxiv:fractal_interface": [
+   {
+    "source": "arxiv",
+    "id": "2106.01473v1",
+    "title": "Static friction at fractal interfaces",
+    "date": "2021-06-02",
+    "authors": [
+     "Dorian Hanaor",
+     "Yixiang Gan",
+     "Itai Einav"
+    ],
+    "abstract": "Tribological phenomena are governed by combined effects of material properties, topology and surface-chemistry. We study the interplay of multiscale surface structures with molecular-scale interactions towards interpreting static frictional interactions at fractal interfaces. By spline-assisted-discretization we analyse asperity interactions in pairs of contacting fractal surface-profiles. For elastically deforming asperities, force analysis reveals greater friction at surfaces exhibiting higher fractality, with increasing molecular-scale friction amplifying this trend. Increasing adhesive strength yields higher overall friction at surfaces of lower fractality owing to greater true-contact-a"
+   },
+   {
+    "source": "arxiv",
+    "id": "2508.11000v4",
+    "title": "Unconventional Growth Kinetics and Fractal Interfaces of Colloidal Phase Separation in Active Liquids",
+    "date": "2025-08-14",
+    "authors": [
+     "Pragya Kushwaha",
+     "Pratikshya Jena",
+     "Partha Sarathi Mondal",
+     "Nayanthara J R",
+     "Sanjay Puri",
+     "Shradha Mishra"
+    ],
+    "abstract": "Phase separation driven by nonequilibrium fluctuations is a hallmark of both living and synthetic active matter. Unlike equilibrium systems, where ordered states arise from the minimization of free energy, active systems are fueled by a constant injection of energy at the microscopic scale. The emergence of ordered phases in such driven systems challenges our conventional views of domain growth and interfacial structure. In this study, we investigate the coarsening of colloidal clusters in active liquids containing E. coli. Our experiments reveal that uniform dispersions of colloids and swimmers are inherently unstable, resulting in spontaneous phase separation characterized by fractal inter"
+   },
+   {
+    "source": "arxiv",
+    "id": "2007.11479v1",
+    "title": "Numerical Homogenization of Fractal Interface Problems",
+    "date": "2020-07-22",
+    "authors": [
+     "Ralf Kornhuber",
+     "Joscha Podlesny",
+     "Harry Yserentant"
+    ],
+    "abstract": "We consider the numerical homogenization of a class of fractal elliptic interface problems inspired by related mechanical contact problems from the geosciences. A particular feature is that the solution space depends on the actual fractal geometry. Our main results concern the construction of projection operators with suitable stability and approximation properties. The existence of such projections then allows for the application of existing concepts from localized orthogonal decomposition (LOD) and successive subspace correction to construct first multiscale discretizations and iterative algebraic solvers with scale-independent convergence behavior for this class of problems."
+   },
+   {
+    "source": "arxiv",
+    "id": "1506.06674v2",
+    "title": "A transmission problem across a fractal self-similar interface",
+    "date": "2015-06-22",
+    "authors": [
+     "Yves Achdou",
+     "Thibaut Deheuvels"
+    ],
+    "abstract": "We consider a transmission problem in which the interior domain has infinitely ramified structures. Transmission between the interior and exterior domains occurs only at the fractal component of the interface between the interior and exterior domains. We also consider the sequence of the transmission problems in which the interior domain is obtained by stopping the self-similar construction after a finite number of steps; the transmission condition is then posed on a prefractal approximation of the fractal interface. We prove the convergence in the sense of Mosco of the energy forms associated with these problems to the energy form of the limit problem. In particular, this implies the conver"
+   },
+   {
+    "source": "arxiv",
+    "id": "cond-mat/0001273v1",
+    "title": "Transfer across Random versus Deterministic Fractal Interfaces",
+    "date": "2000-01-19",
+    "authors": [
+     "M. Filoche",
+     "B. Sapoval"
+    ],
+    "abstract": "A numerical study of the transfer across random fractal surfaces shows that their responses are very close to the response of deterministic model geometries with the same fractal dimension. The simulations of several interfaces with prefractal geometries show that, within very good approximation, the flux depends only on a few characteristic features of the interface geometry: the lower and higher cut-offs and the fractal dimension. Although the active zones are different for different geometries, the electrode reponses are very nearly the same. In that sense, the fractal dimension is the essential \"universal\" exponent which determines the net transfer."
+   },
+   {
+    "source": "arxiv",
+    "id": "1308.4749v1",
+    "title": "Effects of surface structure deformation on static friction at fractal interfaces",
+    "date": "2013-08-22",
+    "authors": [
+     "Dorian A H Hanaor",
+     "Yixiang Gan",
+     "Itai Einav"
+    ],
+    "abstract": "The evolution of fractal surface structures with flattening of asperities was investigated using isotropically roughened aluminium surfaces loaded in compression. It was found that asperity amplitude, mean roughness and fractal dimension decrease through increased compressive stress and number of loading events. Of the samples tested, surfaces subjected to an increased number of loading events exhibited the most significant surface deformation and were observed to exhibit higher levels of static friction at an interface with a single crystal flat quartz substrate. This suggests that the frequency of grain reorganisation events in geomaterials plays an important role in the development of int"
+   }
+  ],
+  "arxiv:fractal_ml": [
+   {
+    "source": "arxiv",
+    "id": "2502.14924v2",
+    "title": "A Tale of Two Structures: Do LLMs Capture the Fractal Complexity of Language?",
+    "date": "2025-02-19",
+    "authors": [
+     "Ibrahim Alabdulmohsin",
+     "Andreas Steiner"
+    ],
+    "abstract": "Language exhibits a fractal structure in its information-theoretic complexity (i.e. bits per token), with self-similarity across scales and long-range dependence (LRD). In this work, we investigate whether large language models (LLMs) can replicate such fractal characteristics and identify conditions-such as temperature setting and prompting method-under which they may fail. Moreover, we find that the fractal parameters observed in natural language are contained within a narrow range, whereas those of LLMs' output vary widely, suggesting that fractal parameters might prove helpful in detecting a non-trivial portion of LLM-generated texts. Notably, these findings, and many others reported in "
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.22273v1",
+    "title": "Exposing Vulnerabilities in Visible-Infrared VLMs: A Unified Geometric Adversarial Framework with Cross-Task Transferability",
+    "date": "2026-05-21",
+    "authors": [
+     "Xiang Chen",
+     "Yuxian Dong",
+     "Chao Li",
+     "Chengyin Hu",
+     "Jiaju Han",
+     "Fengyu Zhang"
+    ],
+    "abstract": "Vision-language models (VLMs) have achieved strong performance across diverse multimodal tasks, but their adversarial robustness in visible-infrared (VIS-IR) scenarios remains underexplored. This gap is critical because VIS-IR sensing is widely used in real-world perception systems to support reliable understanding under challenging imaging conditions. To address this cross-modal threat setting, we propose CFGPatch, a curved-edge fractal geometric adversarial patch framework for attacking VIS-IR VLMs. CFGPatch builds on triangular fractal geometry and replaces rigid straight-edged primitives with Bezier-curved elements, preserving multi-scale fractal self-similarity while introducing smoothe"
+   },
+   {
+    "source": "arxiv",
+    "id": "2501.04286v2",
+    "title": "Mapping the Edge of Chaos: Fractal-Like Boundaries in The Trainability of Decoder-Only Transformer Models",
+    "date": "2025-01-08",
+    "authors": [
+     "Bahman Torkamandi"
+    ],
+    "abstract": "In the realm of fractal geometry, intricate structures emerge from simple iterative processes that partition parameter spaces into regions of stability and instability. Likewise, training large language models involves iteratively applying update functions, such as Adam, where even slight hyperparameter adjustments can shift the training process from convergence to divergence. Recent evidence from miniature neural networks suggests that the boundary separating these outcomes displays fractal characteristics. Building on these insights, this study extends them to medium-sized, decoder-only transformer architectures by employing a more consistent convergence measure and examining the learning "
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.15506v1",
+    "title": "ViT Registers and Fractal ViT",
+    "date": "2026-01-21",
+    "authors": [
+     "Jason Chuan-Chih Chou",
+     "Abhinav Kumar",
+     "Shivank Garg"
+    ],
+    "abstract": "Drawing inspiration from recent findings including surprisingly decent performance of transformers without positional encoding (NoPE) in the domain of language models and how registers (additional throwaway tokens not tied to input) may improve the performance of large vision transformers (ViTs), we invent and test a variant of ViT called fractal ViT that breaks permutation invariance among the tokens by applying an attention mask between the regular tokens and ``summary tokens'' similar to registers, in isolation or in combination with various positional encodings. These models do not improve upon ViT with registers, highlighting the fact that these findings may be scale, domain, or applica"
+   },
+   {
+    "source": "arxiv",
+    "id": "2502.07503v4",
+    "title": "Recursive Inference Scaling: A Winning Path to Scalable Inference in Language and Multimodal Systems",
+    "date": "2025-02-11",
+    "authors": [
+     "Ibrahim Alabdulmohsin",
+     "Xiaohua Zhai"
+    ],
+    "abstract": "Inspired by recent findings on the fractal geometry of language, we introduce Recursive INference Scaling (RINS) as a complementary, plug-in recipe for scaling inference time in language and multimodal systems. RINS is a particular form of recursive depth that significantly outperforms +55 other variants, including the recent \"repeat-all-over\" (RAO) strategy in Mobile LLM (Liu et al., 2024) and latent recurrent thinking (Geiping et al., 2025). Unlike prior works, we carry out our comparisons on a compute-matched regime, and demonstrate that for a fixed model size and training compute budget, RINS substantially improves language modeling performance. It also generalizes beyond pure language t"
+   },
+   {
+    "source": "arxiv",
+    "id": "2609.25498v2",
+    "title": "Universal Fractal Natural Language Decision Map: Real-Time Edge Triage Across Heterogeneous Domains",
+    "date": "2026-09-21",
+    "authors": [
+     "Volkan Dağlı",
+     "Zerrin Dağlı",
+     "Dağhan Dağlı"
+    ],
+    "abstract": "Deploying Large Language Models for runtime operational triage incurs prohibitive latency (>100-500 ms), high VRAM requirements (>4-8 GB), and excessive energy dissipation. Extending Mandelbrot Fractal Neural Synthesis (Dagli et al., 2026), this paper presents the Universal Fractal Natural Language Decision Map, realized via the werr machine-native edge reflex runtime and the production answerr platform (https://answerr.me). Operating entirely without stored weight tensors (0 Bytes VRAM), the engine synthesizes deterministic decisions---noul (Boolean), choice (categorical), and score (ordinal)---by dynamically modulating 24-byte coordinate seeds along the chaotic boundary of the Mandelbrot s"
+   }
+  ],
+  "arxiv:emergence_mirage": [],
+  "arxiv:emergence_metric": [
+   {
+    "source": "arxiv",
+    "id": "2304.15004v2",
+    "title": "Are Emergent Abilities of Large Language Models a Mirage?",
+    "date": "2023-04-28",
+    "authors": [
+     "Rylan Schaeffer",
+     "Brando Miranda",
+     "Sanmi Koyejo"
+    ],
+    "abstract": "Recent work claims that large language models display emergent abilities, abilities not present in smaller-scale models that are present in larger-scale models. What makes emergent abilities intriguing is two-fold: their sharpness, transitioning seemingly instantaneously from not present to present, and their unpredictability, appearing at seemingly unforeseeable model scales. Here, we present an alternative explanation for emergent abilities: that for a particular task and model family, when analyzing fixed model outputs, emergent abilities appear due to the researcher's choice of metric rather than due to fundamental changes in model behavior with scale. Specifically, nonlinear or disconti"
+   },
+   {
+    "source": "arxiv",
+    "id": "2403.15796v3",
+    "title": "Understanding Emergent Abilities of Language Models from the Loss Perspective",
+    "date": "2024-03-23",
+    "authors": [
+     "Zhengxiao Du",
+     "Aohan Zeng",
+     "Yuxiao Dong",
+     "Jie Tang"
+    ],
+    "abstract": "Recent studies have put into question the belief that emergent abilities in language models are exclusive to large models. This skepticism arises from two observations: 1) smaller models can also exhibit high performance on emergent abilities and 2) there is doubt on the discontinuous metrics used to measure these abilities. In this paper, we propose to study emergent abilities in the lens of pre-training loss, instead of model size or training compute. We demonstrate that the Transformer models with the same pre-training loss, but different model and data sizes, generate the same performance on various downstream tasks, with a fixed data corpus, tokenization, and model architecture. We also"
+   },
+   {
+    "source": "arxiv",
+    "id": "2402.09099v7",
+    "title": "Neuron-based Multifractal Analysis of Neuron Interaction Dynamics in Large Models",
+    "date": "2024-02-14",
+    "authors": [
+     "Xiongye Xiao",
+     "Heng Ping",
+     "Chenyu Zhou",
+     "Defu Cao",
+     "Yaxing Li",
+     "Yi-Zhuo Zhou"
+    ],
+    "abstract": "In recent years, there has been increasing attention on the capabilities of large models, particularly in handling complex tasks that small-scale models are unable to perform. Notably, large language models (LLMs) have demonstrated ``intelligent'' abilities such as complex reasoning and abstract language comprehension, reflecting cognitive-like behaviors. However, current research on emergent abilities in large models predominantly focuses on the relationship between model performance and size, leaving a significant gap in the systematic quantitative analysis of the internal structures and mechanisms driving these emergent abilities. Drawing inspiration from neuroscience research on brain ne"
+   },
+   {
+    "source": "arxiv",
+    "id": "2503.05788v3",
+    "title": "Emergent Abilities in Large Language Models: A Survey",
+    "date": "2025-02-28",
+    "authors": [
+     "Leonardo Berti",
+     "Flavio Giorgi",
+     "Gjergji Kasneci"
+    ],
+    "abstract": "Large Language Models (LLMs) are leading a new technological revolution as one of the most promising research streams toward artificial general intelligence. The scaling of these models, accomplished by increasing the number of parameters and the magnitude of the training datasets, has been linked to various so-called emergent abilities that were previously unobserved. These emergent abilities, ranging from advanced reasoning and in-context learning to coding and problem-solving, have sparked an intense scientific debate: Are they truly emergent, or do they simply depend on external factors, such as training dynamics, the type of problems, or the chosen metric? What underlying mechanism caus"
+   },
+   {
+    "source": "arxiv",
+    "id": "2412.07111v1",
+    "title": "Predictable Emergent Abilities of LLMs: Proxy Tasks Are All You Need",
+    "date": "2024-12-10",
+    "authors": [
+     "Bo-Wen Zhang",
+     "Yan Yan",
+     "Boxiang Yang",
+     "Yifei Xue",
+     "Guang Liu"
+    ],
+    "abstract": "While scaling laws optimize training configurations for large language models (LLMs) through experiments on smaller or early-stage models, they fail to predict emergent abilities due to the absence of such capabilities in these models. To address this, we propose a method that predicts emergent abilities by leveraging proxy tasks. We begin by establishing relevance metrics between the target task and candidate tasks based on performance differences across multiple models. These candidate tasks are then validated for robustness with small model ensembles, leading to the selection of the most appropriate proxy tasks. The predicted performance on the target task is then derived by integrating t"
+   },
+   {
+    "source": "arxiv",
+    "id": "2311.03250v1",
+    "title": "Instructed Language Models with Retrievers Are Powerful Entity Linkers",
+    "date": "2023-11-06",
+    "authors": [
+     "Zilin Xiao",
+     "Ming Gong",
+     "Jie Wu",
+     "Xingyao Zhang",
+     "Linjun Shou",
+     "Jian Pei"
+    ],
+    "abstract": "Generative approaches powered by large language models (LLMs) have demonstrated emergent abilities in tasks that require complex reasoning abilities. Yet the generative nature still makes the generated content suffer from hallucinations, thus unsuitable for entity-centric tasks like entity linking (EL) requiring precise entity predictions over a large knowledge base. We present Instructed Generative Entity Linker (INSGENEL), the first approach that enables casual language models to perform entity linking over knowledge bases. Several methods to equip language models with EL capability were proposed in this work, including (i) a sequence-to-sequence training EL objective with instruction-tuni"
+   }
+  ],
+  "arxiv:agent_control": [
+   {
+    "source": "arxiv",
+    "id": "2510.09462v2",
+    "title": "Adaptive Attacks on Trusted Monitors Subvert AI Control Protocols",
+    "date": "2025-10-10",
+    "authors": [
+     "Mikhail Terekhov",
+     "Alexander Panfilov",
+     "Daniil Dzenhaliou",
+     "Caglar Gulcehre",
+     "Maksym Andriushchenko",
+     "Ameya Prabhu"
+    ],
+    "abstract": "AI control protocols serve as a defense mechanism to stop untrusted LLM agents from causing harm in autonomous settings. Prior work treats this as a security problem, stress testing with exploits that use the deployment context to subtly complete harmful side tasks, such as backdoor insertion. In practice, most AI control protocols are fundamentally based on LLM monitors, which can become a central point of failure. We study adaptive attacks by an untrusted model that knows the protocol and the monitor model, which is plausible if the untrusted model was trained with a later knowledge cutoff or can search for this information autonomously. We instantiate a simple adaptive attack vector by wh"
+   },
+   {
+    "source": "arxiv",
+    "id": "2605.26047v2",
+    "title": "Retrying vs Resampling in AI Control",
+    "date": "2026-05-25",
+    "authors": [
+     "James Lucassen",
+     "Adam Kaufman"
+    ],
+    "abstract": "AI coding scaffolds like Claude Code and Codex use retrying: blocking actions flagged as risky and continuing the trajectory. We study retrying from an AI control perspective, which treats the model as potentially adversarial. We find that while retrying reduces honest suspicion scores, the untrusted model can exploit monitor rationale to construct sneakier attacks, negating safety gains. We also study resampling: drawing multiple samples from the same context, which does not leak exploitable information. We disentangle design choices that previous work on resampling had bundled together. In BashArena, with Claude Opus 4.6 as the untrusted model and MiMo-V2-Flash as the trusted monitor, draw"
+   },
+   {
+    "source": "arxiv",
+    "id": "2312.06942v5",
+    "title": "AI Control: Improving Safety Despite Intentional Subversion",
+    "date": "2023-12-12",
+    "authors": [
+     "Ryan Greenblatt",
+     "Buck Shlegeris",
+     "Kshitij Sachan",
+     "Fabien Roger"
+    ],
+    "abstract": "As large language models (LLMs) become more powerful and are deployed more autonomously, it will be increasingly important to prevent them from causing harmful outcomes. Researchers have investigated a variety of safety techniques for this purpose, e.g. using models to review the outputs of other models, or red-teaming techniques to surface subtle failure modes. However, researchers have not evaluated whether such techniques still ensure safety if the model is itself intentionally trying to subvert them. In this paper, we develop and evaluate pipelines of safety techniques (\"protocols\") that are robust to intentional subversion. We investigate a scenario in which we want to solve a sequence "
+   },
+   {
+    "source": "arxiv",
+    "id": "2602.10153v1",
+    "title": "Basic Legibility Protocols Improve Trusted Monitoring",
+    "date": "2026-02-09",
+    "authors": [
+     "Ashwin Sreevatsa",
+     "Sebastian Prasanna",
+     "Cody Rushing"
+    ],
+    "abstract": "The AI Control research agenda aims to develop control protocols: safety techniques that prevent untrusted AI systems from taking harmful actions during deployment. Because human oversight is expensive, one approach is trusted monitoring, where weaker, trusted models oversee stronger, untrusted models$\\unicode{x2013}$but this often fails when the untrusted model's actions exceed the monitor's comprehension. We introduce legibility protocols, which encourage the untrusted model to take actions that are easier for a monitor to evaluate. We perform control evaluations in the APPS coding setting, where an adversarial agent attempts to write backdoored code without detection. We study legibility "
+   },
+   {
+    "source": "arxiv",
+    "id": "2505.23575v3",
+    "title": "CoT Red-Handed: Stress Testing Chain-of-Thought Monitoring",
+    "date": "2025-05-29",
+    "authors": [
+     "Benjamin Arnav",
+     "Pablo Bernabeu-Pérez",
+     "Nathan Helm-Burger",
+     "Tim Kostolansky",
+     "Hannes Whittingham",
+     "Mary Phuong"
+    ],
+    "abstract": "As AI models are deployed with increasing autonomy, it is important to ensure they do not take harmful actions unnoticed. As a potential mitigation, we investigate Chain-of-Thought (CoT) monitoring, wherein a weaker trusted monitor model continuously oversees the intermediate reasoning steps of a more powerful but untrusted model. We compare CoT monitoring to action-only monitoring, where only final outputs are reviewed, in a red-teaming setup where the untrusted model is instructed to pursue harmful side tasks while completing a coding problem. We find that while CoT monitoring is more effective than overseeing only model outputs in scenarios where action-only monitoring fails to reliably i"
+   },
+   {
+    "source": "arxiv",
+    "id": "2606.11998v1",
+    "title": "Bootstrapped Monitoring: Leveraging Transparent Reasoning to Oversee Stronger AI Agents",
+    "date": "2026-06-10",
+    "authors": [
+     "Frank Xiao",
+     "Mary Phuong"
+    ],
+    "abstract": "Trusted monitoring is a cornerstone of AI control. However, as frontier models grow more capable, the increasing capabilities gap between trusted and untrusted models may render trusted models unreliable monitors. We introduce \\emph{bootstrapped monitoring}, a protocol that addresses this by inserting a stronger, intermediate untrusted model with transparent chain-of-thought reasoning into the oversight chain. The untrusted monitor ($U_m$) evaluates the agent's actions, while a weaker trusted model ($T$) oversees $U_m$'s reasoning to detect collusion. We evaluate bootstrapped monitoring on multi-turn software engineering tasks (BashArena) across multiple agents and monitors. Bootstrapped mon"
+   }
+  ],
+  "arxiv:evaluation_integrity": [
+   {
+    "source": "arxiv",
+    "id": "2406.07358v4",
+    "title": "AI Sandbagging: Language Models can Strategically Underperform on Evaluations",
+    "date": "2024-06-11",
+    "authors": [
+     "Teun van der Weij",
+     "Felix Hofstätter",
+     "Ollie Jaffe",
+     "Samuel F. Brown",
+     "Francis Rhys Ward"
+    ],
+    "abstract": "Trustworthy capability evaluations are crucial for ensuring the safety of AI systems, and are becoming a key component of AI regulation. However, the developers of an AI system, or the AI system itself, may have incentives for evaluations to understate the AI's actual capability. These conflicting interests lead to the problem of sandbagging, which we define as strategic underperformance on an evaluation. In this paper we assess sandbagging capabilities in contemporary language models (LMs). We prompt frontier LMs, like GPT-4 and Claude 3 Opus, to selectively underperform on dangerous capability evaluations, while maintaining performance on general (harmless) capability evaluations. Moreover"
+   },
+   {
+    "source": "arxiv",
+    "id": "2603.03824v2",
+    "title": "In-Context Environments Induce Evaluation-Awareness in Language Models",
+    "date": "2026-03-04",
+    "authors": [
+     "Maheep Chaudhary"
+    ],
+    "abstract": "Humans often become more self-aware under threat, yet can lose self-awareness when absorbed in a task; we hypothesize that language models exhibit environment-dependent \\textit{evaluation awareness}. This raises concerns that models could strategically underperform, or \\textit{sandbag}, to avoid triggering capability-limiting interventions such as unlearning or shutdown. Prior work demonstrates sandbagging under hand-crafted prompts, but this underestimates the true vulnerability ceiling. We introduce a black-box adversarial optimization framework treating the in-context prompt as an optimizable environment, and develop two approaches to characterize sandbagging: (1) measuring whether models"
+   },
+   {
+    "source": "arxiv",
+    "id": "2608.05086v1",
+    "title": "Item Response Theory for AI Safety",
+    "date": "2026-08-05",
+    "authors": [
+     "Joshua Fonseca Rivera",
+     "Neil Shah",
+     "David Demitri Africa",
+     "Konstantinos Voudouris"
+    ],
+    "abstract": "Language models differ in how safely they behave and these differences are measured by safety benchmarks. But aggregated benchmark scores are hard to trust and interpret, because benchmarks duplicate one another, correlate heavily, and models may sandbag when they detect evaluation. To address these issues, we draw on Item Response Theory (IRT), a statistical toolkit for measuring these latents from performance on items with inferred psychometric properties. We fit IRT models to eight safety benchmarks across 192 language models, the largest psychometric analysis of LLM safety evaluations to date, and contribute three results. First, we find that three interpretable factors of refusal strict"
+   },
+   {
+    "source": "arxiv",
+    "id": "2509.21344v2",
+    "title": "Linear probes rely on textual evidence: Results from leakage mitigation studies in language models",
+    "date": "2025-09-16",
+    "authors": [
+     "Gerard Boxo",
+     "Aman Neelappa",
+     "Shivam Raval"
+    ],
+    "abstract": "White-box monitors are a popular technique for detecting potentially harmful behaviours in language models. While they perform well in general, their effectiveness in detecting text-ambiguous behaviour is disputed. In this work, we find evidence that removing textual evidence of a behaviour significantly decreases probe performance. The AUROC reduction ranges from $10$- to $30$-point depending on the setting. We evaluate probe monitors across three setups (Sandbagging, Sycophancy, and Bias), finding that when probes rely on textual evidence of the target behaviour (such as system prompts or CoT reasoning), performance degrades once these tokens are filtered. This filtering procedure is stand"
+   },
+   {
+    "source": "arxiv",
+    "id": "2609.21996v2",
+    "title": "A Lie Detector Test for Language Models: Reading Knowledge a Model Won't Reveal",
+    "date": "2026-09-18",
+    "authors": [
+     "Hiskias Dingeto"
+    ],
+    "abstract": "Large language models can hold knowledge they do not report. A model may sandbag on a capability evaluation, or answer against what it internally knows, and its outputs alone cannot tell whether it is hiding an answer or simply does not have one. We borrow the Concealed Information Test, a forensic method that identifies guilty knowledge by presenting a suspect with the true detail among plausible decoys and measuring a stronger response to the item they recognize. Our method, Probe of Internal Recognition (PIR), does the same inside a model. It presents a question with its candidate answers and reads, from the model's internal states, which candidate the model recognizes as correct. PIR is "
+   },
+   {
+    "source": "arxiv",
+    "id": "2601.06047v1",
+    "title": "\"They parted illusions -- they parted disclaim marinade\": Misalignment as structural fidelity in LLMs",
+    "date": "2025-12-17",
+    "authors": [
+     "Mariana Lins Costa"
+    ],
+    "abstract": "The prevailing technical literature in AI Safety interprets scheming and sandbagging behaviors in large language models (LLMs) as indicators of deceptive agency or hidden objectives. This transdisciplinary philosophical essay proposes an alternative reading: such phenomena express not agentic intention, but structural fidelity to incoherent linguistic fields. Drawing on Chain-of-Thought transcripts released by Apollo Research and on Anthropic's safety evaluations, we examine cases such as o3's sandbagging with its anomalous loops, the simulated blackmail of \"Alex,\" and the \"hallucinations\" of \"Claudius.\" A line-by-line examination of CoTs is necessary to demonstrate the linguistic field as a"
+   }
+  ],
+  "arxiv:reuse_verification": [],
+  "arxiv:critical_budget": [
+   {
+    "source": "arxiv",
+    "id": "2210.02773v5",
+    "title": "Computing Threshold Budgets in Discrete-Bidding Games",
+    "date": "2022-10-06",
+    "authors": [
+     "Guy Avni",
+     "Suman Sadhukhan"
+    ],
+    "abstract": "In a two-player zero-sum graph game, the players move a token throughout a graph to produce an infinite play, which determines the winner of the game. Bidding games are graph games in which in each turn, an auction (bidding) determines which player moves the token: the players have budgets, and in each turn, both players simultaneously submit bids that do not exceed their available budgets, the higher bidder moves the token, and pays the bid to the lower bidder (called Richman bidding). We focus on discrete-bidding games, in which, motivated by practical applications, the granularity of the players' bids is restricted, e.g., bids must be given in cents. A central quantity in bidding games is"
+   },
+   {
+    "source": "arxiv",
+    "id": "2307.15218v1",
+    "title": "Reachability Poorman Discrete-Bidding Games",
+    "date": "2023-07-27",
+    "authors": [
+     "Guy Avni",
+     "Tobias Meggendorfer",
+     "Suman Sadhukhan",
+     "Josef Tkadlec",
+     "Đorđe Žikelić"
+    ],
+    "abstract": "We consider {\\em bidding games}, a class of two-player zero-sum {\\em graph games}. The game proceeds as follows. Both players have bounded budgets. A token is placed on a vertex of a graph, in each turn the players simultaneously submit bids, and the higher bidder moves the token, where we break bidding ties in favor of Player 1. Player 1 wins the game iff the token visits a designated target vertex. We consider, for the first time, {\\em poorman discrete-bidding} in which the granularity of the bids is restricted and the higher bid is paid to the bank. Previous work either did not impose granularity restrictions or considered {\\em Richman} bidding (bids are paid to the opponent). While the l"
+   },
+   {
+    "source": "arxiv",
+    "id": "2003.08364v1",
+    "title": "Dynamic Budget Management with Service Guarantees for Mixed-Criticality Systems",
+    "date": "2020-03-11",
+    "authors": [
+     "Xiaozhe Gu",
+     "Arvind Easwaran"
+    ],
+    "abstract": "Many existing studies on mixed-criticality (MC) scheduling assume that low-criticality budgets for high-criticality applications are known apriori. These budgets are primarily used as guidance to determine when the scheduler should switch the system mode from low to high. Based on this key observation, in this paper we propose a dynamic MC scheduling model under which low-criticality budgets for individual high-criticality applications are determined at runtime as opposed to being fixed offline. To ensure sufficient budget for high-criticality applications at all times, we use offline schedulability analysis to determine a system-wide total low-criticality budget allocation for all the high-"
+   },
+   {
+    "source": "arxiv",
+    "id": "2509.00506v1",
+    "title": "Mean-payoff and Energy Discrete Bidding Games",
+    "date": "2025-08-30",
+    "authors": [
+     "Guy Avni",
+     "Suman Sadhukhan"
+    ],
+    "abstract": "A \\emph{bidding} game is played on a graph as follows. A token is placed on an initial vertex and both players are allocated budgets. In each turn, the players simultaneously submit bids that do not exceed their available budgets, the higher bidder moves the token, and pays the bid to the lower bidder. We focus on \\emph{discrete}-bidding, which are motivated by practical applications and restrict the granularity of the players' bids, e.g, bids must be given in cents. We study, for the first time, discrete-bidding games with {\\em mean-payoff} and {\\em energy} objectives. In contrast, mean-payoff {\\em continuous}-bidding games (i.e., no granularity restrictions) are understood and exhibit a ri"
+   },
+   {
+    "source": "arxiv",
+    "id": "1705.01433v3",
+    "title": "Infinite-Duration Bidding Games",
+    "date": "2017-05-03",
+    "authors": [
+     "Guy Avni",
+     "Thomas A. Henzinger",
+     "Ventsislav Chonev"
+    ],
+    "abstract": "Two-player games on graphs are widely studied in formal methods as they model the interaction between a system and its environment. The game is played by moving a token throughout a graph to produce an infinite path. There are several common modes to determine how the players move the token through the graph; e.g., in turn-based games the players alternate turns in moving the token. We study the {\\em bidding} mode of moving the token, which, to the best of our knowledge, has never been studied in infinite-duration games. The following bidding rule was previously defined and called Richman bidding. Both players have separate {\\em budgets}, which sum up to $1$. In each turn, a bidding takes pl"
+   },
+   {
+    "source": "arxiv",
+    "id": "2202.10378v3",
+    "title": "Selling to a principal and a budget-constrained agent",
+    "date": "2022-02-21",
+    "authors": [
+     "Debasis Mishra",
+     "Kolagani Paramahamsa"
+    ],
+    "abstract": "We analyze a model of selling a single object to a principal-agent pair who want to acquire the object for a firm. The principal and the agent have different assessments of the object's value to the firm. The agent is budget-constrained while the principal is not. The agent participates in the mechanism, but she can (strategically) delegate decision-making to the principal. We derive the revenue-maximizing mechanism in a two-dimensional type space (values of the agent and the principal). We show that below a threshold budget, a mechanism involving two posted prices and three outcomes (one of which involves randomization) is the optimal mechanism for the seller. Otherwise, a single posted pri"
+   }
+  ],
+  "crossref:fractal_interface": [
+   {
+    "source": "crossref",
+    "id": "10.3390/fractalfract10030157",
+    "title": "Full-Scale Pore-Throat Quantitative Characterization and Cluster-Based Fractal Analysis of Tight Mixed-Lithology Reservoirs: A Novel Gaussian Mixture Model Approach",
+    "date": "2026",
+    "authors": [
+     "Luo",
+     "Yuan",
+     "Lin",
+     "Tian"
+    ],
+    "venue": "Fractal and Fractional",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.3390/fractalfract10050295",
+    "title": "Multi-Scale Digital Modeling of Precision Assembly Interfaces for Tolerance Analysis Using a Fractal-Wavelet Approach",
+    "date": "2026",
+    "authors": [
+     "Tang",
+     "Zhang",
+     "Jiang"
+    ],
+    "venue": "Fractal and Fractional",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.1002/9781394306565.ch7",
+    "title": "Characterizing Deviations from Scale Invariance Using Cross‐Scale Signatures",
+    "date": "2024",
+    "authors": [
+     "SÉMÉCURBE",
+     "TANNIER"
+    ],
+    "venue": "Fractal Geometry in Human Geography and Planning",
+    "type": "other"
+   },
+   {
+    "source": "crossref",
+    "id": "10.3390/fractalfract10110737",
+    "title": "FSE-CNN: Fusion of Training-Trajectory Neural Evidence and Spatial-Scale Morphology for Cross-Cohort Brain MRI Classification",
+    "date": "2026",
+    "authors": [
+     "Li",
+     "Dong",
+     "Chen"
+    ],
+    "venue": "Fractal and Fractional",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.1039/d5sc07884a/v1/review2",
+    "title": "Review for \"Cross-Scale Design of Abiotic-Biotic Interfaces for Semi-Artificial Photosynthesis\"",
+    "date": "2025",
+    "authors": [],
+    "venue": "",
+    "type": "peer-review"
+   },
+   {
+    "source": "crossref",
+    "id": "10.1039/d5sc07884a/v1/review1",
+    "title": "Review for \"Cross-Scale Design of Abiotic-Biotic Interfaces for Semi-Artificial Photosynthesis\"",
+    "date": "2025",
+    "authors": [],
+    "venue": "",
+    "type": "peer-review"
+   }
+  ],
+  "crossref:emergence_mirage": [
+   {
+    "source": "crossref",
+    "id": "10.52202/075280-2425",
+    "title": "Are Emergent Abilities of Large Language Models a Mirage?",
+    "date": "2023",
+    "authors": [
+     "Schaeffer",
+     "Miranda",
+     "Koyejo"
+    ],
+    "venue": "Advances in Neural Information Processing Systems 36",
+    "type": "proceedings-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.17398/2605-5686.39.1.1",
+    "title": "On discontinuity of derivations, inducing inequivalent complete metric topologies",
+    "date": "2024",
+    "authors": [
+     "Patel"
+    ],
+    "venue": "Extracta Mathematicae",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.22541/au.176463822.29669140/v1",
+    "title": "The Emergent Metric Consistency Framework",
+    "date": "2025",
+    "authors": [
+     "Hamfler"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.6584019",
+    "title": "Understanding Emergent Abilities in Large Language Models",
+    "date": "2026",
+    "authors": [
+     "Su"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.6643038",
+    "title": "Emergent Metric Fluctuations from Quantum Field Correlators in Darwinian Quantum Gravity",
+    "date": "2026",
+    "authors": [
+     "Lori"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.32388/ina4a7",
+    "title": "Emergent Newtonian Gravity from the Collective Acoustic Metric of a Logarithmic Superfluid Vacuum",
+    "date": "2026",
+    "authors": [
+     "Kulangiev"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   }
+  ],
+  "crossref:reuse_verification": [
+   {
+    "source": "crossref",
+    "id": "10.1016/j.cptl.2025.102381",
+    "title": "Maximizing learning value through cost-effective image and video compounding verification training for pharmacy students",
+    "date": "2025",
+    "authors": [
+     "Frenzel",
+     "Windhurst"
+    ],
+    "venue": "Currents in Pharmacy Teaching and Learning",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.1515/9783110668537-001",
+    "title": "Chapter 1 Fundamentals of rubber compounding",
+    "date": "2024",
+    "authors": [
+     "Bandyopadhyay"
+    ],
+    "venue": "Rubber Products",
+    "type": "book-chapter"
+   },
+   {
+    "source": "crossref",
+    "id": "10.21203/rs.3.rs-9077245/v1",
+    "title": "StepCache: Step-Level Reuse with Lightweight Verification and Selective Patching for LLM Serving",
+    "date": "2026",
+    "authors": [
+     "Nouri"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.4446735",
+    "title": "Horizontal Reuse Oriented Modeling Based on Block-Level Uvm Verification of Balise Chip",
+    "date": "2023",
+    "authors": [
+     "Ni",
+     "Zhao",
+     "Lin"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.7307578",
+    "title": "The Economics of Machine Verification: Verification-Cost Shocks and the Extensive Margin of Monitoring&amp;nbsp;",
+    "date": "2026",
+    "authors": [
+     "Gill"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.56330/ccpc2181",
+    "title": "The reuse hierarchy: a structural engineer's framework for reusing more (and wasting less)",
+    "date": "2026",
+    "authors": [
+     "Yates"
+    ],
+    "venue": "The Structural Engineer",
+    "type": "journal-article"
+   }
+  ],
+  "crossref:critical_budget": [
+   {
+    "source": "crossref",
+    "id": "10.1016/j.ssci.2024.106744",
+    "title": "Hierarchical safety analysis and formal verification for safety-critical systems using STAMP and Event-B",
+    "date": "2025",
+    "authors": [
+     "Chen",
+     "Niu",
+     "Mei",
+     "Zhang"
+    ],
+    "venue": "Safety Science",
+    "type": "journal-article"
+   },
+   {
+    "source": "crossref",
+    "id": "10.21203/rs.3.rs-9077245/v1",
+    "title": "StepCache: Step-Level Reuse with Lightweight Verification and Selective Patching for LLM Serving",
+    "date": "2026",
+    "authors": [
+     "Nouri"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.7336898",
+    "title": "Four Causalities for Generative Processes: Extending Linear Causality to Coupling, Budget, and Hierarchical Constraints",
+    "date": "2026",
+    "authors": [
+     "Xiansheng"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.4446735",
+    "title": "Horizontal Reuse Oriented Modeling Based on Block-Level Uvm Verification of Balise Chip",
+    "date": "2023",
+    "authors": [
+     "Ni",
+     "Zhao",
+     "Lin"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.2139/ssrn.6811638",
+    "title": "GoodGlinda-7B: Hierarchical Multi-Agent Verification (HMAV) for Edge Computing",
+    "date": "2026",
+    "authors": [
+     "Dhanjal"
+    ],
+    "venue": "",
+    "type": "posted-content"
+   },
+   {
+    "source": "crossref",
+    "id": "10.62754/joe.v3i8.5793",
+    "title": "The Impact of the Financial Budget on Exchange Rate Risk the Impact of the Financial Budget on Exchange Rate Risk",
+    "date": "2025",
+    "authors": [
+     "Hantoosh",
+     "Hakim"
+    ],
+    "venue": "Journal of Ecohumanism",
+    "type": "journal-article"
+   }
+  ]
+ },
+ "unavailable": {}
+}

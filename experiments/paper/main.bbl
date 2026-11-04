@@ -32,6 +32,36 @@ G.~B. West, J.~H. Brown, and B.~J. Enquist, ``A general model for the origin of 
 \bibitem{barabasi1999}
 A.-L. Barab{\'a}si and R.~Albert, ``Emergence of scaling in random networks,'' \emph{Science}, vol. 286, no. 5439, pp. 509--512, 1999.
 
+\bibitem{schaeffer2023}
+R.~Schaeffer, B.~Miranda, and S.~Koyejo, ``Are emergent abilities of large language models a mirage?'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2023.
+
+\bibitem{du2024}
+Z.~Du, A.~Zeng, Y.~Dong, and J.~Tang, ``Understanding emergent abilities of language models from the loss perspective,'' in \emph{arXiv preprint arXiv:2403.15796}, 2024.
+
+\bibitem{zhao2025}
+R.~Zhao, T.~Qin, D.~Alvarez-Melis, and S.~Kakade, ``Random scaling of emergent capabilities,'' in \emph{arXiv preprint arXiv:2502.17356}, 2025.
+
+\bibitem{wei2022}
+J.~Wei, Y.~Tay, R.~Bommasani, C.~Raffel, B.~Zoph, S.~Borgeaud, D.~Yogatama, M.~Bosma, D.~Zhou, D.~Metzler, E.~H. Chi, T.~Hashimoto, O.~Vinyals, P.~Liang, J.~Dean, and W.~Fedus, ``Emergent abilities of large language models,'' \emph{arXiv preprint arXiv:2206.07682}, 2022.
+
+\bibitem{alabdulmohsin2025}
+I.~Alabdulmohsin and A.~Steiner, ``A tale of two structures: Do {LLMs} capture the fractal complexity of language?'' in \emph{arXiv preprint arXiv:2502.14924}, 2025.
+
+\bibitem{torkamandi2025}
+B.~Torkamandi, ``Mapping the edge of chaos: Fractal-like boundaries in the trainability of decoder-only transformer models,'' in \emph{arXiv preprint arXiv:2501.04286}, 2025.
+
+\bibitem{greenblatt2023}
+R.~Greenblatt, B.~Shlegeris, K.~Sachan, and F.~Roger, ``{AI} control: Improving safety despite intentional subversion,'' in \emph{arXiv preprint arXiv:2312.06942}, 2023.
+
+\bibitem{vanderweij2024}
+T.~van~der Weij, F.~Hofst{\"a}tter, O.~Jaffe, and S.~F. Brown, ``{AI} sandbagging: Language models can strategically underperform on evaluations,'' in \emph{arXiv preprint arXiv:2406.07358}, 2024.
+
+\bibitem{gill2026}
+A.~Gill, ``The economics of machine verification: Verification-cost shocks and the extensive margin of monitoring,'' SSRN preprint, 2026.
+
+\bibitem{necula1997}
+G.~C. Necula, ``Proof-carrying code,'' in \emph{Proceedings of the 24th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (POPL)}, 1997, pp. 106--119.
+
 \bibitem{engel2007}
 G.~S. Engel, T.~R. Calhoun, E.~L. Read, T.-K. Ahn, T.~Man{\v{c}}al, and G.~R. Fleming, ``Evidence for wavelike energy transfer through quantum coherence in photosynthetic systems,'' \emph{Nature}, vol. 446, no. 7137, pp. 782--786, 2007.
 
@@ -74,7 +104,7 @@ J.~Kaplan, S.~McCandlish, T.~Henighan, T.~B. Brown, B.~Chess, R.~Child, S.~Gray,
 \bibitem{besiroglu2024}
 T.~Besiroglu, E.~Erdil, M.~Barnett, and J.~You, ``Chinchilla scaling: A replication attempt,'' in \emph{arXiv preprint arXiv:2404.10102}, 2024.
 
-\bibitem{schaeffer2023}
-R.~Schaeffer, B.~Miranda, and S.~Koyejo, ``Are emergent abilities of large language models a mirage?'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2023.
+\bibitem{pearl2009}
+J.~Pearl, \emph{Causality}, 2nd~ed.\hskip 1em plus 0.5em minus 0.4em\relax Cambridge University Press, 2009, models, Reasoning, and Inference.
 
 \end{thebibliography}

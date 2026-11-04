@@ -34,6 +34,7 @@ document below is the record of refusing it.
 | PRE-001 | the paper's biological premise was corrected before publication | medium — premise, not code | closed |
 | PRE-002 | the exponential-fit measurement was conditioned on $D\approx0.999$, biasing the rate it was meant to check | medium — a measured number, not a released one | closed |
 | PRE-003 | the "true emergence" hypothesis asked the experiment to confirm a shape that its own budget forbids | **high** — would have published a fitted non-result as a discovery | **closed** (v0.6.1) |
+| PUB-001 | the archived v1.0.0 manuscript went to press without a literature-audit pass; the released PDF and the repository diverged by ten references | medium — a released artefact, not a code path | **closed** (v1.0.1) |
 
 Severity is assigned by one criterion: *can a consumer of this output be
 misled without seeing an error?* All three entries passed that test, which is why
@@ -540,10 +541,51 @@ That is now also the paper's §IV-C ("Self-Auditing the Auditor"): the defects a
 reported as the model's strongest internal evidence, because a witness chain that
 cannot be shown to fail is not a witness chain.
 
+## PUB-001 — a released paper with no prior-art pass
+
+This entry is not a code defect. It is a process defect, recorded because the
+artefact it produced is public and citable.
+
+**What happened.** v1.0.0 (commit `8308367`, DOI `10.5281/zenodo.23949827`) shipped a
+26-page manuscript whose bibliography carried 19 entries and no section stating
+what the paper's claims owe to prior work. The repository's own rule for
+citations — resolve an identifier before writing the entry — had been applied to
+the 19 entries, and that was mistaken for having checked whether the *claims* were
+already made. It is not the same check. The citation auditor answers "does this
+identifier name this paper"; it cannot answer "has someone else already derived
+this".
+
+**What a consumer would see.** A reader who knows Schaeffer et al. (2023) would
+find the paper's emergence section plausible and its bibliography silent about the
+paper it is responding to. A reader who knows the verification-cost literature
+would find $B^{*}$ presented without the nearest existing threshold. Neither is a
+false number; both are an unearned appearance of priority.
+
+**Blast radius.** Text and bibliography only. No experiment, no figure, no
+measured coefficient, and no verdict in Appendix A moved. The 26-page length is
+unchanged, so pagination in the archived v1.0.0 PDF still matches the v1.0.1 PDF
+except in the Introduction and Appendix A.1.
+
+**Fix.** A retrieval pass over arXiv and CrossRef
+(`experiments/literature_search.py`, snapshot in
+`experiments/paper/data/literature_search.json`), an audit written as
+`experiments/paper/LITERATURE_AUDIT.md` that states what each near neighbour does
+*not* do, ten identifiers added and all re-resolved (27 `PASS`, 0 `FAIL`, 2
+`INVALID`), and a `Relation to prior work` subsection in the Introduction. One
+near neighbour (Gill 2026, SSRN) is cited rather than routed around, and the paper
+now says explicitly that its $B^{*}$ is not the first verification threshold.
+
+**Not closed by this entry.** The retrieval was two channels deep; Semantic
+Scholar returned HTTP 429 and is recorded as `UNAVAILABLE` rather than replaced.
+Paywalled venues are a `BLIND` region, which is why the text says "to our
+knowledge" and not "no one has".
+
+---
+
 ## Reprocessing
 
 ```bash
-python3 -m unittest discover -s tests            # 708 tests, all green
+python3 -m unittest discover -s tests            # 988 tests, all green
 python3 -m unittest tests.test_witness_binding -v # the three defects, pinned
 python3 -m experiments.run_experiments           # regenerates the evidence
 ```

@@ -34,6 +34,7 @@ FIXED_TIME = (2026, 11, 4, 0, 0, 0)
 #: Every file this revision added or changed, relative to the package root.
 OVERLAY = [
     ("main.pdf", os.path.join(PAPER, "main.pdf")),
+    ("ERRATA.md", os.path.join(ROOT, "ERRATA.md")),
     ("main.tex", os.path.join(PAPER, "main.tex")),
     ("references.bib", os.path.join(PAPER, "references.bib")),
     ("data/solidification_macros.tex",
@@ -102,6 +103,12 @@ OVERLAY = [
      os.path.join(HERE, "PAPER_AUDIT_REPORT.md")),
     ("CITATION_AUDIT_REPORT.md",
      os.path.join(HERE, "CITATION_AUDIT_REPORT.md")),
+    ("LITERATURE_AUDIT.md",
+     os.path.join(PAPER, "LITERATURE_AUDIT.md")),
+    ("data/literature_search.json",
+     os.path.join(PAPER, "data", "literature_search.json")),
+    ("source/literature_search.py",
+     os.path.join(HERE, "literature_search.py")),
     ("data/citation_audit_macros.tex",
      os.path.join(PAPER, "data", "citation_audit_macros.tex")),
     ("data/citation_audit_table.tex",
@@ -198,6 +205,9 @@ def main() -> int:
         "fractal_interface_paper/data/citation_audit_table.tex",
         "fractal_interface_paper/source/citation_audit_results.json",
         "fractal_interface_paper/CITATION_AUDIT_REPORT.md",
+        "fractal_interface_paper/LITERATURE_AUDIT.md",
+        "fractal_interface_paper/data/literature_search.json",
+        "fractal_interface_paper/source/literature_search.py",
     ]
     missing = [name for name in required if name not in names]
     if missing:
