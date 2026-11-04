@@ -1,0 +1,506 @@
+{
+  "all_pass": true,
+  "analytic": {
+    "B_star_detector": 1.0229621125143513,
+    "B_star_detector_rho_half": 1.0421052631578949,
+    "B_star_detector_rho_nine": 1.2531645569620256,
+    "B_star_detector_rho_zero": 1.0206185567010309,
+    "B_star_no_premium": 1.0,
+    "c_bar": 0.109,
+    "depth_gain_slope": 8.174311926605505,
+    "detector_limit": 0.891,
+    "gain_infinite": 9.174311926605505,
+    "gain_two": 1.8034265103697025,
+    "intercept_infrastructure": 0.9999999999999998,
+    "local_rate": 20.437072832635202,
+    "peak_budget": 3.7114299211597457,
+    "peak_reach_ratio": 23817430.558430534,
+    "r2_infrastructure": 1.0,
+    "slope_infrastructure": 1.1246044906581918,
+    "slope_infrastructure_predicted": 1.122334455667789
+  },
+  "checks": [
+    {
+      "claim": "B* = c_v exactly when S = c_d = 0; no interior loss region",
+      "error": 0.0,
+      "id": "P1",
+      "measured": 1.0,
+      "predicted": 1.0,
+      "tolerance": 1e-12,
+      "verdict": "pass"
+    },
+    {
+      "claim": "B*(S) affine, intercept c_v, slope G_inf/(G_inf-1)",
+      "error": 0.0022700349904027917,
+      "id": "P2",
+      "measured": 1.1246044906581918,
+      "measured_intercept": 0.9999999999999998,
+      "predicted": 1.122334455667789,
+      "predicted_intercept": 1.0,
+      "r2": 1.0,
+      "tolerance": 0.01,
+      "verdict": "pass"
+    },
+    {
+      "claim": "B*(rho) = c_v*[a(1-rho)+S]/(a(1-rho)-c_d), asymptote 1-c_d/a",
+      "id": "P3",
+      "measured": 1.2563773875144206,
+      "predicted": 1.2531645569620256,
+      "rising": true,
+      "tolerance": 0.01,
+      "verdict": "pass",
+      "worst_relative_error": 0.0025637738751435432
+    },
+    {
+      "claim": "R_solid/R_unsolid peaks at finite B+ then returns to 1",
+      "id": "P4",
+      "interior": true,
+      "measured": 1.0000016799724056,
+      "peak_budget": 3.7114299211597457,
+      "peak_ratio": 23817430.558430534,
+      "predicted": 1.0,
+      "tolerance": 0.01,
+      "verdict": "pass"
+    },
+    {
+      "claim": "depth gain linear in B, slope 1/c_bar - 1/c_v",
+      "error": 0.0,
+      "id": "P5",
+      "measured": 8.174311926605505,
+      "predicted": 8.174311926605505,
+      "tolerance": 0.001,
+      "verdict": "pass"
+    },
+    {
+      "claim": "local rate -> alpha*(1/c_bar-1/c_v)*e^-c_v/K0 / K_0 as window -> 0",
+      "id": "P6",
+      "measured": 20.333397237539867,
+      "predicted": 20.437072832635202,
+      "shrinks": true,
+      "tolerance": 0.02,
+      "verdict": "pass",
+      "worst_relative_error": 0.0050729180222805655
+    },
+    {
+      "claim": "whole-rung B* within one replay of B*, and below it for S>0",
+      "form_matches": true,
+      "id": "P7",
+      "measured": 5.06011962890625,
+      "never_above_by_more_than_a_replay": true,
+      "never_below_ninety_percent": true,
+      "predicted": 5.489337822671156,
+      "verdict": "pass"
+    }
+  ],
+  "detector": [
+    {
+      "B_analytic": 1.0,
+      "B_measured": 1.0,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.0,
+      "B_measured": 1.0,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.0,
+      "B_measured": 1.0,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.0,
+      "B_measured": 1.0,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.0206185567010309,
+      "B_measured": 1.0206185567010309,
+      "B_stderr": 1.0537561021115225e-21,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.02
+    },
+    {
+      "B_analytic": 1.0229621125143513,
+      "B_measured": 1.0229705979217927,
+      "B_stderr": 1.601741740824209e-05,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.02
+    },
+    {
+      "B_analytic": 1.0421052631578949,
+      "B_measured": 1.0421763191566424,
+      "B_stderr": 8.986845379367046e-05,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.02
+    },
+    {
+      "B_analytic": 1.2531645569620256,
+      "B_measured": 1.2563773875144206,
+      "B_stderr": 0.0019835351966410895,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.02
+    },
+    {
+      "B_analytic": 1.1123595505617978,
+      "B_measured": 1.1123595505617978,
+      "B_stderr": 3.576312934790814e-21,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.1
+    },
+    {
+      "B_analytic": 1.1264222503160557,
+      "B_measured": 1.1264736952104097,
+      "B_stderr": 9.711320879951735e-05,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.1
+    },
+    {
+      "B_analytic": 1.2531645569620253,
+      "B_measured": 1.253678496751964,
+      "B_stderr": 0.0006502303344715714,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.1
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.1
+    },
+    {
+      "B_analytic": 1.337837837837838,
+      "B_measured": 1.3378378378378377,
+      "B_stderr": 1.5519343365491965e-19,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.25
+    },
+    {
+      "B_analytic": 1.390015600624025,
+      "B_measured": 1.3902114673004742,
+      "B_stderr": 0.0003697753326197939,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.25
+    },
+    {
+      "B_analytic": 2.020408163265306,
+      "B_measured": 2.0237520718182553,
+      "B_stderr": 0.004235937016198181,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.25
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.25
+    },
+    {
+      "B_analytic": 2.020408163265306,
+      "B_measured": 2.020408163265306,
+      "B_stderr": 4.7193627249442735e-19,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.5
+    },
+    {
+      "B_analytic": 2.278772378516624,
+      "B_measured": 2.2798255341831792,
+      "B_stderr": 0.0019888838717062036,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.5
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.5
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.5
+    },
+    {
+      "B_analytic": 5.210526315789475,
+      "B_measured": 5.21052631578947,
+      "B_stderr": 1.0044268057698558e-17,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.8
+    },
+    {
+      "B_analytic": 9.791208791208794,
+      "B_measured": 9.822402285002218,
+      "B_stderr": 0.05906927164698621,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.8
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.8
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.8
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.0,
+      "x": 0.99
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.1,
+      "x": 0.99
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.5,
+      "x": 0.99
+    },
+    {
+      "B_analytic": Infinity,
+      "B_measured": Infinity,
+      "B_stderr": 0.0,
+      "kind": "detector",
+      "rho": 0.9,
+      "x": 0.99
+    }
+  ],
+  "drift": [
+    {
+      "B_analytic": 1.0206185567010309,
+      "B_measured": 1.0206185567010309,
+      "B_stderr": 1.0537561021115225e-21,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.0217273221075502,
+      "B_measured": 1.0217222602663476,
+      "B_stderr": 1.036964327674531e-05,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.05
+    },
+    {
+      "B_analytic": 1.0229621125143513,
+      "B_measured": 1.0229705979217927,
+      "B_stderr": 1.601741740824209e-05,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.1
+    },
+    {
+      "B_analytic": 1.027681660899654,
+      "B_measured": 1.027668233668609,
+      "B_stderr": 3.347793506674951e-05,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.25
+    },
+    {
+      "B_analytic": 1.0421052631578949,
+      "B_measured": 1.0421763191566424,
+      "B_stderr": 8.986845379367046e-05,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.5
+    },
+    {
+      "B_analytic": 1.0879120879120878,
+      "B_measured": 1.088175888854292,
+      "B_stderr": 0.000339861362649539,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.75
+    },
+    {
+      "B_analytic": 1.2531645569620256,
+      "B_measured": 1.2563773875144206,
+      "B_stderr": 0.0019835351966410895,
+      "cd": 0.02,
+      "kind": "drift",
+      "x": 0.9
+    }
+  ],
+  "granularity": {
+    "comparisons": [
+      {
+        "S": 0.0,
+        "difference": 0.01007080078125,
+        "fluid": 1.0,
+        "form": 1.01,
+        "granular": 1.01007080078125,
+        "ratio": 1.01007080078125
+      },
+      {
+        "S": 0.25,
+        "difference": -0.020512813135697305,
+        "fluid": 1.2805836139169473,
+        "form": 1.26,
+        "granular": 1.26007080078125,
+        "ratio": 0.9839816682700208
+      },
+      {
+        "S": 0.5,
+        "difference": -0.05109642705264439,
+        "fluid": 1.5611672278338944,
+        "form": 1.51,
+        "granular": 1.51007080078125,
+        "ratio": 0.9672703691560703
+      },
+      {
+        "S": 1.0,
+        "difference": -0.10249802988653878,
+        "fluid": 2.1223344556677888,
+        "form": 2.02,
+        "granular": 2.01983642578125,
+        "ratio": 0.9517050530783151
+      },
+      {
+        "S": 2.0,
+        "difference": -0.214456508991828,
+        "fluid": 3.244668911335578,
+        "form": 3.03,
+        "granular": 3.03021240234375,
+        "ratio": 0.9339049638492845
+      },
+      {
+        "S": 4.0,
+        "difference": -0.429218193764906,
+        "fluid": 5.489337822671156,
+        "form": 5.06,
+        "granular": 5.06011962890625,
+        "ratio": 0.9218087485903637
+      }
+    ],
+    "form_matches": true,
+    "never_above_by_more_than_a_replay": true,
+    "never_below_ninety_percent": true
+  },
+  "infrastructure": [
+    {
+      "B_analytic": 1.0,
+      "B_granular": 1.01007080078125,
+      "B_granular_form": 1.01,
+      "B_measured": 1.0,
+      "B_stderr": 0.0,
+      "depth_gain_at_ten": 73.56880733944953,
+      "kind": "infrastructure",
+      "x": 0.0
+    },
+    {
+      "B_analytic": 1.2805836139169473,
+      "B_granular": 1.26007080078125,
+      "B_granular_form": 1.26,
+      "B_measured": 1.281151122664548,
+      "B_stderr": 0.0003864512864416658,
+      "depth_gain_at_ten": 71.27522935779817,
+      "kind": "infrastructure",
+      "x": 0.25
+    },
+    {
+      "B_analytic": 1.5611672278338944,
+      "B_granular": 1.51007080078125,
+      "B_granular_form": 1.51,
+      "B_measured": 1.5623022453290958,
+      "B_stderr": 0.0007729025728833316,
+      "depth_gain_at_ten": 68.98165137614679,
+      "kind": "infrastructure",
+      "x": 0.5
+    },
+    {
+      "B_analytic": 2.1223344556677888,
+      "B_granular": 2.01983642578125,
+      "B_granular_form": 2.02,
+      "B_measured": 2.1246044906581916,
+      "B_stderr": 0.0015458051457666632,
+      "depth_gain_at_ten": 64.39449541284404,
+      "kind": "infrastructure",
+      "x": 1.0
+    },
+    {
+      "B_analytic": 3.244668911335578,
+      "B_granular": 3.03021240234375,
+      "B_granular_form": 3.03,
+      "B_measured": 3.249208981316383,
+      "B_stderr": 0.0030916102915333264,
+      "depth_gain_at_ten": 55.220183486238525,
+      "kind": "infrastructure",
+      "x": 2.0
+    },
+    {
+      "B_analytic": 5.489337822671156,
+      "B_granular": 5.06011962890625,
+      "B_granular_form": 5.06,
+      "B_measured": 5.498417962632767,
+      "B_stderr": 0.006183220583066653,
+      "depth_gain_at_ten": 36.87155963302752,
+      "kind": "infrastructure",
+      "x": 4.0
+    }
+  ],
+  "parameters": {
+    "K0": 10.0,
+    "alpha": 27.631021115928547,
+    "c_c": 0.01,
+    "c_d": 0.02,
+    "c_v": 1.0,
+    "draws": 60000,
+    "rho": 0.1,
+    "seed": 20261104
+  }
+}

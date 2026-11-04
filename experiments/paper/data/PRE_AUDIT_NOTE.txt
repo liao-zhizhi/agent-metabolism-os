@@ -1,0 +1,5 @@
+% The bibliography as it stood before the citation audit: nineteen entries, not
+% one of them carrying a DOI or an arXiv id. Kept verbatim (and shipped in the
+% release) so the appendix's claim about the first audit is reproducible: run
+% audit_bib.py on this file and the verdicts are 0 PASS, 19 INVALID, 0 FAIL.
+% It is not \input anywhere and is not the bibliography the paper uses.

@@ -1,0 +1,217 @@
+{
+  "law": {
+    "name": "Chinchilla",
+    "source": "Hoffmann et al., NeurIPS 2022, eq. 4 + Table A3 (E=1.69, A=406.4, alpha=0.34)",
+    "irreducible": 1.69,
+    "exponent": 0.34
+  },
+  "power_law": {
+    "slope": 2.040000000000002,
+    "intercept": -0.8936982955201098,
+    "r2": 1.0,
+    "stderr": 4.1587365624944457e-16,
+    "max_residual": 3.4638958368304884e-14,
+    "a0": 0.40913983131218995
+  },
+  "exponential_in_d": {
+    "slope": 8.620245553792653,
+    "intercept": -3.9509809895356764,
+    "r2": 0.8968001957041248,
+    "stderr": 0.14639450617242405,
+    "max_residual": 1.1001849482215613,
+    "a0": 0.019235822376193257
+  },
+  "crossings": {
+    "p=1": {
+      "params": 35307749332.90915,
+      "log10_params": 10.547870034655961,
+      "fidelity": 0.9,
+      "resistance": 0.09999999999999998,
+      "nines_check": 1.0,
+      "factor_above_nominal": 1.7653874666454574
+    },
+    "p=2": {
+      "params": 35426864709492.34,
+      "log10_params": 13.549332718813062,
+      "fidelity": 0.9900000000000001,
+      "resistance": 0.009999999999999898,
+      "nines_check": 2.0000000000000044,
+      "factor_above_nominal": 1771.3432354746171
+    },
+    "p=3": {
+      "params": 3.1353332655526316e+16,
+      "log10_params": 16.49628371030167,
+      "fidelity": 0.999,
+      "resistance": 0.0010000000000000009,
+      "nines_check": 2.9999999999999996,
+      "factor_above_nominal": 1567666.6327763158
+    }
+  },
+  "at_nominal": {
+    "params": 20000000000.0,
+    "loss": 1.817821379626753,
+    "fidelity": 0.8800105529204305,
+    "difficulty": 0.718273088615216,
+    "resistance": 0.11998944707956949,
+    "nines": 0.920856947924399,
+    "reach": 5.422779683523842
+  },
+  "family": [
+    {
+      "depth": 1,
+      "params": 138533128.44623592,
+      "log10_params": 8.14155364185507,
+      "fidelity_at_crossing": 0.49999999999999994,
+      "nines_at_crossing": 0.3010299956639812,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 2,
+      "params": 1063986167.8755063,
+      "log10_params": 9.02693598204325,
+      "fidelity_at_crossing": 0.7071067811865475,
+      "nines_at_crossing": 0.5332906831698536,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 3,
+      "params": 3506319200.177759,
+      "log10_params": 9.544851449854079,
+      "fidelity_at_crossing": 0.7937005259840998,
+      "nines_at_crossing": 0.685501879308881,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 4,
+      "params": 8171811162.62566,
+      "log10_params": 9.912318322231432,
+      "fidelity_at_crossing": 0.8408964152537145,
+      "nines_at_crossing": 0.7983200351994761,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 5,
+      "params": 15752437757.115503,
+      "log10_params": 10.197347772255126,
+      "fidelity_at_crossing": 0.8705505632961241,
+      "nines_at_crossing": 0.8878998350470362,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 6,
+      "params": 26929841049.488045,
+      "log10_params": 10.430233790042259,
+      "fidelity_at_crossing": 0.8908987181403393,
+      "nines_at_crossing": 0.9621701467415684,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 7,
+      "params": 42377576104.56147,
+      "log10_params": 10.627136112485239,
+      "fidelity_at_crossing": 0.9057236642639067,
+      "nines_at_crossing": 1.0255973056610848,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 8,
+      "params": 62762561858.254234,
+      "log10_params": 10.797700662419611,
+      "fidelity_at_crossing": 0.9170040432046712,
+      "nines_at_crossing": 1.080943064060651,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 9,
+      "params": 88746096124.62874,
+      "log10_params": 10.948149257853085,
+      "fidelity_at_crossing": 0.9258747122872905,
+      "nines_at_crossing": 1.1300336079372981,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 10,
+      "params": 120984605428.8407,
+      "log10_params": 11.082730112443306,
+      "fidelity_at_crossing": 0.9330329915368074,
+      "nines_at_crossing": 1.1741391013467295,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 11,
+      "params": 160130221388.74893,
+      "log10_params": 11.204473304085145,
+      "fidelity_at_crossing": 0.9389309106617064,
+      "nines_at_crossing": 1.2141785561512242,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    },
+    {
+      "depth": 12,
+      "params": 206831237416.6976,
+      "log10_params": 11.315616130230438,
+      "fidelity_at_crossing": 0.9438743126816935,
+      "nines_at_crossing": 1.2508383275615365,
+      "transition_width_decades": 3.9398170623724322,
+      "slope_per_decade": 0.271325162085391
+    }
+  ],
+  "nearest_depth_at_nominal": {
+    "depth": 5,
+    "params": 15752437757.115503,
+    "log10_params": 10.197347772255126,
+    "fidelity_at_crossing": 0.8705505632961241,
+    "nines_at_crossing": 0.8878998350470362,
+    "transition_width_decades": 3.9398170623724322,
+    "slope_per_decade": 0.271325162085391
+  },
+  "transition": {
+    "width_decades": 3.9398170623724322,
+    "slope_per_decade": 0.271325162085391,
+    "points_at_spacing": {
+      "1": 3.9398170623724322,
+      "0.5": 7.8796341247448645
+    },
+    "depth_invariant": true,
+    "worst_collapse_error": 7.771561172376096e-16
+  },
+  "invariant": {
+    "k_over_p0": 0.7828789316179762,
+    "alpha_ln10": 0.7828789316179756,
+    "relative_difference": 7.090643136421228e-16,
+    "implied_selectivity": 0.45708818961487474,
+    "interpretation": "k/P0 = alpha*ln10 to machine precision; the mapping has exactly one free number, the implied selectivity s = exp(-k/P0)"
+  },
+  "robustness": {
+    "Chinchilla": {
+      "exponent": 0.34,
+      "k": 2.040000000000002,
+      "r2_power": 1.0,
+      "r2_exponential": 0.8968001957041248,
+      "implied_selectivity": 0.45708818961487474,
+      "p2_params": 35426864709492.34,
+      "p_at_20B": 0.920856947924399,
+      "width_decades": 3.9398170623724322
+    },
+    "Kaplan": {
+      "exponent": 0.076,
+      "k": 0.45600000000000035,
+      "r2_power": 1.0,
+      "r2_exponential": 0.8968001957041251,
+      "implied_selectivity": 0.8394599865193973,
+      "p2_params": 1.704434715049727e+40,
+      "p_at_20B": 0.8216497259138458,
+      "width_decades": 17.625497384297724
+    }
+  }
+}

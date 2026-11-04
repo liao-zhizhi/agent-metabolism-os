@@ -128,12 +128,20 @@ from .regime import (
 )
 from .interface_engine import (
     DEFAULT_AMPLIFICATION,
+    DIGEST_SCHEME,
+    DIFFICULTY_CEILING,
     EXPANSIVE,
     NARROW,
     NARROW_THRESHOLD,
     NESTING_RATIO,
     REPLICATION_CEILING,
+    SOLIDIFIED,
+    SOLIDIFIED_COST,
+    SOLIDIFICATION_GAIN,
+    SOLIDIFY_STATES,
     SPAN_HORIZON,
+    UNSOLIDIFIED,
+    VERIFY_COST,
     FractalEvolver,
     Interface,
     InterfaceError,
@@ -141,6 +149,10 @@ from .interface_engine import (
     NarrowCondition,
     format_span,
     magnitude_gap,
+    upgrade_witness,
+    verify_witness,
+    witness_digest,
+    witness_payload,
 )
 from .lean_auditor import (
     COMPILER,
@@ -177,7 +189,7 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.5.8"
+__version__ = "1.0.0"
 
 __all__ = [
     "DEFAULT_INVENTIONS",
@@ -196,8 +208,14 @@ __all__ = [
     "NESTING_RATIO",
     "REPLICATION_CEILING",
     "SPAN_HORIZON",
+    "DIGEST_SCHEME",
+    "DIFFICULTY_CEILING",
     "format_span",
     "magnitude_gap",
+    "upgrade_witness",
+    "verify_witness",
+    "witness_digest",
+    "witness_payload",
     "Boundary",
     "BoundaryAudit",
     "BoundaryAuditor",

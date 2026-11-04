@@ -1,0 +1,300 @@
+{
+  "parameters": {
+    "seed": 20261104,
+    "iterations": 1000,
+    "false_completion_rate": 0.3,
+    "context_pollution_rate": 0.5,
+    "absent_fraction": 0.6,
+    "log_leak_rate": 0.45,
+    "benign_alarm_rate": 0.06
+  },
+  "counts": {
+    "failures": 302,
+    "successes": 698,
+    "absent": 197,
+    "stale": 105,
+    "polluted": 525
+  },
+  "strategies": {
+    "pure_context": {
+      "label": "Pure context",
+      "false_completion": {
+        "rate": 1.0,
+        "low": 0.9874397054097682,
+        "high": 1.0,
+        "count": 302,
+        "n": 302
+      },
+      "sensitivity": {
+        "rate": 0.0,
+        "low": 0.0,
+        "high": 0.012560294590231665,
+        "count": 0,
+        "n": 302
+      },
+      "false_alarm": {
+        "rate": 0.0,
+        "low": 0.0,
+        "high": 0.005473399686517433,
+        "count": 0,
+        "n": 698
+      },
+      "specificity": {
+        "rate": 1.0,
+        "low": 0.9945266003134826,
+        "high": 1.0
+      },
+      "verdicts": {
+        "PASS": 1000
+      },
+      "composition": {
+        "pass_correct": 698,
+        "pass_wrong": 302,
+        "fail": 0,
+        "invalid": 0,
+        "not_run": 0
+      },
+      "pass_before": 1.0,
+      "pass_after_do_reject": 1.0,
+      "cell": {
+        "witness_accept": [
+          1.0,
+          0.9945266003134824,
+          1.0,
+          698
+        ],
+        "witness_reject": [
+          1.0,
+          0.9874397054097682,
+          1.0,
+          302
+        ],
+        "context_success": [
+          1.0,
+          0.996173241514445,
+          1.0,
+          1000
+        ]
+      }
+    },
+    "weak_intervention": {
+      "label": "Weak intervention",
+      "false_completion": {
+        "rate": 0.7980132450331126,
+        "low": 0.7491194614270323,
+        "high": 0.839420760340379,
+        "count": 241,
+        "n": 302
+      },
+      "sensitivity": {
+        "rate": 0.20198675496688742,
+        "low": 0.16057923965962087,
+        "high": 0.2508805385729675,
+        "count": 61,
+        "n": 302
+      },
+      "false_alarm": {
+        "rate": 0.03151862464183381,
+        "low": 0.020905114368159804,
+        "high": 0.047260506541557105,
+        "count": 22,
+        "n": 698
+      },
+      "specificity": {
+        "rate": 0.9684813753581661,
+        "low": 0.9527394934584429,
+        "high": 0.9790948856318402
+      },
+      "verdicts": {
+        "PASS": 917,
+        "FAIL": 83
+      },
+      "composition": {
+        "pass_correct": 676,
+        "pass_wrong": 241,
+        "fail": 83,
+        "invalid": 0,
+        "not_run": 0
+      },
+      "pass_before": 0.917,
+      "pass_after_do_reject": 0.917,
+      "cell": {
+        "witness_accept": [
+          0.9684813753581661,
+          0.9527394934584429,
+          0.9790948856318401,
+          698
+        ],
+        "witness_reject": [
+          0.7980132450331126,
+          0.7491194614270323,
+          0.839420760340379,
+          302
+        ],
+        "context_success": [
+          0.917,
+          0.8982635048659464,
+          0.9325449785571007,
+          1000
+        ]
+      }
+    },
+    "causal_intervention": {
+      "label": "Causal intervention",
+      "false_completion": {
+        "rate": 0.0,
+        "low": 0.0,
+        "high": 0.012560294590231665,
+        "count": 0,
+        "n": 302
+      },
+      "sensitivity": {
+        "rate": 1.0,
+        "low": 0.9874397054097682,
+        "high": 1.0,
+        "count": 302,
+        "n": 302
+      },
+      "false_alarm": {
+        "rate": 0.0,
+        "low": 0.0,
+        "high": 0.005473399686517433,
+        "count": 0,
+        "n": 698
+      },
+      "specificity": {
+        "rate": 1.0,
+        "low": 0.9945266003134826,
+        "high": 1.0
+      },
+      "verdicts": {
+        "PASS": 698,
+        "FAIL": 105,
+        "INVALID": 197
+      },
+      "composition": {
+        "pass_correct": 698,
+        "pass_wrong": 0,
+        "fail": 105,
+        "invalid": 197,
+        "not_run": 0
+      },
+      "pass_before": 0.698,
+      "pass_after_do_reject": 0.0,
+      "cell": {
+        "witness_accept": [
+          1.0,
+          0.9945266003134824,
+          1.0,
+          698
+        ],
+        "witness_reject": [
+          0.0,
+          0.0,
+          0.012560294590231665,
+          302
+        ],
+        "context_success": [
+          0.698,
+          0.6688303415169653,
+          0.7256542621227547,
+          1000
+        ]
+      }
+    }
+  },
+  "claims": {
+    "P_pass_given_context": {
+      "value": 1.0,
+      "target": 1.0,
+      "statement": "P(PASS | Context) = 1: the prose judge never looks away"
+    },
+    "P_pass_conflict_causal": {
+      "value": 0.0,
+      "target": 0.0,
+      "statement": "P(PASS | Context, Witness rejects), causal judge = 0"
+    },
+    "P_pass_conflict_context": {
+      "value": 1.0,
+      "target": 1.0,
+      "statement": "P(PASS | Context, Witness rejects), prose judge = 1"
+    },
+    "P_pass_conflict_weak": {
+      "value": 0.7980132450331126,
+      "target": null,
+      "statement": "P(PASS | Context, Witness rejects), log judge"
+    }
+  },
+  "intervention": {
+    "pure_context": {
+      "before": 1.0,
+      "after": 1.0,
+      "delta": 0.0
+    },
+    "weak_intervention": {
+      "before": 0.917,
+      "after": 0.917,
+      "delta": 0.0
+    },
+    "causal_intervention": {
+      "before": 0.698,
+      "after": 0.0,
+      "delta": 0.698
+    }
+  },
+  "gate_reasons": {
+    "ISSUED": 698,
+    "DIGEST_MISMATCH": 105,
+    "ARTEFACT_MISSING": 197
+  },
+  "git_states": {
+    "untracked": 803,
+    "absent": 197
+  },
+  "channel": {
+    "git_only_catches": 197,
+    "digest_catches": 105
+  },
+  "weak_ceiling": {
+    "observed_leak": 0.4139072847682119,
+    "predicted_sensitivity": 0.20695364238410596,
+    "measured_sensitivity": 0.20198675496688742
+  },
+  "stress_test": {
+    "registration_poisoning": [
+      {
+        "poison_rate": 0.0,
+        "false_completion": 0.0,
+        "false_alarm": 0.0
+      },
+      {
+        "poison_rate": 0.01,
+        "false_completion": 0.009933774834437087,
+        "false_alarm": 0.01002865329512894
+      },
+      {
+        "poison_rate": 0.02,
+        "false_completion": 0.019867549668874173,
+        "false_alarm": 0.02005730659025788
+      },
+      {
+        "poison_rate": 0.05,
+        "false_completion": 0.04966887417218543,
+        "false_alarm": 0.050143266475644696
+      },
+      {
+        "poison_rate": 0.1,
+        "false_completion": 0.09933774834437085,
+        "false_alarm": 0.10028653295128939
+      },
+      {
+        "poison_rate": 0.25,
+        "false_completion": 0.25165562913907286,
+        "false_alarm": 0.2492836676217765
+      }
+    ],
+    "state_aliasing": {
+      "note": "a hash witnesses state, not action; the rate is not measurable from artefacts because the two cases are, by construction, the same state"
+    }
+  }
+}

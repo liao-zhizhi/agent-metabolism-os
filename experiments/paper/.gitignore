@@ -1,0 +1,10 @@
+# LaTeX build products. main.pdf and data/ are kept: the PDF is a deliverable
+# and data/ is generated, but generated deterministically by the experiment
+# script, so committing it keeps the paper buildable without numpy/scipy.
+main.aux
+main.log
+main.out
+main.blg
+main.fls
+main.fdb_latexmk
+main.synctex.gz

@@ -70,6 +70,8 @@ from .double_entry import FAIL, INVALID, PASS
 
 __all__ = [
     "DEFAULT_AMPLIFICATION",
+    "DIGEST_SCHEME",
+    "DIFFICULTY_CEILING",
     "EXPANSIVE",
     "FractalEvolver",
     "Interface",
@@ -80,10 +82,20 @@ __all__ = [
     "NESTING_RATIO",
     "NarrowCondition",
     "REPLICATION_CEILING",
+    "SOLIDIFIED",
+    "SOLIDIFIED_COST",
+    "SOLIDIFICATION_GAIN",
+    "SOLIDIFY_STATES",
     "SPAN_HORIZON",
+    "UNSOLIDIFIED",
     "VERDICTS",
+    "VERIFY_COST",
     "format_span",
     "magnitude_gap",
+    "upgrade_witness",
+    "verify_witness",
+    "witness_digest",
+    "witness_payload",
 ]
 
 #: The three verdicts are imported from the package's own lattice rather than
@@ -127,6 +139,60 @@ NESTING_RATIO = 0.5
 #: compared, or printed, and a quantity that breaks arithmetic is not a
 #: measurement.
 SPAN_HORIZON = 1.0e12
+
+#: The hardest difficulty this model can represent. ``_next_difficulty`` clamps
+#: here because a child at exactly 1.0 would be a wall, and a wall has no
+#: successor. Named rather than inlined so that the clamp and the report of the
+#: clamp cannot drift apart -- which is exactly how ERR-002 survived.
+DIFFICULTY_CEILING = 1.0 - 1.0e-9
+
+#: Witness scheme. Version 1 committed to the interface, the mechanism, the
+#: evidence and the amplification, and to nothing else -- so two crossings of
+#: *different* gaps by the same mechanism produced byte-identical digests
+#: (ERR-003). Version 2 additionally binds the difficulty, both spans, the
+#: status, replicability and the fault kinds. The version travels inside the
+#: digest so a reader can tell which contract a stored witness was written
+#: under: ``sha256:v2:`` can be re-verified, bare ``sha256:`` cannot.
+DIGEST_SCHEME = "sha256:v2"
+
+# -- solidification ---------------------------------------------------------
+#
+# Every crossing above is priced as if it were the first. It is not: a gap that
+# has been crossed once, against a witness, can be *compiled* -- the verification
+# is replaced by a replay of the path it validated. That is what a cache, a
+# compiled binary and a learned reflex have in common, and it is the mechanism
+# behind the falling marginal cost in Eq. (19) of the paper: rung j does not pay
+# for the prefix, only for the boundary that is new.
+#
+# The state is a *label*, and the label is only worth what vouches for it. A
+# solidified rung that cannot name the witness that compiled it is a cache with
+# no provenance -- exactly the transcript-reading judge of Experiment G, which
+# returns PASS because the file says PASS. So solidification requires a verified
+# witness bound to *this* gap, and the asymmetry is deliberate: reducing
+# verification needs a witness, increasing it never does.
+
+#: Never crossed against a witness, or invalidated since. Costs a full check.
+UNSOLIDIFIED = "UNSOLIDIFIED"
+
+#: Crossed against a witness and compiled. Costs a replay.
+SOLIDIFIED = "SOLIDIFIED"
+
+#: The two labels. A third would need a third price and there is no third price.
+SOLIDIFY_STATES = (UNSOLIDIFIED, SOLIDIFIED)
+
+#: What one full verification costs, in arbitrary but comparable units. One is
+#: the unit, so every other cost is a fraction of "check the whole thing".
+VERIFY_COST = 1.0
+
+#: What a replay costs. Two orders of magnitude below verification is the claim
+#: being tested, not a measurement of any particular compiler; the experiment
+#: reports the ratio it assumes and the whole curve as a function of it.
+SOLIDIFIED_COST = 0.01
+
+#: Changing this changes the experiment's headline number, so it is named here
+#: rather than buried in the experiment file.
+SOLIDIFICATION_GAIN = VERIFY_COST / SOLIDIFIED_COST
+
 
 #: Worst-wins, same ranking as the rest of the package. A contradiction outranks
 #: an omission, and neither is ever promoted past a witness.
@@ -428,6 +494,15 @@ class Interface:
     #: instead of compounding on the first crossing's result. Without it, reach
     #: would be a counter again, just with extra steps.
     base_span: Optional[float] = None
+    #: ``UNSOLIDIFIED`` or ``SOLIDIFIED``: whether this rung is checked in full
+    #: on every traversal or replayed from a compiled path. A label, not a
+    #: property of the physics -- the gap is exactly as narrow either way.
+    state: str = UNSOLIDIFIED
+    #: The difficulty the compiled path was validated at. Together with
+    #: ``state`` this is the whole contract: a cache that does not say what it
+    #: was compiled against is a cache that cannot notice the gap moving under
+    #: it, which is ERR-003 with a different noun.
+    solidified_at: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not self.source or not self.target:
@@ -471,6 +546,48 @@ class Interface:
                     self.status, NARROW, EXPANSIVE
                 )
             )
+        if self.state not in SOLIDIFY_STATES:
+            raise InterfaceError(
+                "unknown state {!r}; known: {}".format(
+                    self.state, " or ".join(SOLIDIFY_STATES)
+                )
+            )
+        # Two guards, and both are about the same thing: a compiled path is a
+        # claim that *this* verification already happened, for *this* gap. An
+        # uncrossed rung has nothing to have verified, and a rung whose
+        # difficulty has moved has had its verification withdrawn -- the opening
+        # it was validated against no longer exists.
+        if self.state == SOLIDIFIED:
+            if not self.condition_met:
+                raise InterfaceError(
+                    "{} cannot be {}: it has never been crossed, so there is no "
+                    "verification for a compiled path to replay".format(
+                        list(self.key), SOLIDIFIED
+                    )
+                )
+            if self.solidified_at is None:
+                raise InterfaceError(
+                    "{} is {} without naming the difficulty it was compiled "
+                    "against. A cache that does not say what it validated cannot "
+                    "notice the gap moving under it.".format(
+                        list(self.key), SOLIDIFIED
+                    )
+                )
+            if float(self.solidified_at) != float(self.difficulty):
+                raise InterfaceError(
+                    "{} is {} against difficulty {}, but the gap now stands at "
+                    "{}. The verification is withdrawn; re-verify before "
+                    "replaying.".format(
+                        list(self.key), SOLIDIFIED,
+                        _format_difficulty(float(self.solidified_at)),
+                        _format_difficulty(self.difficulty),
+                    )
+                )
+        elif self.solidified_at is not None:
+            raise InterfaceError(
+                "{} is {} but still names a compile point; a withdrawn cache "
+                "must forget what it validated".format(list(self.key), UNSOLIDIFIED)
+            )
 
     # -- identity ---------------------------------------------------------
 
@@ -498,6 +615,22 @@ class Interface:
         That is a counter wearing a mechanism's name.
         """
         return float(self.base_span) if self.base_span is not None else float(self.span)
+
+    @property
+    def is_solidified(self) -> bool:
+        """Whether a traversal of this rung is a replay rather than a check."""
+        return self.state == SOLIDIFIED
+
+    @property
+    def crossing_cost(self) -> float:
+        """What one traversal costs, in units of a full verification.
+
+        A *label* has a price; it does not change the gap. The difficulty, the
+        span and the amplification are identical in both states, which is the
+        point: solidification is a claim about what has already been checked,
+        never about how narrow the opening is.
+        """
+        return SOLIDIFIED_COST if self.is_solidified else VERIFY_COST
 
     # -- traversal --------------------------------------------------------
 
@@ -535,7 +668,7 @@ class Interface:
             "target": self.target,
             "condition": self.condition,
             "span": self.span,
-            "difficulty": round(self.difficulty, 6),
+            "difficulty": float(self.difficulty),
             "condition_met": self.condition_met,
             "amplification": self.amplification,
             "generation": self.generation,
@@ -544,6 +677,11 @@ class Interface:
             "rationale": self.rationale,
             "status": self.status,
             "origin_span": self.origin_span,
+            "state": self.state,
+            "solidified_at": (
+                float(self.solidified_at) if self.solidified_at is not None else None
+            ),
+            "crossing_cost": self.crossing_cost,
         }
         if depth > 0:
             payload["sub_interfaces"] = [
@@ -585,8 +723,37 @@ def _unit(value: Any) -> Optional[float]:
 def _next_difficulty(difficulty: float, ratio: float) -> float:
     """Close half the remaining room. Never returns 1.0, which would be a wall."""
     candidate = difficulty + (1.0 - difficulty) * ratio
-    ceiling = 1.0 - 1.0e-9
-    return min(candidate, ceiling)
+    return min(candidate, DIFFICULTY_CEILING)
+
+
+def _successor_saturates(difficulty: float, ratio: float) -> bool:
+    """Whether closing half the room would fail to narrow the opening.
+
+    This is the condition ``min()`` hides. Once difficulty is within
+    ``1 - DIFFICULTY_CEILING`` of the ceiling, the successor comes back *equal* to
+    its parent instead of raising, so the ladder keeps reporting success while
+    its central invariant has already failed (ERR-002). Naming the condition is
+    what lets the crossing say so out loud.
+    """
+    return _next_difficulty(difficulty, ratio) <= difficulty
+
+
+def _format_difficulty(difficulty: float) -> str:
+    """Enough significant digits to tell neighbouring rungs apart.
+
+    ``.3f`` was correct when difficulties were 0.2 and 0.9. At 0.999999999 it
+    prints ``1.000``, which re-creates the false wall that removing the rounding
+    was meant to abolish (ERR-001). Rendering is now the caller's problem, so the
+    renderer has to be the one that knows how much precision the number needs.
+    """
+    room = 1.0 - difficulty
+    if room >= 1.0e-3:
+        return "{:.3f}".format(difficulty)
+    if room <= 0.0:
+        return repr(difficulty)
+    # three digits past the leading one of the gap, clamped to float64's reach
+    decimals = min(15, max(9, int(-math.floor(math.log10(room))) + 3))
+    return "{:.{decimals}f}".format(difficulty, decimals=decimals)
 
 
 def _fault(kind: str, verdict: Optional[str], detail: str) -> Dict[str, Any]:
@@ -709,9 +876,112 @@ def _norm(value: Any) -> str:
     return _text(value).lower()
 
 
-def _digest(payload: Mapping[str, Any]) -> str:
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+#: Fields a version-2 witness commits to. A crossing that omits any of these has
+#: not said enough for a third party to tell it apart from a *different*
+#: crossing -- which is precisely the hole version 1 left open.
+WITNESS_FIELDS = (
+    "interface",
+    "verdict",
+    "difficulty",
+    "span_before",
+    "span_after",
+    "amplification",
+    "status",
+    "mechanism",
+    "evidence",
+    "replicable",
+)
+
+
+def _canonical_witness_value(value: Any) -> Any:
+    """A value that hashes the same way however it is presented.
+
+    Floats are normalised through ``float()`` so that ``1`` and ``1.0`` cannot
+    produce two witnesses for one claim, and NaN is refused outright: there is no
+    stable contract with a value that is not equal to itself.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if number != number:
+            raise InterfaceError("a witness cannot commit to NaN")
+        return number
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value]
+    return str(value)
+
+
+def witness_payload(record: Mapping[str, Any]) -> Dict[str, Any]:
+    """The claim a witness actually binds, derived from the record itself.
+
+    Derived rather than hand-assembled, and that is the whole fix. Version 1
+    assembled the payload at the call site from four hand-picked keys; nobody
+    noticed that the key which distinguishes two gaps was not among them
+    (ERR-003). Deriving it inverts the failure mode: a field present in the
+    record is in the witness, and a field the record lacks shows up as *absent*
+    rather than as silently unbinding.
+    """
+    payload: Dict[str, Any] = {"v": 2}
+    for field in WITNESS_FIELDS:
+        if field in record:
+            payload[field] = _canonical_witness_value(record[field])
+    payload["faults"] = sorted(
+        {str(fault.get("kind", "")) for fault in record.get("faults") or ()}
+    )
+    # An upgraded record must bind *which* witness it supersedes, or a reader can
+    # switch the claim of provenance without touching anything else. Absent on a
+    # record written under v2 in the first place.
+    if record.get("superseded_digest") is not None:
+        payload["superseded_digest"] = str(record["superseded_digest"])
+    return payload
+
+
+def witness_digest(record: Mapping[str, Any]) -> str:
+    """``sha256:v2:<hex>`` over :func:`witness_payload`."""
+    canonical = json.dumps(
+        witness_payload(record), sort_keys=True, separators=(",", ":"), default=str
+    )
+    return DIGEST_SCHEME + ":" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def verify_witness(record: Mapping[str, Any]) -> bool:
+    """Does this record's stored digest still match its own contents?
+
+    The half of the contract that nobody exercises. A digest which is never
+    recomputed is decoration: it proves the file has not been touched, not that
+    the record still says what was witnessed. Recomputing from the record means
+    editing *any* bound field -- the difficulty included -- breaks the check,
+    which is the property version 1 did not have.
+    """
+    stored = record.get("digest")
+    if not isinstance(stored, str):
+        return False
+    return stored == witness_digest(record)
+
+
+def upgrade_witness(record: Mapping[str, Any]) -> Dict[str, Any]:
+    """Re-witness a stored version-1 record under version 2.
+
+    A version-1 record **cannot be retroactively verified**. It never committed to
+    the difficulty, so there is nothing to check the difficulty against; any
+    upgrade that claimed otherwise would be manufacturing assurance after the
+    fact. What this function does is the honest half: it records the old digest it
+    is replacing, and freezes the record as it stands now, so that every *later*
+    edit is detectable.
+
+    The distinction is the point, so it is stated in the return value rather than
+    only here: an upgraded witness is trustworthy from the moment of upgrade, not
+    from the moment of the original crossing.
+    """
+    upgraded = dict(record)
+    previous = upgraded.get("digest")
+    if isinstance(previous, str):
+        upgraded["superseded_digest"] = previous
+    upgraded["digest_scheme"] = DIGEST_SCHEME
+    upgraded["upgraded"] = True
+    upgraded["digest"] = witness_digest(upgraded)
+    return upgraded
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +1050,7 @@ class FractalEvolver:
         self._layers: Dict[str, Layer] = {}
         self._roots: Dict[Tuple[str, str, int], Interface] = {}
         self._history: List[Dict[str, Any]] = []
+        self._solidification_history: List[Dict[str, Any]] = []
         self._membrane = membrane
         self._threshold = threshold
         self._ratio = ratio
@@ -931,6 +1202,7 @@ class FractalEvolver:
         condition_implementation: Any,
         next_condition: Optional[str] = None,
         amplification: Optional[float] = None,
+        solidify: bool = False,
     ) -> Dict[str, Any]:
         """Try to cross a gap. This is the only door upward.
 
@@ -1097,7 +1369,7 @@ class FractalEvolver:
                 "condition": live.condition,
                 "verdict": verdict,
                 "faults": faults,
-                "difficulty": round(live.difficulty, 6),
+                "difficulty": float(live.difficulty),
                 "generation": live.generation,
                 "span_before": live.span,
                 "origin_span": live.origin_span,
@@ -1110,12 +1382,20 @@ class FractalEvolver:
                 "superseding": superseding,
                 "cost": spec.cost,
                 "replicable": spec.replicable,
+                "state": live.state,
+                "crossing_cost": live.crossing_cost,
+                "solidified": False,
                 "message": "the gap is not broken",
             }
             self._record(result)
             return result
 
         span_after = min(live.origin_span * checked, self._horizon)
+        # A crossing always yields an unverified rung, even when the mechanism is
+        # the same one that compiled the previous state: the *content* of the
+        # verification has changed (a new mechanism, a new span), so a cache of
+        # the old check is not a cache of this one. Solidification is re-earned
+        # below, at the new value, never inherited.
         crossed = live.evolve(
             condition_met=True,
             span=span_after,
@@ -1123,31 +1403,60 @@ class FractalEvolver:
             amplification=checked,
             crossed_by=spec.mechanism,
             status=status,
+            state=UNSOLIDIFIED,
+            solidified_at=None,
         )
 
         spawn = next_condition if next_condition is not None else ""
         if not isinstance(spawn, str):
             raise InterfaceError("next_condition must be a string or None")
-        child = Interface(
-            source=crossed.source,
-            target=crossed.target,
-            condition=spawn.strip(),
-            span=span_after,
-            difficulty=_next_difficulty(crossed.difficulty, self._ratio),
-            generation=crossed.generation + 1,
-            parent=crossed.key,
-            amplification=crossed.amplification,
-            rationale=(
-                "the gap inside the space just connected; same shape, "
-                "narrower opening"
-            ),
-        )
-        # A supersession *replaces* the next gap rather than adding a second one.
-        # The cryostat revealed a gap inside a laboratory; the protein revealed a
-        # gap inside a biosphere. Those are not two interiors, they are the same
-        # interior seen after a wider crossing, so appending would describe a
-        # space nobody is in.
-        crossed = crossed.evolve(sub_interfaces=(child,))
+
+        # The successor is computed before the child is built, because a child
+        # that is not narrower is not a child. Version 1 built it anyway and let
+        # the clamp produce a rung identical to its parent, reported as PASS with
+        # a self-similar chain (ERR-002). A crossing that cannot be followed by a
+        # narrower opening is terminal, and saying so is cheaper than pretending.
+        child_difficulty = _next_difficulty(crossed.difficulty, self._ratio)
+        terminal = _successor_saturates(crossed.difficulty, self._ratio)
+        child: Optional[Interface]
+        if terminal:
+            faults.append(
+                _fault(
+                    "DIFFICULTY_SATURATED",
+                    None,  # non-decisive: the crossing happened, the ladder ended
+                    "difficulty {difficulty} is at the representational ceiling "
+                    "1 - {room:.0e}, so no narrower opening can be expressed. The "
+                    "crossing stands and the reach is real; the ladder stops here "
+                    "instead of growing a rung that would only repeat this one."
+                    .format(
+                        difficulty=_format_difficulty(crossed.difficulty),
+                        room=1.0 - DIFFICULTY_CEILING,
+                    ),
+                )
+            )
+            crossed = crossed.evolve(sub_interfaces=())
+            child = None
+        else:
+            child = Interface(
+                source=crossed.source,
+                target=crossed.target,
+                condition=spawn.strip(),
+                span=span_after,
+                difficulty=child_difficulty,
+                generation=crossed.generation + 1,
+                parent=crossed.key,
+                amplification=crossed.amplification,
+                rationale=(
+                    "the gap inside the space just connected; same shape, "
+                    "narrower opening"
+                ),
+            )
+            # A supersession *replaces* the next gap rather than adding a second.
+            # The cryostat revealed a gap inside a laboratory; the protein
+            # revealed a gap inside a biosphere. Those are not two interiors,
+            # they are the same interior seen after a wider crossing, so
+            # appending would describe a space nobody is in.
+            crossed = crossed.evolve(sub_interfaces=(child,))
 
         escalated = span_after >= self._horizon
         result = {
@@ -1155,13 +1464,14 @@ class FractalEvolver:
             "condition": crossed.condition,
             "verdict": PASS,
             "faults": faults,
-            "difficulty": round(crossed.difficulty, 6),
+            "difficulty": float(crossed.difficulty),
             "generation": crossed.generation,
             "span_before": live.span,
             "origin_span": live.origin_span,
             "span_after": span_after,
             "amplification": checked,
-            "sub_interface": child.as_dict(depth=0),
+            "sub_interface": child.as_dict(depth=0) if child is not None else None,
+            "terminal": terminal,
             "escalated": escalated,
             "condition_met": True,
             "mechanism": spec.mechanism,
@@ -1174,20 +1484,36 @@ class FractalEvolver:
                 "the gap is broken and the reach is {}. It is now infrastructure."
                 .format(format_span(span_after))
                 if escalated
-                else "the gap is broken {}x; the reach is {} and the next gap is {}"
-                .format(
-                    "{:.0f}".format(checked),
-                    format_span(span_after),
-                    "narrower" if child.named else "not yet named",
+                else (
+                    "the gap is broken {}x and the reach is {}. The ladder is "
+                    "terminal here: at this difficulty no narrower opening can be "
+                    "represented, so nothing further is spawned."
+                    .format("{:.0f}".format(checked), format_span(span_after))
+                    if terminal
+                    else "the gap is broken {}x; the reach is {} and the next gap "
+                    "is {}".format(
+                        "{:.0f}".format(checked),
+                        format_span(span_after),
+                        "narrower" if child is not None and child.named
+                        else "not yet named",
+                    )
                 )
             ),
         }
-        self._record(result, digest_payload={
-            "interface": list(crossed.key),
-            "mechanism": spec.mechanism,
-            "evidence": spec.evidence,
-            "amplification": checked,
-        })
+        # Solidification is offered here rather than assumed, because a crossing
+        # is not the same event as a decision to stop checking. The caller that
+        # asks for it gets it only on a PASS, which is the only verdict a
+        # compiled path may replay.
+        if solidify:
+            crossed = crossed.evolve(
+                state=SOLIDIFIED, solidified_at=crossed.difficulty
+            )
+            result["solidified"] = True
+        else:
+            result["solidified"] = False
+        result["state"] = crossed.state
+        result["crossing_cost"] = crossed.crossing_cost
+        self._record(result)
         self._install(root, crossed)
         return result
 
@@ -1195,6 +1521,256 @@ class FractalEvolver:
         self._replace_node(root_key, updated)
 
     # -- 2. reading the ladder --------------------------------------------
+
+    def solidify(
+        self,
+        interface: Any,
+        witness: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Compile a crossed rung into a replayable path, if a witness vouches for it.
+
+        The gate is a **verified witness bound to this gap**, not a verdict and
+        not a flag. That distinction is the whole section:
+
+        * ``INVALID`` when no witness is offered. Nothing has been refuted and
+          nothing has been compiled; the rung stays expensive and honest.
+        * ``FAIL`` when the witness is present but does not vouch for *this* gap
+          -- wrong interface, non-PASS verdict, or a digest that no longer
+          recomputes from the record. A compilation that the record cannot
+          support is a contradiction, not an omission.
+        * ``PASS`` otherwise, and the rung's ``state`` becomes ``SOLIDIFIED``
+          with ``solidified_at`` fixed at the current difficulty.
+
+        Why the witness is required rather than convenient: a cache that cannot
+        name what validated it is *indistinguishable from a lie that happens to
+        be right*. It returns PASS, cheaply, for the same reason the
+        transcript-reading judge of Experiment G does -- because the last thing
+        written said PASS. The witness is what makes cheapness a fact about the
+        artefact rather than about the record.
+        """
+        root, live = self._locate(interface)
+        if not live.is_crossed:
+            raise InterfaceError(
+                "{} is not crossed, so there is nothing to compile. A cached "
+                "verification of a gap that was never verified is the failure "
+                "this method exists to make unrepresentable.".format(list(live.key))
+            )
+
+        faults: List[Dict[str, Any]] = []
+        if witness is None:
+            faults.append(
+                _fault(
+                    "NO_WITNESS",
+                    INVALID,
+                    "no witness was offered. The rung stays {}: a compiled path "
+                    "is a claim that a check already happened, and a claim with "
+                    "nothing behind it is the cheapest kind of false "
+                    "prosperity.".format(UNSOLIDIFIED),
+                )
+            )
+        else:
+            record = dict(witness)
+            if not verify_witness(record):
+                faults.append(
+                    _fault(
+                        "WITNESS_DOES_NOT_VERIFY",
+                        FAIL,
+                        "the witness digest does not recompute from its own "
+                        "contents. It was edited after the fact, or written under "
+                        "an older contract; either way it cannot support a "
+                        "compilation.",
+                    )
+                )
+            if record.get("verdict") != PASS:
+                faults.append(
+                    _fault(
+                        "WITNESS_NOT_A_PASS",
+                        FAIL,
+                        "the witness records verdict {!r}. Only a PASS may be "
+                        "replayed; compiling a FAIL would cache the failure and "
+                        "then repeat it without checking.".format(
+                            record.get("verdict")
+                        ),
+                    )
+                )
+            if list(record.get("interface") or []) != list(live.key):
+                faults.append(
+                    _fault(
+                        "WITNESS_NOT_FOR_THIS_GAP",
+                        FAIL,
+                        "the witness covers {} but this run is about {}. A witness "
+                        "for a different gap is a witness for a different claim, "
+                        "which is precisely the defect ERR-003 recorded.".format(
+                            list(record.get("interface") or []), list(live.key)
+                        ),
+                    )
+                )
+            if record.get("difficulty") is None:
+                # A version-1 witness never committed to the difficulty, so it
+                # cannot say whether the gap has moved since. That is exactly the
+                # weakness ERR-003 recorded, and it is why an upgraded v1 record
+                # is insufficient for compilation even though it re-verifies.
+                faults.append(
+                    _fault(
+                        "WITNESS_UNBOUND",
+                        INVALID,
+                        "the witness does not name a difficulty, so it cannot "
+                        "vouch for the gap that is being compiled. An upgraded "
+                        "version-1 record is trustworthy from the upgrade "
+                        "onward, not from the crossing.",
+                    )
+                )
+            elif _unit(record.get("difficulty")) is None or float(
+                record["difficulty"]
+            ) != float(live.difficulty):
+                faults.append(
+                    _fault(
+                        "WITNESS_DIFFICULTY_MOVED",
+                        FAIL,
+                        "the witness was recorded at difficulty {!r} and the "
+                        "gap now stands at {}. The opening it validated no "
+                        "longer exists.".format(
+                            record.get("difficulty"),
+                            _format_difficulty(live.difficulty),
+                        ),
+                    )
+                )
+
+        verdict = _worst(faults)
+        if verdict != PASS:
+            result = {
+                "interface": list(live.key),
+                "verdict": verdict,
+                "faults": faults,
+                "difficulty": float(live.difficulty),
+                "state": live.state,
+                "crossing_cost": live.crossing_cost,
+                "solidified": False,
+                "message": "the rung stays {}".format(live.state),
+            }
+            self._record_solidification(result)
+            return result
+
+        compiled = live.evolve(
+            state=SOLIDIFIED, solidified_at=live.difficulty
+        )
+        self._install(root, compiled)
+        result = {
+            "interface": list(compiled.key),
+            "verdict": PASS,
+            "faults": [],
+            "difficulty": float(compiled.difficulty),
+            "state": compiled.state,
+            "solidified_at": float(compiled.difficulty),
+            "crossing_cost": compiled.crossing_cost,
+            "cost_before": live.crossing_cost,
+            "gain": live.crossing_cost / compiled.crossing_cost,
+            "witness_digest": str(witness.get("digest")) if witness else None,
+            "solidified": True,
+            "message": (
+                "the rung is compiled. Traversal now costs {:.2g} instead of "
+                "{:.2g}; the gap is exactly as narrow as it was.".format(
+                    compiled.crossing_cost, live.crossing_cost
+                )
+            ),
+        }
+        self._record_solidification(result)
+        return result
+
+    def drift(self, interface: Any, reason: str = "the environment moved") -> Dict[str, Any]:
+        """Withdraw a compiled path: the rung must be verified again.
+
+        Ungated on purpose, and the asymmetry is a principle rather than an
+        oversight. Moving to *more* checking is always safe, so the world may
+        force it at any time without producing evidence; moving to *less*
+        checking requires a witness, which is :meth:`solidify`. A door that
+        opened in both directions with the same key would let a system buy
+        cheapness by asserting that nothing had changed.
+
+        Idempotent: drifting an already-unsolidified rung is a no-op that says
+        so, because a caller that re-checks should not be punished for it.
+        """
+        root, live = self._locate(interface)
+        if not live.is_solidified:
+            return {
+                "interface": list(live.key),
+                "drifted": False,
+                "state": live.state,
+                "reason": "already {}".format(live.state),
+                "message": "nothing to withdraw",
+            }
+        reverted = live.evolve(state=UNSOLIDIFIED, solidified_at=None)
+        self._install(root, reverted)
+        result = {
+            "interface": list(live.key),
+            "drifted": True,
+            "state": reverted.state,
+            "previous_state": live.state,
+            "difficulty": float(reverted.difficulty),
+            "crossing_cost": reverted.crossing_cost,
+            "reason": reason,
+            "message": (
+                "the compiled path is withdrawn ({}). The next traversal pays a "
+                "full verification: a cache that is never invalidated is a "
+                "transcript with better latency.".format(reason)
+            ),
+        }
+        self._record_solidification(result)
+        return result
+
+    def solidification_report(self) -> Dict[str, Any]:
+        """How much of the ladder is compiled, and what one traversal costs.
+
+        Two numbers that are easy to confuse and are kept apart: the *fraction of
+        rungs* that are compiled (a shape) and the *cost of a traversal* (a
+        quantity). A chain can be 90% compiled and still expensive if the
+        remaining tenth is the rung everything else depends on.
+
+        Counted over *crossed* rungs only. The frontier is a gap, not a
+        traversal: it is the next thing to pay for, and pricing it as if it had
+        already been paid would flatter every unfinished ladder.
+        """
+        nodes = [node for root in self.chains() for node in root.walk()]
+        crossed = [node for node in nodes if node.is_crossed]
+        if not crossed:
+            return {
+                "rungs": len(nodes),
+                "crossed": 0,
+                "solidified": 0,
+                "fraction": 0.0,
+                "cost": 0.0,
+                "uncompiled_cost": 0.0,
+                "gain": 1.0,
+                "mixed": False,
+            }
+        solid = [node for node in crossed if node.is_solidified]
+        cost = sum(node.crossing_cost for node in crossed)
+        return {
+            "rungs": len(nodes),
+            "crossed": len(crossed),
+            "solidified": len(solid),
+            "fraction": len(solid) / len(crossed),
+            "cost": cost,
+            "uncompiled_cost": VERIFY_COST * len(crossed),
+            "gain": (VERIFY_COST * len(crossed) / cost) if cost > 0 else float("inf"),
+            "mixed": 0 < len(solid) < len(crossed),
+        }
+
+    def _record_solidification(self, result: Dict[str, Any]) -> None:
+        """Book a solidification decision the way a crossing is booked.
+
+        Separate history from the crossing history, because a label change is not
+        a crossing: folding them together would make ``len(history())`` stop
+        being the number of gaps crossed, which is the one count this module
+        promises.
+        """
+        step = dict(result)
+        step["step"] = len(self._solidification_history) + 1
+        self._solidification_history.append(step)
+
+    def solidification_history(self) -> List[Dict[str, Any]]:
+        """Every compile and every withdrawal, oldest first."""
+        return [dict(step) for step in self._solidification_history]
 
     def escalate(self, interface: Any) -> Dict[str, Any]:
         """Whether a crossed interface has become infrastructure, and why.
@@ -1236,7 +1812,7 @@ class FractalEvolver:
         return {
             "interface": list(live.key),
             "span": live.span,
-            "difficulty": round(live.difficulty, 6),
+            "difficulty": float(live.difficulty),
             "at_horizon": at_horizon,
             "chain_self_similar": coherent,
             "is_infrastructure": at_horizon and coherent,
@@ -1252,14 +1828,25 @@ class FractalEvolver:
         """
         violations: List[str] = []
         pairs = 0
+        terminal = 0
         for root in self.chains():
             for node in root.walk():
+                if node.is_crossed and not node.sub_interfaces:
+                    # A crossed gap with no successor is the representational
+                    # ceiling, not a violation: the ladder ended honestly. Counted
+                    # so a caller can tell "the chain is short" apart from "the
+                    # chain has nowhere further to go".
+                    terminal += 1
                 for child in node.sub_interfaces:
                     pairs += 1
                     if child.difficulty <= node.difficulty:
                         violations.append(
-                            "{} -> {}: difficulty did not rise ({:.4f} -> {:.4f})"
-                            .format(node.key, child.key, node.difficulty, child.difficulty)
+                            "{} -> {}: difficulty did not rise ({} -> {})"
+                            .format(
+                                node.key, child.key,
+                                _format_difficulty(node.difficulty),
+                                _format_difficulty(child.difficulty),
+                            )
                         )
                     if child.span < node.span:
                         violations.append(
@@ -1285,10 +1872,39 @@ class FractalEvolver:
                                 node.key
                             )
                         )
+        # Solidification coherence. The construction guard already refuses an
+        # uncrossed or mis-dated compiled rung, so this cannot fire on a chain
+        # built through the public door; it is checked here because a chain
+        # assembled by hand or read from a file is exactly the case the guard is
+        # easy to route around, and because a compiled rung is the one piece of
+        # state that lets the engine stop looking.
+        rungs = [node for root in self.chains() for node in root.walk()]
+        crossed = [node for node in rungs if node.is_crossed]
+        compiled = [node for node in crossed if node.is_solidified]
+        for node in compiled:
+            if not node.is_crossed:
+                violations.append(
+                    "{}: is {} but was never crossed".format(node.key, SOLIDIFIED)
+                )
+            if node.solidified_at is None or float(node.solidified_at) != float(
+                node.difficulty
+            ):
+                violations.append(
+                    "{}: is {} against difficulty {}, but the gap stands at {}".format(
+                        node.key, SOLIDIFIED, node.solidified_at,
+                        _format_difficulty(node.difficulty),
+                    )
+                )
         return {
             "generations": pairs,
+            "terminal_rungs": terminal,
             "violations": violations,
             "self_similar": not violations,
+            "rungs": len(rungs),
+            "solidified_rungs": len(compiled),
+            # Over crossed rungs, matching ``solidification_report``. Two names
+            # for one quantity must not mean two different things.
+            "compiled_fraction": (len(compiled) / len(crossed)) if crossed else 0.0,
         }
 
     @property
@@ -1297,18 +1913,19 @@ class FractalEvolver:
 
     # -- 3. plumbing -------------------------------------------------------
 
-    def _record(
-        self,
-        result: Dict[str, Any],
-        digest_payload: Optional[Mapping[str, Any]] = None,
-    ) -> None:
+    def _record(self, result: Dict[str, Any]) -> None:
         step = dict(result)
         step["step"] = len(self._history) + 1
-        step["digest"] = _digest(
-            digest_payload
-            if digest_payload is not None
-            else {"interface": result["interface"], "verdict": result["verdict"]}
-        )
+        step["digest_scheme"] = DIGEST_SCHEME
+        # The witness is derived from the record, never handed in. A caller that
+        # could choose the payload could choose to leave the difficulty out,
+        # which is how version 1 lost it.
+        step["digest"] = witness_digest(step)
+        # The result carries its own witness. A ledger the caller has to go and
+        # look up is a ledger whose lookup gets skipped, and an unwitnessed claim
+        # is the thing this package refuses to accept from anyone else.
+        result["digest"] = step["digest"]
+        result["digest_scheme"] = DIGEST_SCHEME
         self._history.append(step)
         if self._membrane is None:
             result["logged"] = False
@@ -1370,7 +1987,7 @@ class FractalEvolver:
             lines.append("=" * width)
             return "\n".join(lines)
         lines.append(
-            "  {:<4} {:<26} {:>7} {:>12}  {}".format(
+            "  {:<4} {:<26} {:>13} {:>12}  {}".format(
                 "gen", "condition", "narrow", "reach", "x"
             )
         )
@@ -1378,10 +1995,10 @@ class FractalEvolver:
         for node in rungs:
             amplification = "{}x".format(format_span(node.amplification))
             lines.append(
-                "  {:<4} {:<26} {:>7.3f} {:>12}  {}".format(
+                "  {:<4} {:<26} {:>13} {:>12}  {}".format(
                     node.generation,
                     (node.condition or "(unnamed)")[:26],
-                    node.difficulty,
+                    _format_difficulty(node.difficulty),
                     format_span(node.span),
                     amplification,
                 )

@@ -1,0 +1,556 @@
+# ERRATA
+
+Defects found in this repository, recorded the moment they were found rather than
+after they were fixed.
+
+This file exists because of a specific failure mode. A defect that is quietly
+patched leaves no trace that it ever existed, and the audit trail then looks
+cleaner than the code was. So the rule here is:
+
+1. **Every defect gets an entry** with a runnable reproduction, the severity, and
+   what it corrupts downstream.
+2. **Nothing is fixed silently.** An entry is only closed when the fix and its
+   blast radius are written down.
+3. **An open entry is not a scandal; a missing one is.** The status column is the
+   point of the file.
+
+All three open entries below were found during the work reported in
+`experiments/paper/` (November 2026). Entries ERR-001 and ERR-002 were surfaced by
+building the experiments; ERR-003 was surfaced by verifying ERR-001, which is why
+the count is three and not two.
+
+One further entry, PRE-003, is of a different kind and is recorded here because it
+is the closest this repository has come to publishing a defect. It is not a bug in
+the code. It is a hypothesis that arrived with the desired answer attached, and the
+document below is the record of refusing it.
+
+## Status
+
+| id | defect | severity | status |
+|:--|:--|:--|:--|
+| ERR-001 | six-decimal rounding turns passable gaps into reported walls | **high** — silent data corruption | **closed** (v0.6.0) |
+| ERR-002 | clamped successor keeps returning `PASS` after the ladder stops being fractal | **high** — silent false positive | **closed** (v0.6.0) |
+| ERR-003 | witness digest does not bind the gap's difficulty | **high** — two distinct claims share one witness | **closed** (v0.6.0) |
+| PRE-001 | the paper's biological premise was corrected before publication | medium — premise, not code | closed |
+| PRE-002 | the exponential-fit measurement was conditioned on $D\approx0.999$, biasing the rate it was meant to check | medium — a measured number, not a released one | closed |
+| PRE-003 | the "true emergence" hypothesis asked the experiment to confirm a shape that its own budget forbids | **high** — would have published a fitted non-result as a discovery | **closed** (v0.6.1) |
+
+Severity is assigned by one criterion: *can a consumer of this output be
+misled without seeing an error?* All three entries passed that test, which is why
+all three are high. A crash would have been cheaper.
+
+All three are now closed in the same change, because they could not be closed
+honestly one at a time: fixing the rounding exposes the clamp, and fixing the
+clamp is what made anyone look at the witness. The three closed entries below
+keep their original "what a consumer would see" section verbatim, since that is
+the evidence, and append a **Fix** section describing what replaced it.
+
+---
+
+## ERR-001 — six-decimal rounding invents walls
+
+**Location.** `agent_metabolism/interface_engine.py`, four sites:
+`:538` (`Interface.as_dict`), `:1100` (escalate preview), `:1158`
+(`cross_interface` result), `:1239` (escalate result).
+
+```python
+"difficulty": round(self.difficulty, 6),
+```
+
+**What happens.** `round(x, 6)` returns `1.0` for any `x >= 0.9999995`. A gap with
+`1 - D <= 5e-7` is therefore *reported* as difficulty exactly `1.0`. But `1.0` is
+not a difficulty in this model — it is a wall, the one value
+`_next_difficulty` refuses to return and `potential_from_difficulty` refuses to
+invert. The record says "this gap cannot be crossed" about a gap that was just
+crossed successfully.
+
+**Reproduction.**
+
+```python
+import sys; sys.path.insert(0, '.')
+from agent_metabolism.interface_engine import *
+
+m = Layer("Macro", "M", measured={"t": 1.0})
+q = Layer("Quantum", "Q", measured={"t": 1e-12})
+
+for k in (6, 7, 8):
+    D = 1.0 - 10.0 ** (-k)
+    e = FractalEvolver([m, q])
+    g = Interface("Macro", "Quantum", "c", span=10, difficulty=D)
+    e.seed(g)
+    r = e.cross_interface(
+        g, NarrowCondition("x", "mech", "art-1", 2.0, replicable=False)
+    )
+    print(D, r["difficulty"], r["verdict"])
+```
+
+Observed:
+
+```
+0.999999   0.999999  PASS     <- 1e-6 tolerance survives
+0.9999999  1.0       PASS     <- 1e-7 tolerance is reported as a wall
+0.99999999 1.0       PASS
+```
+
+**What it corrupts.** Every consumer of the result dictionary: `render_chain`
+output, `evolver.history`, the membrane's log entries, and — see ERR-003 — the
+witness digest's antecedents. A reader of the history cannot tell a
+1e-7 gap from a 1e-12 gap, and cannot tell either from a genuine wall.
+
+**Why it was not caught.** The suite's difficulties cluster at `0.8`, `0.9`,
+`0.95` and `0.99`, all of which round-trip through six decimals without loss. There
+is exactly one near-wall test — `test_difficulty_never_reaches_one` at
+`tests/test_interface_engine.py:573` — and it is the clearest illustration of the
+blind spot. It seeds `difficulty=0.999999` and asserts the *child* is below `1.0`:
+
+```python
+evolver.seed(Interface("A", "B", "c", span=1, difficulty=0.999999))
+result = evolver.cross_interface(("A", "B", 0),
+                                 {"mechanism": "c", "evidence": "e"})
+self.assertLess(result["sub_interface"]["difficulty"], 1.0)
+```
+
+The child is `0.9999995`, which floats just below the rounding threshold and
+survives as `0.999999`. The test passes *one step away* from the defect. Seed
+`0.9999999` instead and the child is reported as `1.0` — the guard against walls
+would fail, but only because it happened to trip over the rounding, not because it
+was testing for it. A guard that checks the child's value cannot detect a parent
+that was already misreported.
+
+The defect was found because the regression in `experiments/` needed `1 - D` down
+to `1e-9` for the representation-boundary probe, and the fit collapsed outright:
+every hard row shared the same `difficulty`, and `math.log(1.0 - 1.0)` raised
+`ValueError` because the reported value was exactly `1.0`.
+
+**Workaround in `experiments/`.** The CSV carries both `difficulty` (the engine's
+report) and `difficulty_exact` (the value that was set); all regressions use the
+latter. This is a workaround, not a fix: the corruption is still in the engine's
+public output.
+
+**Proposed fix.** Do not round in the result dictionary. Round at render time, in
+`format_span`/`render_chain`, where a human is the consumer and six decimals are
+appropriate.
+
+Blast radius, checked rather than assumed: `_install`/`_replace_node` copy the
+`Interface` object and never round-trip through `as_dict`, so the fix does not
+change the model's state. `Layer.as_dict` and `NarrowCondition.as_dict` are
+unaffected. The at-risk call sites are tests that compare a rounded field to
+9 decimal places — `tests/test_interface_engine.py:595`
+(`assertAlmostEqual(..., places=9)`) is the one that would tighten, not loosen,
+once the rounding is gone.
+
+---
+**Fix.** Rounding left the data and moved to the renderer. `Interface.as_dict`,
+`cross_interface`, `escalate` and the failure record now carry `float(...)`, the
+value the engine actually holds; `_format_difficulty` decides how many digits a
+human should see and spends more of them as `1 - D` shrinks. Rendering at three
+decimals for a 0.9 gap and at twelve for a `1 - 1e-9` gap is the same number
+reported honestly, which rounding to a fixed six was not.
+
+Pinned by `tests/test_witness_binding.py::TestNoFalseWalls` and, from outside the
+engine, by `tests/test_experiments.py::test_the_engine_report_and_the_exact_value_now_agree`
+-- a test that asserts the two columns agree everywhere and therefore *failed*
+before the fix. That is the distinction the README has to make now: the old test
+pinned a workaround, the new one pins an invariant.
+
+
+## ERR-002 — the ladder stops being fractal and keeps reporting PASS
+
+**Location.** `agent_metabolism/interface_engine.py:588`, inside
+`_next_difficulty`.
+
+```python
+def _next_difficulty(difficulty: float, ratio: float) -> float:
+    """Close half the remaining room. Never returns 1.0, which would be a wall."""
+    candidate = difficulty + (1.0 - difficulty) * ratio
+    ceiling = 1.0 - 1.0e-9
+    return min(candidate, ceiling)
+```
+
+The clamp is deliberate and correctly motivated: a child at difficulty `1.0` would
+be a wall, and a wall has no successor. The defect is not the clamp. It is that
+**nothing reports when the clamp engages**.
+
+**What happens.** Once `difficulty >= 1 - 1e-9`, `_next_difficulty` returns the
+ceiling unchanged, so the child is exactly as hard as the parent. The engine's
+central invariant — that each generation is strictly harder — is violated. Yet
+`cross_interface` returns `PASS`, because the crossing itself did happen. The
+fractal law silently stops holding while every signal a caller normally checks
+stays green.
+
+**Reproduction.**
+
+```python
+for k in (8, 9, 10):
+    D = 1.0 - 10.0 ** (-k)
+    e = FractalEvolver([m, q])
+    g = Interface("Macro", "Quantum", "c", span=10, difficulty=D)
+    e.seed(g)
+    r = e.cross_interface(
+        g, NarrowCondition("x", "mech", "art-1", 2.0, replicable=False),
+        next_condition="inside",
+    )
+    child = e.frontier()[0]
+    print(k, r["verdict"], child.difficulty > g.difficulty,
+          e.invariants()["self_similar"])
+```
+
+Observed:
+
+```
+8   PASS  True   True      <- still a fractal
+9   PASS  False  False     <- clamp engaged, verdict unchanged
+10  PASS  False  False
+```
+
+Bisection on `_next_difficulty` locates the boundary at
+`D* = 0.9999999990000008` (`1 - D* = 1e-9`). From `D = 0.99` the ladder holds 24
+generations before the clamp; the paper reports this number.
+
+**What it corrupts.** A chain that reports `PASS` at every rung and is not
+self-similar. The only detector is `FractalEvolver.invariants()`, which is a
+whole-chain check the caller has to remember to run. `cross_interface` cannot
+detect it alone, because the clamp is a property of the successor rather than of
+the crossing.
+
+**Second-order effect.** The violation message is itself corrupted by ERR-001:
+it prints `difficulty did not rise (1.0000 -> 1.0000)` for a parent at
+`0.999999999` and a child at `0.999999999`. The diagnostic that is supposed to
+explain the failure repeats the same rounding that hides it.
+
+**Proposed fix.** Return a fault (`DIFFICULTY_SATURATED`, non-decisive) from
+`_next_difficulty`'s callers when `candidate >= ceiling`, and have
+`cross_interface` attach it to the result. The crossing stays `PASS`; the status
+gains a note that the chain has stopped being a fractal. Blast radius: tests
+asserting exact `faults` lists, and `invariants()`, which would gain a nameable
+cause. Backwards-compatible if the fault is non-decisive.
+
+---
+**Fix.** Saturation is now reported instead of hidden. `_successor_saturates`
+asks, before any child is built, whether closing half the room would in fact
+narrow it. If not, the crossing still returns `PASS` -- it happened, and claiming
+otherwise would be the opposite lie -- but no rung is spawned, `terminal` is set
+on the record, and a **non-decisive** `DIFFICULTY_SATURATED` fault explains why.
+`invariants()` gains `terminal_rungs` so a caller can tell "the chain is short"
+apart from "the chain has nowhere further to go", and `self_similar` keeps its
+old meaning: no counterfeit rung exists, so no violation is manufactured.
+
+The alternative considered and rejected was to keep the child and make the
+crossing `FAIL`. That would report a crossing that demonstrably happened as not
+having happened; the defect was the silence, not the `PASS`.
+
+
+## ERR-003 — the witness does not bind the claim
+
+**Location.** `agent_metabolism/interface_engine.py:1185`, the digest payload
+built by `cross_interface`.
+
+```python
+self._record(result, digest_payload={
+    "interface": list(crossed.key),
+    "mechanism": spec.mechanism,
+    "evidence": spec.evidence,
+    "amplification": checked,
+})
+```
+
+**What happens.** The witness commits to *which* interface, *which* mechanism,
+*which* artefact, and the amplification actually granted. It does not commit to
+the gap's **difficulty** and does not commit to **span before or after**. Two
+crossings of different gaps by the same mechanism with the same cited artefact
+therefore produce byte-identical digests.
+
+**Reproduction.**
+
+```python
+digests = {}
+for D in (0.90, 0.99, 0.9999):
+    e = FractalEvolver([m, q])
+    g = Interface("Macro", "Quantum", "c", span=10, difficulty=D)
+    e.seed(g)
+    e.cross_interface(
+        g, NarrowCondition("x", "mech", "art-1", 2.0, replicable=False)
+    )
+    digests[D] = e.history[-1]["digest"]
+
+print(digests)
+print(len(set(digests.values())), "distinct digests for", len(digests), "claims")
+```
+
+Observed:
+
+```
+0.9     sha256:d5094052d5db629bddba563af7af33034538e131fe9fef119c87e92af11d1fbc
+0.99    sha256:d5094052d5db629bddba563af7af33034538e131fe9fef119c87e92af11d1fbc
+0.9999  sha256:d5094052d5db629bddba563af7af33034538e131fe9fef119c87e92af11d1fbc
+3 claims, 1 distinct digest
+```
+
+**Why this one matters most.** The premise of this repository is that a claim is
+only as good as the witness that binds it, and that an un-witnessed claim is
+`INVALID` rather than merely weak. A digest that omits the quantity distinguishing
+two claims is exactly the failure the ledger exists to prevent: it lets a
+recorded crossing at `D = 0.90` stand as a witness for a crossing at
+`D = 0.9999`. The ledger is not lying; it is answering a different question than
+the one being asked of it.
+
+The paper's Experiment C is directly affected in interpretation. It reports
+`D_50` values to four decimals for three fidelity tiers. Those measurements are
+sound — the experiment carries `difficulty_exact` — but the *engine's own witness*
+could not have told the three tiers apart.
+
+**Proposed fix.** Add `difficulty` and `span_before`/`span_after` to the digest
+payload. This changes every digest in the system, so it is a breaking change for
+any stored audit trail; it needs a version prefix (`sha256:v2:...`) rather than a
+silent swap. Also consider digesting the full `NarrowCondition`, including
+`replicable` and `cost`, since status is derived from `replicable` and an auditor
+cannot currently verify a `NARROW`/`EXPANSIVE` call from the witness alone.
+
+---
+**Fix.** The witness is now **derived from the record**, not assembled at the call
+site. `witness_payload` walks a declared field list
+(`interface`, `verdict`, `difficulty`, `span_before`, `span_after`,
+`amplification`, `status`, `mechanism`, `evidence`, `replicable`) plus the sorted
+fault kinds, and `_record` calls it on the record it is about to append. A field
+present in the record is in the witness; a field the record lacks shows up as
+absent rather than as silently unbinding. Hand-assembly is how the difficulty was
+lost, so hand-assembly was removed as a possibility rather than corrected once.
+
+The digest is versioned in place -- `sha256:v2:<hex>` -- so `startswith("sha256:")`
+keeps working for existing consumers while a reader can tell which contract a
+stored witness was written under. `verify_witness` recomputes the digest from the
+record, which is the half of the contract nobody exercises: editing the
+difficulty, either span, the verdict, the status, the evidence or the recorded
+provenance all now break it.
+
+`upgrade_witness` re-witnesses a version-1 record. It **does not** restore the
+old guarantee, and the docstring says so: a v1 witness never committed to the
+difficulty, so nothing can check whether its difficulty moved. Upgrading records
+the superseded digest (bound into the new payload) and freezes the record as it
+now stands. An upgraded witness is trustworthy from the moment of upgrade, not
+from the moment of the original crossing. There was no persisted v1 ledger in this
+repository to migrate -- history lives in memory on each evolver -- so the upgrade
+path exists for external consumers, not to rewrite a history that does not exist.
+
+Pinned by `tests/test_witness_binding.py::TestTheWitnessBindsTheClaim`,
+`TestVerifyWitness` and `TestUpgradeWitness` (32 tests in that file, including the
+exact collision that motivated the entry: four difficulties, four distinct
+digests where there used to be one).
+
+
+## PRE-001 — the biological premise, corrected before publication
+
+Not a code defect, but a defect in the paper's premise, and it would have been
+fatal with a physics referee. Recorded here because it was caught by the same
+process and because the correction is what made the quantitative result possible.
+
+**The error.** The first draft of the parameter table took the long-lived
+oscillations reported for the FMO complex at cryogenic temperature
+(Panitchayangkoon et al., PNAS 2010) as evidence that the protein scaffold
+extends electronic coherence at room temperature. Under that assumption the
+biomimetic mechanism would gain a coherence advantage, and the paper's
+counterfactual would have claimed that a protein matches or beats a dilution
+refrigerator *in coherence time*.
+
+**The correction.** The long-lived beats do not survive to physiological
+temperature; the room-temperature residual oscillations are assigned to
+vibrational rather than electronic coherence (Duan et al., PNAS 2017). At 300 K the
+scaffold buys **no** coherence-time advantage over bulk solvent. The parameter
+table now encodes `T2_FMO_300K = 1e-12 s`, identical to the bulk value, tagged
+`literature`.
+
+**Why this rescued the argument rather than weakening it.** Under the corrected
+premise the biological mechanism still wins the counterfactual by three orders of
+magnitude (reach `1e5` versus `1e2`), while gaining *nothing* in coherence. That
+makes reach a function of replicability and fidelity rather than of physical gain,
+which is a sharper and more falsifiable claim than the one the first draft was
+making. The wrong premise would have produced a result a referee could dismiss by
+citing one paper; the corrected premise produces a result that contradicts the
+field's usual progress metric.
+
+**Status.** Closed. Encoded in `experiments/parameters.py`; the contested reading
+is discussed in the paper's §IV-D.
+
+---
+
+## PRE-002 -- the fit that measured its own conditioning
+
+### What would have been wrong
+
+Experiment E checks the derived rate of the local exponential form, `1 + f**2/5`,
+against a least-squares fit on a window of relative half-width `f`. The windows sit
+at `D` between 0.99 and 0.99999, where the spread in `D` is `1e-4` or smaller. The
+first version fitted `y = a + alpha * D` on the raw values, with `D` near 1.
+
+Two defects, both invisible in the summary number:
+
+1. **The design matrix is ill-conditioned.** Columns of `1` and `D ~ 0.999` differ
+   by four orders of magnitude in scale, so `numpy.linalg.lstsq`'s singular-value
+   cutoff can drop the slope. The fit is biased by roughly `1e-3 * f**2`, which is
+   the same order as the `O(f**4)` term the check exists to resolve.
+2. **The window was sampled endpoint to endpoint.** The two endpoints stand for
+   half a cell each and were counted as full ones, giving the raw moment sums an
+   `O(1/samples)` bias: `1e-5` in the fitted rate at 401 points, again the same
+   order as the quantity under test.
+
+The visible symptom was a residual against `1 + f**2/5` that did not scale as
+`f**4` -- it hovered at `~1e-3 f**2` and shrank by a factor of 4 per halving
+instead of 16. Had the paper reported only the agreement at one `f`, it would have
+published a rate agreeing to five digits with a theory that was right for reasons
+the fit was not testing.
+
+### What a consumer would have seen
+
+Nothing. There was no error, no warning, and no NaN. The fit converged, the R^2
+was 0.9993, and the number was wrong in the fourth significant figure of the
+correction term -- exactly the figure the experiment was built to check.
+
+### Fix
+
+- `_linear_fit` now fits on centred data (`x - mean(x)`), which is algebraically
+  identical and numerically stable. The docstring states why, because "centring is
+  not cosmetic" is the sort of comment that saves the next person an hour.
+- `model.geometric_window` and `model.absolute_window` sample cell centres rather
+  than endpoints, removing the `O(1/N)` moment bias instead of arguing about it.
+- The residual is now a *tested* quantity rather than a reported one:
+  `test_the_residual_matches_the_fourth_order_coefficient` checks it against the
+  derived `3 f**4 / 35` to 5%, and `test_the_residual_really_is_fourth_order`
+  checks that it shrinks by at least 8x per halving of `f`. Against the old code
+  both fail.
+
+### Why this one is worth recording
+
+PRE-001 was a premise corrected by reading the literature. This one is a
+*measurement* corrected by deriving the number it was measuring. The check that
+found it -- does the residual scale as the next term of the series -- is the same
+check the paper applies to its own law, and it took a closed form to make it
+possible. A numerical experiment whose target has no closed form cannot be audited
+this way, which is an argument for keeping the algebra in `model.py` where the
+experiments can be tested against it.
+
+---
+
+## PRE-003 — the experiment was asked to confirm a shape its own budget forbids
+
+### What was proposed
+
+A design brief for `experiments/true_emergence_experiment.py` specified the
+conclusion before specifying the measurement. Group A (a correlational agent) would
+inflate its apparent reach; Group B (a causally witnessed agent) would show a
+genuine crossing of difficulty boundaries and, because only real connections nest
+fractally, "once the base layer is connected, each further layer costs less, so
+reach explodes super-exponentially". The deliverable was a plot with B's curve
+turning up, and a paragraph explaining the turn.
+
+The brief is internally coherent, which is what makes it dangerous. Each sentence
+is plausible, and the requested figure is the one the paper would most like to
+publish: it would credit the labelling system with a capability rather than with an
+absence of lies.
+
+### Why the requested result cannot occur
+
+A ladder of depth $K$ is completed only when its prefixes are, so
+
+    P(pass K) <= P(pass j)  for every j <= K
+
+under *any* joint law of the layers. No independence assumption is used, so no
+conditional structure and no nesting discount can reverse the inequality. Reach,
+defined as the completion of a chain, is non-increasing in depth by construction.
+
+The brief's mechanism --- each layer cheaper than the last --- is real and is
+already in the paper as Eq. (19): a path of $K$ boundaries costs $n+\log_{10}K$
+nines rather than $nK$, so the $j$-th layer costs $\log_{10}(j/(j-1))$ nines. Those
+marginals are strictly positive and strictly decreasing: `0.301, 0.176, 0.125,
+0.097, 0.079`. Decreasing towards zero is a discount. A sum of non-negative terms
+cannot fall, so the total cost is increasing and reach cannot turn up. An
+"explosion" requires a *negative* marginal cost, which is not a discount but a
+different claim about what is being measured.
+
+### What a consumer would have seen
+
+Had the brief been implemented as written, Group B's curve would have had to be
+produced by construction: either a per-layer probability that rises with depth
+(assumed, not measured) or a reach metric silently swapped for per-crossing
+amplification. Both produce a rising curve. Neither is a discovery, and both are
+indistinguishable in a PDF from the result the brief predicted. The paper would
+have reported an "exponential emergence" that is an assumption wearing a plot.
+
+### What was done instead
+
+- The nesting discount was made a *parameter* $\delta$ rather than an assumption,
+  and swept over $\delta \in \{0, 0.1, 0.25, 0.5, 0.75, 1\}$. No admissible schedule
+  raises reach with depth; $\delta = 0$ --- every layer after the first free --- is
+  flat, and the paper's budget is the least generous of the family.
+- The refutation was made load-bearing in code: `prefix_bound()` states the
+  inequality, and `test_the_model_can_express_an_explosion` asserts that a schedule
+  with *negative* marginal cost does produce rising reach. Without that test,
+  "no admissible schedule explodes" would be a statement about the arithmetic of
+  the sweep rather than about the hypothesis.
+- The comparison was kept, including the part that flatters the labelling system:
+  Group A's assertion overstates the causal rate by $2.08\times10^{10}$ at
+  $D=0.99$ and depth 6, and Group A holds a *positive floor* of 1572 crossings
+  while Group B's witnessed reach passes through one crossing and keeps falling.
+  The negative result is about the explosion, not about the value of the witness.
+- The one real gain was quantified: nesting buys 9.3 orders of magnitude in
+  the *cost of depth* ($7.94\times10^{-13}$ to $1.60\times10^{-3}$) and nothing in
+  the difficulty exponent, which stays at $1.00$ while the independent model's
+  equals the depth.
+
+### Why this one is worth recording
+
+ERR-001..003 were defects in code: the code said one thing, the artefact another,
+and a test could be written that fails against the parent commit. PRE-003 has no
+parent commit. What it has is a specification whose acceptance criterion was
+"produce this curve", and the only defence against that is a mathematical
+statement that the curve is not available --- plus a test that the machinery could
+have produced it if it were.
+
+The repository now carries both. `experiments/true_emergence_experiment.py` is the
+measurement, `tests/test_true_emergence.py` (39 tests) pins the inequality against
+500 adversarial ladders and pins the model's ability to say yes, and the paper's
+Section V-E (Experiment H) reports the negative result with the numbers that
+support it.
+
+The general lesson is not "check your assumptions". It is that a negative result
+needs *two* things to be publishable: an argument for why the effect cannot exist,
+and a demonstration that the apparatus was capable of detecting it. The first stops
+the paper from being wrong; the second stops the reader from suspecting the authors
+of incompetence rather than of honesty.
+
+
+
+They are not independent, and the compound failure is worth stating plainly.
+
+ERR-001 makes hard gaps indistinguishable in the record. ERR-003 removes
+difficulty from the witness entirely. Together they mean that the region the
+paper studies — the last few orders of magnitude before the wall — is the region
+in which the engine's own audit trail is least able to reconstruct what happened.
+ERR-002 then lets the ladder leave the self-similar regime while `cross_interface`
+keeps answering `PASS`. A chain can therefore walk into the clamp, cross a gap
+that does not exist, and emit a witness that does not distinguish it from the last
+one.
+
+None of this affected the paper's *numerical* results, because `experiments/`
+read `difficulty_exact` and ran `invariants()` explicitly. What it affected is the
+claim that the engine could have discovered this on its own. It could not. It was
+found by writing an experiment that needed precision the engine never promised,
+which is an argument for the experiments beyond the ones the paper makes.
+
+That is now also the paper's §IV-C ("Self-Auditing the Auditor"): the defects are
+reported as the model's strongest internal evidence, because a witness chain that
+cannot be shown to fail is not a witness chain.
+
+## Reprocessing
+
+```bash
+python3 -m unittest discover -s tests            # 708 tests, all green
+python3 -m unittest tests.test_witness_binding -v # the three defects, pinned
+python3 -m experiments.run_experiments           # regenerates the evidence
+```
+
+`tests/test_witness_binding.py` is the file that ERR-001..003 produced, and
+`tests/test_topology.py` is the file PRE-002 produced. The former has 32 tests
+and asserts the *properties* that were missing rather than the fixes that supplied
+them: no reported wall below 1.0, no rung spawned at the ceiling, and no two
+distinct claims sharing a witness. Each of those tests fails against the parent
+commit of the fix, which is the only property a regression test needs.
