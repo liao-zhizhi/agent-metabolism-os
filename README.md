@@ -431,14 +431,64 @@ which is why every row says so.
 python3 demo_boundary_audit.py          # 4 filings, 3 verdicts, 17 self-checks
 ```
 
+## Fractal interfaces: a medium is the next layer up
+
+Explaining an interface by its medium is circular. Air is not the substrate of a
+conversation — air is a layer, bounded by the layer above it, and a conversation
+crosses it only because a language fits through a very narrow opening in it.
+Every "medium" is just the next layer up, mistaken for a floor because that is
+where the search stopped.
+
+[`agent_metabolism/interface_engine.py`](agent_metabolism/interface_engine.py)
+models an interface as a **gap**: what has to be true for two layers to reach each
+other, and how much reach that buys.
+
+Crossing a gap does not delete it. It closes the old opening and opens a new one
+**of the same shape**, one octave in:
+
+| generation | gap | narrow condition | reach |
+|:--|:--|:--|:--|
+| 0 | air | language | 2 → 100 (a small tribe) |
+| 1 | space/time | writing | 100 → 1,000,000 (industrial society) |
+| 2 | semantics | schema + physical witness | 1,000,000 → the horizon (AI OS) |
+
+Difficulty climbs toward 1.0 while reach explodes. That is the invariant, and the
+demo asserts it rather than narrating it: `invariants()` recomputes the law
+against the chain as it actually stands. Crossing is the only door upward —
+`FractalEvolver.cross_interface` is the sole method that raises `condition_met`,
+multiplies a span, or spawns a sub-interface.
+
+Four things the engine refuses, each because allowing it would make the ladder a
+poster rather than a model:
+
+* **A gap anything can cross** is `FAIL` (`NOT_A_BOUNDARY`). Crediting it would
+  let a caller multiply reach by satisfying nothing.
+* **A placeholder condition** is `INVALID`. `magic` cannot be measured, so it
+  cannot be wrong.
+* **Re-crossing** raises. Reach is not a counter; a loop would manufacture
+  unbounded span without ever satisfying a new condition.
+* **A falling amplification** raises. A crossing that connects less than the thing
+  it replaces is not a crossing.
+
+The third reach saturates at a finite horizon instead of becoming `inf`.
+Infinity cannot be multiplied, compared, or printed, and a quantity that breaks
+arithmetic is a slogan. Saturation is exactly where an interface stops being a
+feature and becomes the floor everything else stands on — the demo prints that
+notice, in the words the design used.
+
+```bash
+python3 demo_fractal_interfaces.py      # 2 -> 100 -> 1e6 -> 1e12, 22 self-checks
+```
+
 ## Run it
 
 ```bash
-PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 446 tests, ~2s
+PYTHONPATH=.:../agent-harness-audit python3 -m unittest discover -s tests -p 'test_*.py'   # 545 tests, ~2s
 python3 demo.py                         # the full lifecycle
 python3 integration_demo.py             # audit -> charge -> next-day shutdown
 python3 demo_lean_fake_proof.py         # a Riemann "proof" that is not one
 python3 demo_one_person_company.py      # three agents, one liar, one balance sheet
+python3 demo_fractal_interfaces.py      # three generations, 2 -> 1e12
 ```
 
 No install step, no dependencies, no network. Python 3.9+.
@@ -893,7 +943,7 @@ itself. The constants are where a real system would put its own measurements.
 ## Tests
 
 ```
-Ran 446 tests in ~2s
+Ran 545 tests in ~2s
 OK
 ```
 

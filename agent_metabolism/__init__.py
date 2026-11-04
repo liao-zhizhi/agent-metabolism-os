@@ -15,6 +15,8 @@ to live outside it, which is what this package is.
     --  lean_auditor.py  holes in a machine-written proof, judged without reading it
     --  boundary_auditor.py  claims of crossing between physical layers, judged
                         on falsifiability and arithmetic, never on truth
+    --  interface_engine.py  gaps between layers, and the fractal law that each
+                        crossing narrows the opening and widens the reach
 
 Standard library only. The energy figures are policy, not measurement, and the
 latencies are modelled rather than slept.
@@ -122,6 +124,16 @@ from .regime import (
     RegimeSwitch,
     evaluate_regime,
 )
+from .interface_engine import (
+    DEFAULT_AMPLIFICATION,
+    NARROW_THRESHOLD,
+    SPAN_HORIZON,
+    FractalEvolver,
+    Interface,
+    InterfaceError,
+    Layer as InterfaceLayer,
+    format_span,
+)
 from .lean_auditor import (
     COMPILER,
     CUSTOM_AXIOM,
@@ -157,13 +169,21 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "0.5.5"
+__version__ = "0.5.7"
 
 __all__ = [
     "DEFAULT_INVENTIONS",
     "DEFAULT_LAYERS",
     "MECHANISMS",
     "MIN_STRUCTURAL_PARAMETERS",
+    "DEFAULT_AMPLIFICATION",
+    "FractalEvolver",
+    "Interface",
+    "InterfaceError",
+    "InterfaceLayer",
+    "NARROW_THRESHOLD",
+    "SPAN_HORIZON",
+    "format_span",
     "Boundary",
     "BoundaryAudit",
     "BoundaryAuditor",
