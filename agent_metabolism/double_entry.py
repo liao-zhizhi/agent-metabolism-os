@@ -272,6 +272,16 @@ class Receipt:
     counters, so the report and the journal cannot drift apart.
     """
 
+    #: ``1..n`` over *judged* entries only. Two consequences a caller building an
+    #: audit log on top must know, because both are silent if assumed away:
+    #:
+    #: * a **refusal** (``AgentLocked``) does **not** advance it -- nothing was
+    #:   judged -- and neither does a manual ``unlock``. A consumer that uses this
+    #:   number as an event id reuses the last one and, if it tails by "seq greater
+    #:   than what I have seen", silently drops the refusal. The CEL console hit
+    #:   exactly this and keeps its own counter; see ``product_mvp/cel_engine.py``.
+    #: * it is per-ledger position, not a timestamp. Two receipts with the same
+    #:   ``agent`` and different ``seq`` are ordered; nothing else about them is.
     seq: int
     agent: str
     intent: str
