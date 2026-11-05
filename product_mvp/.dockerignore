@@ -1,0 +1,13 @@
+# Build context is this directory, and Hugging Face uploads it as the Space repo.
+# Keeping the context small keeps the Space push fast and the image honest about
+# what it actually needs.
+
+.venv
+.venv/
+**/__pycache__
+**/*.pyc
+.pytest_cache
+tests
+assets
+*.md
+docker-compose.yml

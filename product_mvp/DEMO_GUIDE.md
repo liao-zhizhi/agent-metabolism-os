@@ -29,14 +29,17 @@ docker compose up --build
 
 ```
 cel-console  | INFO:     Application startup complete.
-cel-console  | INFO:     Uvicorn running on http://0.0.0.0:8000
+cel-console  | INFO:     Uvicorn running on http://0.0.0.0:7860
 ```
+
+> 容器里监听 7860（Hugging Face Space 的端口），compose 把它映射到本机 8000，所以浏览器
+> 还是打开 **http://localhost:8000**。
 
 浏览器打开 **http://localhost:8000** ，应当看到：
 
 - 顶部徽章是绿色的 `HEALTHY`
 - 四张指标卡全是 `0` / `100.0`
-- 中间终端里只有一行 `[boot] cel-gateway v0.1.0 · double-entry membrane armed…`
+- 中间终端里只有一行 `[boot] cel-gateway v0.3.0 · double-entry membrane armed…`
 - 右上角 `CHAIN` 显示 `0x0000…`（64 个 0 = 空链的创世值）
 
 ### 如果 `docker compose` 报 `unknown command`
@@ -44,17 +47,17 @@ cel-console  | INFO:     Uvicorn running on http://0.0.0.0:8000
 这台机器只装了 Docker CLI、没装 compose 插件。用等价的裸命令：
 
 ```bash
-# 在仓库根目录（product_mvp 的上一级）执行
-cd ..
-docker build -f product_mvp/Dockerfile -t cel-console:0.1.0 .
-docker run -d --name cel-console -p 8000:8000 \
+# 就在 product_mvp 目录里执行（构建上下文就是它）
+docker build -t cel-console:0.3.0 .
+docker run -d --name cel-console -p 8000:7860 \
   -v cel-ledger:/data \
   -e CEL_LEDGER_LOG=/data/ledger.jsonl \
-  cel-console:0.1.0
+  cel-console:0.3.0
 ```
 
-> 构建上下文必须是**仓库根目录**，因为镜像要 `COPY agent_metabolism/`（核心库不额外安装，
-> 标准库实现，跟审计用的就是同一份字节）。
+> 构建上下文是 `product_mvp/` 本身：核心库不靠 `COPY ../agent_metabolism` 搬运，而是
+> 在构建时按发布 tag 下载（`ARG CEL_CORE_REF`）。这样同一个 Dockerfile 既能本地构建，
+> 也能直接交给 Hugging Face Space（它只能从自己仓库根目录构建）。
 
 ### 收工
 

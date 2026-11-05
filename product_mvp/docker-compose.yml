@@ -4,19 +4,22 @@
 #   docker compose up --build
 #   open http://localhost:8000
 #
-# The build context is the repository root (..) because the image copies
-# agent_metabolism from there. A `.dockerignore` at that root keeps tests,
-# experiment artefacts and the paper out of the context.
+# The build context is this directory. The image fetches the core library from
+# the pinned release tag instead of copying a parent directory, because a
+# Hugging Face Space can only build from the root of its own repo -- and one
+# Dockerfile that works in both places is better than two that drift.
 
 services:
   cel:
     build:
-      context: ..
-      dockerfile: product_mvp/Dockerfile
-    image: cel-console:0.2.0
+      context: .
+      dockerfile: Dockerfile
+    image: cel-console:0.3.0
     container_name: cel-console
     ports:
-      - "8000:8000"
+      # Host 8000 -> container 7860: the image's default port is the one a
+      # Hugging Face Space expects, so the same image is what gets deployed.
+      - "8000:7860"
     environment:
       # Consecutive FAILs before an agent is quarantined (core minimum is 2).
       CEL_FAIL_LIMIT: "3"

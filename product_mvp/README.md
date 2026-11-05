@@ -1,3 +1,13 @@
+---
+title: CEL Dashboard
+emoji: 🛡️
+colorFrom: gray
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # CEL — 因果执行与信任监控台 (MVP)
 
 一个 FastAPI 服务 + 一块暗黑极客风监控大屏，演示三件事：
@@ -27,18 +37,24 @@ Docker：
 
 ```bash
 cd product_mvp
-docker compose up --build      # 构建上下文是仓库根目录，见下方说明
+docker compose up --build      # http://localhost:8000
 ```
 
-> 镜像需要本仓库根目录当构建上下文（它要 `COPY agent_metabolism/`）。因此
-> `docker-compose.yml` 里写的是 `context: ..`，仓库根的 `.dockerignore` 负责把
-> 测试、实验产物和论文挡在上下文之外。如果你的机器只有 `docker` 没有 compose 插件：
+> 构建上下文就是 `product_mvp/` 本身。核心库不靠 `COPY ../agent_metabolism`
+> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.7`）解到
+> `/app/core`——因为 Hugging Face Space 只能从自己仓库的根目录构建，没有"指向上级
+> 目录"这个选项。一个 Dockerfile 同时适用本地与 Space，比两份会逐渐走样的配置更可靠。
+> 只有 `docker` 没有 compose 插件时：
 
 ```bash
-cd ..            # 仓库根
-docker build -f product_mvp/Dockerfile -t cel-console:0.2.0 .
-docker run -p 8000:8000 -v cel-ledger:/data cel-console:0.2.0
+cd product_mvp
+docker build -t cel-console:0.3.0 .
+docker run -p 8000:7860 -v cel-data:/data cel-console:0.3.0
 ```
+
+> 镜像默认监听 **7860**（Hugging Face Space 期望的端口），本地用 `-p 8000:7860`
+> 映射到 8000。要换端口就 `-e PORT=8080`，不要改 Dockerfile——`resolve_bind()`
+> 读 `PORT` → `CEL_PORT` → 默认值，硬编码端口正是"日志说 running、健康检查说死"的成因。
 
 跑测试：
 
@@ -72,6 +88,11 @@ python api_server.py
 
 公网部署（持久化磁盘、`/data`、平台环境变量、验收清单）见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
 
+本目录可以直接作为 **Hugging Face Space** 发布：文件顶部的 YAML 就是 Space 配置
+（`sdk: docker`、`app_port: 7860`），Dockerfile 默认监听 7860 且以 uid 1000 运行。
+把本目录内容推到 Space 仓库、在 Settings 里加一个 `CEL_API_KEY` **secret** 即可，
+详细步骤见 DEPLOYMENT.md §2。
+
 ---
 
 ## 二、文件结构
@@ -82,8 +103,11 @@ product_mvp/
 ├── cel_engine.py           网关本体：判决 / 信任账本 / 哈希链（可脱离 HTTP 单测）
 ├── example_client.py       客户 Agent 的接入示例（requests）
 ├── requirements.txt        只有 fastapi + uvicorn，两行
-├── Dockerfile
-├── docker-compose.yml
+├── Dockerfile              上下文就是本目录；核心库按发布 tag 在构建时取入
+├── .dockerignore
+├── docker-compose.yml      本地一键起（8000 → 容器 7860）
+├── DEPLOYMENT.md           公网部署：Hugging Face Spaces / Railway / 裸 Docker
+├── DEMO_GUIDE.md           十分钟客户演示脚本
 ├── templates/
 │   └── index.html          单页大屏（无模板引擎，直接读盘）
 ├── static/

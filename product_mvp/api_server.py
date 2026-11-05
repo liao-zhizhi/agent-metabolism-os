@@ -231,7 +231,7 @@ async def _lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="CEL -- Causal Execution Ledger",
-    version="0.2.0",
+    version="0.3.0",
     description="Intercept false completions, charge trust, keep a tamper-evident book.",
     lifespan=_lifespan,
 )
