@@ -101,6 +101,18 @@
 
     <p class="hint">把一条故意矛盾的证据提交给网关，看它是否敢于亮红灯。</p>
 
+    <div id="auth-banner" class="auth-banner" hidden>
+      <strong>⚠ 鉴权未启用</strong>
+      <span>未设置 <code>CEL_API_KEY</code>：任何人都能写入这本账。公网部署前必须设置。</span>
+    </div>
+
+    <div id="key-row" class="key-row" hidden>
+      <label for="api-key">X-API-Key</label>
+      <input id="api-key" type="password" placeholder="粘贴服务器上的 CEL_API_KEY" autocomplete="off" spellcheck="false" />
+      <button id="btn-save-key" class="ghost-btn" type="button">保存</button>
+    </div>
+    <p id="key-state" class="key-state" hidden></p>
+
     <button id="btn-simulate" class="danger-btn" type="button">
       <span class="bolt">⚡</span>
       <span>模拟一次假完成</span>

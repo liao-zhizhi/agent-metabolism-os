@@ -36,8 +36,8 @@ docker compose up --build      # 构建上下文是仓库根目录，见下方�
 
 ```bash
 cd ..            # 仓库根
-docker build -f product_mvp/Dockerfile -t cel-console:0.1.0 .
-docker run -p 8000:8000 -v cel-ledger:/data cel-console:0.1.0
+docker build -f product_mvp/Dockerfile -t cel-console:0.2.0 .
+docker run -p 8000:8000 -v cel-ledger:/data cel-console:0.2.0
 ```
 
 跑测试：
@@ -47,6 +47,30 @@ cd product_mvp
 python3 -m unittest discover -s tests -v            # 引擎层，零第三方依赖
 .venv/bin/python -m unittest discover -s tests -v   # 含 HTTP 层（需 fastapi+httpx）
 ```
+
+---
+
+## 一·五、写接口的鉴权
+
+`POST /api/v1/verify` 和 `POST /api/v1/agents/{id}/unlock` 会写入信任账本，所以要
+过一道共享 key 的检查：
+
+```bash
+export CEL_API_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')
+python api_server.py
+```
+
+- 请求头 `X-API-Key` 与 `CEL_API_KEY` 不符、或缺失 → **403**；
+- `CEL_API_KEY` 未设置 → 写入开放（方便本地 demo），但启动日志会打 `auth: DISABLED`，
+  大屏顶部会出现红色 **鉴权未启用** 横幅，`/api/v1/stats` 也会报 `auth_enabled: false`。
+  一个没设防的实例绝不会长得像一个设了防的实例。
+- `GET /api/v1/stats`、`GET /api/v1/ledger`、`GET /api/v1/ledger/verify` 保持匿名，
+  给大屏轮询用。
+
+大屏上的 key 由人工粘贴进控制台的输入框，存在 `sessionStorage`（关掉标签页就没了），
+不会写进 HTML —— 所以"查看源代码"看不到任何 key。
+
+公网部署（持久化磁盘、`/data`、平台环境变量、验收清单）见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
 
 ---
 
@@ -67,8 +91,8 @@ product_mvp/
 │   ├── style.css           暗黑终端风：扫描线、辉光、红灯闪烁
 │   └── favicon.svg
 └── tests/
-    ├── test_engine.py      19 项：判决、隔离、解锁、链完整性
-    └── test_api.py         16 项：页面渲染、三个接口、423 语义
+    ├── test_engine.py      23 项：判决、隔离、解锁、链完整性
+    └── test_api.py         34 项：页面渲染、三个接口、423 语义、403 鉴权
 ```
 
 前端**没有构建步骤**：Tailwind 走 CDN，`app.js` 是普通 `<script>`，改完刷新即可。

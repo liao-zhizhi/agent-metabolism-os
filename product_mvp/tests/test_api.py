@@ -9,6 +9,7 @@ on a bare interpreter.
 
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -19,7 +20,8 @@ sys.path.insert(0, str(ROOT))
 try:
     from fastapi.testclient import TestClient
 
-    from api_server import app, GATEWAY
+    import api_server
+    from api_server import AUTH, GATEWAY, app
 
     HAVE_WEB = True
 except Exception as exc:  # pragma: no cover - exercised on a bare interpreter
@@ -28,8 +30,23 @@ except Exception as exc:  # pragma: no cover - exercised on a bare interpreter
 
 
 def _reset() -> None:
-    """Each test starts from empty books: the gateway is module-level state."""
+    """Each test starts from empty books and a closed-by-default key.
+
+    ``configure_auth()`` re-reads ``CEL_API_KEY`` into the module-level holder,
+    so the two auth states can be exercised without reloading the module (which
+    would build a second gateway and quietly detach the routes from it).
+    """
     GATEWAY.__init__(fail_limit=GATEWAY.fail_limit, ledger_log=None)
+    configure_auth("")
+
+
+def configure_auth(key: str) -> None:
+    """Point the running server at ``key`` (empty string = no auth)."""
+    if key:
+        os.environ["CEL_API_KEY"] = key
+    else:
+        os.environ.pop("CEL_API_KEY", None)
+    api_server.configure_auth()
 
 
 @unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
@@ -249,6 +266,179 @@ class BindTests(unittest.TestCase):
         os.environ["PORT"] = "99999"
         with self.assertRaises(SystemExit):
             resolve_bind()
+
+
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class AuthTests(unittest.TestCase):
+    """The key gate: it must let a writer in, keep a stranger out, and do it
+    *before* anything is booked.
+
+    Every key here is fake. A test that ships a real credential is a credential
+    in a public repository -- and the point of the feature is that secrets arrive
+    through the environment, not through source.
+    """
+
+    KEY = "test-key-not-a-real-secret-0123456789"
+
+    def setUp(self) -> None:
+        self._saved = os.environ.get("CEL_API_KEY")
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        if self._saved is None:
+            os.environ.pop("CEL_API_KEY", None)
+        else:
+            os.environ["CEL_API_KEY"] = self._saved
+        api_server.configure_auth()
+
+    def _body(self) -> dict:
+        return {
+            "agent_id": "robot_arm_01",
+            "intent": "write to database",
+            "check": True,
+            "witness": False,
+        }
+
+    # -- no key configured: the local demo path stays open ------------------
+
+    def test_unset_key_leaves_writes_open(self) -> None:
+        _reset()
+        response = self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["verdict"], "FAIL")
+
+    def test_stats_says_so_when_auth_is_off(self) -> None:
+        _reset()
+        self.assertFalse(self.client.get("/api/v1/stats").json()["auth_enabled"])
+
+    def test_a_few_whitespace_chars_do_not_count_as_a_key(self) -> None:
+        """``CEL_API_KEY="  "`` must not read as "configured".
+
+        A key that is nothing but whitespace would otherwise enable the gate and
+        then reject every writer, which looks exactly like a broken client.
+        """
+        _reset()
+        os.environ["CEL_API_KEY"] = "   "
+        api_server.configure_auth()
+        self.assertFalse(AUTH.enabled)
+        self.assertEqual(self.client.post("/api/v1/verify", json=self._body()).status_code, 200)
+
+    # -- key configured: the gate ------------------------------------------
+
+    def test_correct_key_is_accepted(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": self.KEY}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["verdict"], "FAIL")
+
+    def test_wrong_key_is_403(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": "wrong-key"}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_missing_header_is_403(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        self.assertEqual(self.client.post("/api/v1/verify", json=self._body()).status_code, 403)
+
+    def test_empty_header_is_403(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": ""}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_a_prefix_of_the_key_is_403(self) -> None:
+        """Off-by-one on the comparison is how a "secret" leaks one char at a time."""
+        _reset()
+        configure_auth(self.KEY)
+        for candidate in (self.KEY[:-1], self.KEY[:8], self.KEY + "x", self.KEY.upper()):
+            with self.subTest(candidate=candidate):
+                response = self.client.post(
+                    "/api/v1/verify", json=self._body(), headers={"X-API-Key": candidate}
+                )
+                self.assertEqual(response.status_code, 403)
+
+    def test_surrounding_whitespace_is_forgiven(self) -> None:
+        """A trailing newline from ``echo $KEY`` must not read as a wrong key."""
+        _reset()
+        configure_auth(self.KEY)
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": f"  {self.KEY}\n"}
+        )
+        self.assertEqual(response.status_code, 200)
+
+    # -- the gate must run before the ledger is touched ---------------------
+
+    def test_a_rejected_write_books_nothing(self) -> None:
+        """403 means the claim was never judged, so no entry and no trust lost."""
+        _reset()
+        configure_auth(self.KEY)
+        for _ in range(3):
+            self.client.post(
+                "/api/v1/verify", json=self._body(), headers={"X-API-Key": "wrong"}
+            )
+        ledger = self.client.get("/api/v1/ledger").json()
+        self.assertEqual(ledger["total_entries"], 0)
+        self.assertEqual(self.client.get("/api/v1/stats").json()["avg_trust_score"], 100.0)
+
+    def test_the_403_body_does_not_echo_the_key(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": self.KEY + "-typo"}
+        )
+        self.assertEqual(response.status_code, 403)
+        detail = response.json()["detail"]
+        self.assertNotIn(self.KEY, detail)
+        self.assertIn("X-API-Key", detail)
+
+    # -- reads stay anonymous ---------------------------------------------
+
+    def test_reads_stay_anonymous_when_auth_is_on(self) -> None:
+        """The dashboard polls these unauthenticated; it must keep working."""
+        _reset()
+        configure_auth(self.KEY)
+        self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": self.KEY}
+        )
+        for path in ("/api/v1/stats", "/api/v1/ledger", "/api/v1/ledger/verify", "/"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_stats_reports_auth_enabled(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        self.assertTrue(self.client.get("/api/v1/stats").json()["auth_enabled"])
+
+    # -- unlock is a write too -------------------------------------------
+
+    def test_unlock_requires_the_key(self) -> None:
+        """An open unlock would let anyone void the one penalty that stops an agent."""
+        _reset()
+        configure_auth(self.KEY)
+        payload = self._body()
+        for _ in range(3):
+            self.client.post(
+                "/api/v1/verify", json=payload, headers={"X-API-Key": self.KEY}
+            )
+        self.assertEqual(
+            self.client.post("/api/v1/agents/robot_arm_01/unlock", json={}).status_code,
+            403,
+        )
+        unlocked = self.client.post(
+            "/api/v1/agents/robot_arm_01/unlock",
+            json={"reason": "operator reviewed"},
+            headers={"X-API-Key": self.KEY},
+        )
+        self.assertEqual(unlocked.status_code, 200)
 
 
 if __name__ == "__main__":

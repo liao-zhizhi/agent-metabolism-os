@@ -18,6 +18,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # No CEL_PORT on purpose: the entrypoint reads PORT first if the platform sets
 # one (Render, Railway, Heroku, Fly all do) and falls back to 8000. Pinning the
 # port here is how a Docker deploy dies its health check while logging "running".
+# The HEALTHCHECK below resolves the same way, for the same reason.
 
 WORKDIR /app
 
@@ -44,6 +45,6 @@ USER cel
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"
+    CMD python -c "import os,urllib.request,sys; p=os.environ.get('CEL_PORT') or os.environ.get('PORT') or '8000'; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+p+'/healthz', timeout=2).status == 200 else 1)"
 
 CMD ["python", "api_server.py"]

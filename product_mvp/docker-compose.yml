@@ -13,7 +13,7 @@ services:
     build:
       context: ..
       dockerfile: product_mvp/Dockerfile
-    image: cel-console:0.1.0
+    image: cel-console:0.2.0
     container_name: cel-console
     ports:
       - "8000:8000"
@@ -22,6 +22,10 @@ services:
       CEL_FAIL_LIMIT: "3"
       # Append the hash chain to a volume, so a restart is still auditable.
       CEL_LEDGER_LOG: "/data/ledger.jsonl"
+      # Shared write key. Passed through from your shell, never written here:
+      #   CEL_API_KEY=$(python -c 'import secrets;print(secrets.token_urlsafe(32))') docker compose up
+      # Unset means the gate is OFF -- the dashboard will say so in red.
+      CEL_API_KEY: "${CEL_API_KEY:-}"
     volumes:
       - cel-ledger:/data
     restart: unless-stopped

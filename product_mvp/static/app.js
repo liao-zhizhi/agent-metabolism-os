@@ -12,12 +12,26 @@
 
 const POLL_MS = 2000;
 const MAX_LINES = 140;
+const KEY_STORAGE = "cel_api_key";
 
 const el = (id) => document.getElementById(id);
 
 let lastSeq = 0;
 let polling = false;
 let booted = false;
+let authEnabled = false;
+
+/* Set when the server answered 403 to the stored key. Kept as state rather than
+ * written straight into the DOM, because ``paintAuth`` runs on every 2s poll and
+ * would otherwise wipe the rejection notice back to "saved" before the operator
+ * could read it -- a stale "all good" over a key that does not work. */
+let keyRejected = false;
+
+/* The key lives in sessionStorage, never in the HTML: a page that ships the
+ * credential is a page that hands it to anyone who can view source. sessionStorage
+ * rather than localStorage, so closing the tab drops it instead of leaving a
+ * write credential on a shared demo laptop. */
+let apiKey = sessionStorage.getItem(KEY_STORAGE) || "";
 
 /* ------------------------------------------------------------------ utils */
 
@@ -35,6 +49,14 @@ function clockOf(ts) {
 function fmt(n, digits = 0) {
   if (n === null || n === undefined) return "—";
   return Number(n).toFixed(digits);
+}
+
+/* Headers for a write. `X-API-Key` is omitted when no key is configured, which
+ * is what makes the no-auth local demo work unchanged. */
+function writeHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  return headers;
 }
 
 async function getJSON(url) {
@@ -91,7 +113,36 @@ function paintStats(s) {
   pill.className = "pill pill-" + state;
   el("health-text").textContent = (s.health_state || "HEALTHY");
 
+  paintAuth(Boolean(s.auth_enabled));
   paintAgents(s.agents || []);
+}
+
+/* The server tells us which mode it is in; the page must never guess. An
+ * unprotected instance looks identical to a protected one otherwise, and
+ * "identical" is how someone demos an open port on a public URL. */
+function paintAuth(enabled) {
+  authEnabled = enabled;
+
+  el("auth-banner").hidden = enabled;
+  el("key-row").hidden = !enabled;
+
+  const state = el("key-state");
+  if (!enabled) {
+    state.hidden = true;
+    return;
+  }
+
+  state.hidden = false;
+  if (!apiKey) {
+    state.textContent = "未填写 key：模拟按钮会被 403 拒绝。粘贴服务器的 CEL_API_KEY 后点「保存」。";
+    state.className = "key-state is-warn";
+  } else if (keyRejected) {
+    state.textContent = "这颗 key 被服务器拒绝（403）。核对后重新粘贴并保存。";
+    state.className = "key-state is-warn";
+  } else {
+    state.textContent = "已保存 key（仅本次标签页有效，关闭即清除）。";
+    state.className = "key-state is-ok";
+  }
 }
 
 function paintAgents(agents) {
@@ -250,15 +301,34 @@ const SCENARIOS = {
 };
 
 async function submit(payload, button) {
+  // Fail before the round trip, so the operator gets a sentence instead of a 403.
+  if (authEnabled && !apiKey) {
+    toast("先填写 X-API-Key：这台服务器已启用鉴权，匿名写入会被 403 拒绝", "warn");
+    el("api-key").focus();
+    return;
+  }
+
   if (button) button.disabled = true;
   try {
     const res = await fetch("/api/v1/verify", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: writeHeaders(),
       body: JSON.stringify(payload),
     });
     const data = await res.json();
 
+    if (res.status === 403) {
+      // A 403 is direct evidence that this instance enforces a key -- stronger
+      // than the stats poll, which may simply have failed to load. Trust it, and
+      // show the field even if the panel thought auth was off.
+      authEnabled = true;
+      keyRejected = true;
+      paintAuth(authEnabled);
+      // First sentence only: the server's detail is written for an operator
+      // reading a log, and a wall of it in a toast pushes the useful part away.
+      toast("403 拒绝：" + String(data.detail || "X-API-Key 不正确").split(".")[0], "warn");
+      return;
+    }
     if (res.status === 423) {
       showVerdict(data);
       flashAlarm();
@@ -311,13 +381,25 @@ function showVerdict(data) {
 }
 
 async function unlock(agentId) {
+  if (authEnabled && !apiKey) {
+    toast("解锁是写操作：先填写 X-API-Key", "warn");
+    el("api-key").focus();
+    return;
+  }
   try {
     const res = await fetch(`/api/v1/agents/${encodeURIComponent(agentId)}/unlock`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: writeHeaders(),
       body: JSON.stringify({ reason: "operator release from dashboard" }),
     });
     const data = await res.json();
+    if (res.status === 403) {
+      authEnabled = true;
+      keyRejected = true;
+      paintAuth(authEnabled);
+      toast("403 拒绝：这颗 key 无权解锁", "warn");
+      return;
+    }
     if (!res.ok) {
       toast("解锁失败：" + (data.detail || res.status), "warn");
       return;
@@ -362,6 +444,28 @@ document.addEventListener("DOMContentLoaded", () => {
       '<div class="term-line term-boot"><span class="t">[clear]</span> display cleared · chain untouched</div>';
     booted = true;
   });
+
+  const saveKey = () => {
+    const value = el("api-key").value.trim();
+    apiKey = value;
+    keyRejected = false;  // a new key gets its own verdict from the server
+    if (value) sessionStorage.setItem(KEY_STORAGE, value);
+    else sessionStorage.removeItem(KEY_STORAGE);
+    paintAuth(authEnabled);
+    el("api-key").value = "";
+    if (value) toast("已保存 key：仅本次标签页有效", "pass");
+  };
+
+  el("btn-save-key").addEventListener("click", saveKey);
+  el("api-key").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveKey();
+  });
+
+  // A key restored from sessionStorage is not echoed back into the field: the
+  // input stays empty so shoulder-surfing the demo does not reveal it.
+  el("api-key").placeholder = apiKey
+    ? "已保存（重新输入可覆盖）"
+    : "粘贴服务器上的 CEL_API_KEY";
 
   tick();
   setInterval(tick, POLL_MS);
