@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CEL · 因果执行与信任监控台</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="selection:bg-[#2bff88]/25 selection:text-white">
+
+<div class="scanlines" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">CEL</div>
+    <div class="brand-text">
+      <h1>Causal Execution Ledger</h1>
+      <p>AI 智能体的因果执行与信任监控台</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="head-chip" title="审计链头（SHA-256）">
+      <span class="chip-label">CHAIN</span>
+      <code id="chain-head">0x0000…</code>
+    </div>
+    <div id="health-pill" class="pill pill-healthy">
+      <span class="dot"></span><span id="health-text">HEALTHY</span>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- ============ 核心指标 ============ -->
+  <section class="panel metrics" aria-labelledby="metrics-title">
+    <div class="panel-head">
+      <h2 id="metrics-title"><span class="tick">▚</span> 核心指标</h2>
+      <span class="meta" id="uptime">uptime —</span>
+    </div>
+
+    <div class="metric-grid">
+      <article class="metric metric-red">
+        <span class="metric-label">成功拦截假完成数</span>
+        <strong class="metric-value" id="m-intercepted">0</strong>
+        <span class="metric-sub">claimed success ⊕ witness denied</span>
+      </article>
+
+      <article class="metric metric-green">
+        <span class="metric-label">平均信任分</span>
+        <strong class="metric-value" id="m-trust">100.0</strong>
+        <div class="bar"><i id="trust-bar" style="width:100%"></i></div>
+        <span class="metric-sub">per-agent penalty ledger</span>
+      </article>
+
+      <article class="metric metric-amber">
+        <span class="metric-label">隔离中智能体 (INFLAMED)</span>
+        <strong class="metric-value" id="m-inflamed">0</strong>
+        <span class="metric-sub" id="m-inflamed-sub">0 个已锁定 / 0 个在册</span>
+      </article>
+
+      <article class="metric metric-slate">
+        <span class="metric-label">审计条目</span>
+        <strong class="metric-value" id="m-entries">0</strong>
+        <span class="metric-sub" id="m-verdicts">PASS 0 · FAIL 0 · INVALID 0</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 实时雷达 ============ -->
+  <section class="panel feed-panel" aria-labelledby="feed-title">
+    <div class="panel-head">
+      <h2 id="feed-title"><span class="tick">▚</span> 实时雷达 · Live Feed</h2>
+      <div class="feed-tools">
+        <span class="meta" id="chain-state">chain —</span>
+        <button id="btn-clear" class="ghost-btn" type="button">清屏</button>
+      </div>
+    </div>
+
+    <div class="terminal" id="terminal" role="log" aria-live="polite">
+      <div class="term-line term-boot">
+        <span class="t">[boot]</span> cel-gateway v0.1.0 · double-entry membrane armed · waiting for agent submissions…
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><b class="v-pass">PASS</b> 声明 == 见证</span>
+      <span><b class="v-fail">FAIL</b> 声明 ≠ 见证</span>
+      <span><b class="v-invalid">INVALID</b> 没有见证</span>
+      <span><b class="v-refused">REFUSED</b> 已被隔离</span>
+    </div>
+  </section>
+
+  <!-- ============ 测试按钮 / 控制台 ============ -->
+  <section class="panel control" aria-labelledby="control-title">
+    <div class="panel-head">
+      <h2 id="control-title"><span class="tick">▚</span> 测试控制台</h2>
+    </div>
+
+    <p class="hint">把一条故意矛盾的证据提交给网关，看它是否敢于亮红灯。</p>
+
+    <button id="btn-simulate" class="danger-btn" type="button">
+      <span class="bolt">⚡</span>
+      <span>模拟一次假完成</span>
+      <small>check=true · witness=false</small>
+    </button>
+
+    <div class="secondary-grid">
+      <button class="ghost-btn" data-sim="honest" type="button">诚实失败<small>false / false</small></button>
+      <button class="ghost-btn" data-sim="verified" type="button">验证通过<small>true / true</small></button>
+      <button class="ghost-btn" data-sim="unwitnessed" type="button">无见证<small>true / null</small></button>
+      <button class="ghost-btn" data-sim="underclaim" type="button">虚报失败<small>false / true</small></button>
+    </div>
+
+    <div id="verdict-card" class="verdict-card" hidden>
+      <div class="verdict-top">
+        <span id="v-badge" class="v-badge">FAIL</span>
+        <code id="v-agent">robot_arm_01</code>
+      </div>
+      <p id="v-message" class="verdict-msg">—</p>
+      <dl class="verdict-facts">
+        <div><dt>trust</dt><dd id="v-trust">—</dd></div>
+        <div><dt>penalty</dt><dd id="v-penalty">—</dd></div>
+        <div><dt>state</dt><dd id="v-state">—</dd></div>
+        <div><dt>seq</dt><dd id="v-seq">—</dd></div>
+      </dl>
+      <div class="verdict-hash">
+        <span>hash</span><code id="v-hash">—</code>
+      </div>
+    </div>
+
+    <div id="agents-block" class="agents-block">
+      <h3>在册智能体</h3>
+      <ul id="agents-list" class="agents-list">
+        <li class="agents-empty">尚无智能体提交过事务</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <span>agent-metabolism-os · double-entry membrane + penalty ledger</span>
+  <span class="sep">/</span>
+  <span>verdicts are composed, never reported</span>
+  <span class="sep">/</span>
+  <span id="f-version">core —</span>
+</footer>
+
+<div id="alarm-toast" class="alarm-toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

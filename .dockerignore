@@ -1,0 +1,21 @@
+# Build context for product_mvp/Dockerfile, which is this repository's root.
+#
+# The repository carries test fixtures, experiment artefacts and papers that the
+# image has no use for. Exclude everything, then re-include the two trees the
+# service actually imports and serves.
+
+*
+!product_mvp
+!product_mvp/**
+!agent_metabolism
+!agent_metabolism/**
+
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.lake
+**/node_modules
+**/.git
+product_mvp/tests
+product_mvp/*.md
+product_mvp/.venv

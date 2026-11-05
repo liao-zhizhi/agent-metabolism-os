@@ -1,0 +1,8 @@
+# Server dependencies -- deliberately two lines.
+#
+# The heavy machinery (double-entry ledger, penalty ledger, hash chain) lives in
+# ../agent-metabolism-os and is standard-library only, so nothing is installed
+# for it. Starlette pulls in `anyio`; pydantic comes with fastapi. No Jinja2
+# (HTML is read from disk), no aiofiles (StaticFiles uses anyio), no ORM.
+fastapi>=0.110,<1.0
+uvicorn>=0.27,<1.0

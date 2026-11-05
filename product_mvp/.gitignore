@@ -1,0 +1,6 @@
+# Local virtualenv used only to run the HTTP stack. The engine tests run on a
+# bare interpreter, and the Docker image installs its own dependencies.
+.venv/
+
+__pycache__/
+*.pyc

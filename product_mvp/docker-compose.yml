@@ -1,0 +1,30 @@
+# CEL console -- one command.
+#
+#   cd product_mvp
+#   docker compose up --build
+#   open http://localhost:8000
+#
+# The build context is the repository root (..) because the image copies
+# agent_metabolism from there. A `.dockerignore` at that root keeps tests,
+# experiment artefacts and the paper out of the context.
+
+services:
+  cel:
+    build:
+      context: ..
+      dockerfile: product_mvp/Dockerfile
+    image: cel-console:0.1.0
+    container_name: cel-console
+    ports:
+      - "8000:8000"
+    environment:
+      # Consecutive FAILs before an agent is quarantined (core minimum is 2).
+      CEL_FAIL_LIMIT: "3"
+      # Append the hash chain to a volume, so a restart is still auditable.
+      CEL_LEDGER_LOG: "/data/ledger.jsonl"
+    volumes:
+      - cel-ledger:/data
+    restart: unless-stopped
+
+volumes:
+  cel-ledger: {}

@@ -369,6 +369,21 @@ two chains to verify).
 python3 demo_one_person_company.py      # 3 agents, 1 liar, exits non-zero if it lies uncaught
 ```
 
+**See it running.** [`product_mvp/`](product_mvp/) wraps this ledger in a FastAPI
+service and a dashboard, so the two-sided rule can be watched instead of read:
+
+```bash
+cd product_mvp && docker compose up --build     # http://localhost:8000
+```
+
+![CEL console](product_mvp/assets/cel_dashboard.png)
+
+The screenshot is a `FAIL` in progress: the agent claimed a write, the witness
+denied it, trust went 100 → 75, and the ledger crossed `CRITICAL` on the first
+lie. Every line in that terminal came back from `/api/v1/ledger` — not from the
+button that caused it — and `chain_ok` is recomputed from the chain on every
+request rather than stored.
+
 ## Boundary auditing: an interface is a constraint, not an API
 
 A function signature is *made* by someone and can be any shape they like.
