@@ -38,10 +38,19 @@ document below is the record of refusing it.
 | ERR-004 | the execution layer's witness was not bound to the prediction it checked, so a scene could satisfy an earlier chunk's registration | **high** — three episodes reported a pass after the bowl had been dropped | **closed** (v1.0.3) |
 | ERR-005 | the CEL paper's figures were not derived from the audit's data: one shipped PNG had no producing script, carried numbers that exist in no summary, dropped a declared world, and labelled both arms as crashing | **high** — a figure that cannot be re-derived is an assertion, in a paper about unwitnessed assertions | **closed** (v1.0.3) |
 | PUB-002 | a released figure caption asserted "every crash is a pedestrian" and the figure had no recovery panel, though both captions promised content the files did not contain | medium — a released claim, not a code path | **closed** (v1.0.3) |
+| ERR-006 | per-grant witness cost is $O(N)$ in ledger length, so the layer's total latency crosses above the baseline's at ~4 710 entries and the published "+1.7%" is true only below ~150 episodes | **high** — a constant-cost claim that is silently linear in deployment age | **open** (v1.0.4) |
 
 Severity is assigned by one criterion: *can a consumer of this output be
 misled without seeing an error?* All three entries passed that test, which is why
 all three are high. A crash would have been cheaper.
+
+ERR-006 is the first entry in this file that is **open on purpose**. Its fix is
+designed and priced (§Fix below) but not implemented, because changing the digest
+scheme invalidates every stored ledger and therefore cannot be done in the same
+release as the measurement that found it. Recording it open is the only honest
+state: the cost theory in `experiments/cost_theory/COST_THEORY.md` derives a
+steady-state law that is only valid at $O(1)$ verification, and a document that
+silently assumes its own precondition is the defect this file exists to prevent.
 
 All three are now closed in the same change, because they could not be closed
 honestly one at a time: fixing the rounding exposes the clamp, and fixing the
@@ -772,10 +781,131 @@ already correct; this was the prose disagreeing with them.
 
 ---
 
+## ERR-006 — the witness pays for its own history, linearly
+
+**Location.** The gateway's per-grant chain verification, as invoked by
+`MembraneCEL.check` (`experiments/benchmark_libero_audit.py:905`). The cost model
+is measured rather than assumed, and both measurement sites are in the audit
+outputs: `experiments/libero_audit_summary.json`
+(`witness.cost_model.measured`, `witness.cost_model.canonicalise_and_hash_us`)
+and `experiments/cel_paper/data/witness_cost_table.tex`.
+
+**What happens.** Every `request_action_warrant` call re-verifies the **entire**
+hash chain before issuing the warrant. The witness primitive itself — canonicalise
+plus SHA-256 — is $0.768\,\mu s$ and constant in ledger length. The verification
+around it is not: the measured price per grant is
+
+| ledger entries | verify-chain | per grant |
+|---|---|---|
+| 202 | 2.206 ms | 2.21 ms |
+| 3 002 | 31.0 ms | 31.0 ms |
+| slope | — | **$\approx 10.3\,\mu s$ / entry** |
+
+So the layer's overhead is $c_w(N)=a+bN$ with $b\approx 10.3\,\mu s$, not the
+constant a reader of "the witness costs 55 ms per chunk" would infer.
+
+**What it corrupts.** The headline latency claim. Substituting the measured
+last-ten-episode cost into the arithmetic:
+
+```
+chunks per episode (last 10, CEL arm)     18.3
+witness per chunk, last 10 episodes       99.8 ms
+witness per episode, last 10             1826 ms
+CEL decision latency (measured)          3720 ms
+inferred CEL total, last 10                                  5546 ms
+baseline total (arm A, measured)          4609 ms
+```
+
+The layer is **938 ms slower per episode** by the end of a 100-episode run, having
+been 78 ms slower on average. Solving $w_c L = L_A - L_B^{\text{dec}}$ for the
+per-chunk witness price gives 48.6 ms, which the slope reaches at
+
+$$
+N^* \approx 202+\frac{48.6-2.206}{0.0103}\approx 4\,710\ \text{ledger entries}
+\;\approx\; 2\,620\ \text{chunks}\;\lesssim\;150\ \text{episodes}.
+$$
+
+Beyond roughly 150 episodes of continuous operation, **the layer with the witness
+is slower in total than the baseline it was supposed to be within 1.7% of** — and
+the gap grows without bound. The "+1.7%" in the paper and the "+0.6%" in the cost
+theory are both correct measurements of an interval, and both are wrong as
+statements about a deployment that lasts a week.
+
+**Reproduction** (no re-run; the two endpoints are shipped in the audited summary):
+
+```bash
+python3 - <<'PY'
+import json
+s = json.load(open("experiments/libero_audit_summary.json"))
+B, A = s["arms_summary"]["B_cel"], s["arms_summary"]["A_safe_vla"]
+chunks = 18.3                        # mean over B's last ten episodes
+w = B["witness_ms_per_chunk_last10"] * chunks
+print(f"witness {w:.0f} ms/ep; CEL {B['vla_latency_ms_mean']+w:.0f} ms "
+      f"vs A {A['policy_latency_ms_mean']:.0f} ms")
+b = (31.0 - 2.206) / (3002 - 202)    # ms per entry
+print(f"slope {b*1000:.1f} us/entry; crossover "
+      f"{202 + ((A['policy_latency_ms_mean']-B['vla_latency_ms_mean'])/chunks - 2.206)/b:.0f} entries")
+PY
+# witness 1826 ms/ep; CEL 5546 ms vs A 4609 ms
+# slope 10.3 us/entry; crossover 4710 entries
+```
+
+**Why this is a defect and not a price.** `COST_THEORY.md` §3 derives
+$C_{\text{steady}}=c_c+\rho(c_v-c_c)$ from the premise that verification is
+$O(1)$ per traverse. Half of that equation's leverage — the $T$ term — is bought
+by exactly this constant. An $O(N)$ verifier means that as $T$ grows, the price of
+the very thing that makes $T$ fall grows with it, and the steady state never
+arrives: the sequence $c(N)$ is what the theory assumes away. The paper's own
+§VI says as much ("an implementation defect with a known shape"), but a footnote
+in a paper is not a fix, and the released numbers carry no length qualifier.
+
+**Fix — a design, not a patch.** The verification must stop depending on the
+number of records it verifies. Two admissible constructions:
+
+1. **Merkle tree over the ledger.** Append leaves; keep the tree; the head is one
+   root. A grant carries an inclusion proof of length $\lceil\log_2 N\rceil$ and
+   verifies in $O(\log N)$ hashes. Measured against the current 10.3 µs/entry at
+   $N=10^6$, that is 20 hashes instead of $10^6$.
+2. **Incremental accumulator.** Carry the running digest as a state variable, so
+   each append is $O(1)$ and a grant re-verifies a constant-size commitment.
+   Cheaper than the tree; weaker, because it proves "the chain has not changed
+   since the last anchor" rather than "this record is in the chain".
+
+The engineering decision is the anchor interval: a Merkle root anchored every $k$
+appends bounds the un-witnessed window to $k$ records, and a grant references the
+last anchor plus its own path. That trades a *temporal* guarantee for an
+asymptotic one, and the trade must be written down rather than made silently.
+
+**Requirement, stated as an acceptance criterion.** *Verify complexity must fall
+from $O(N)$ to $O(\log N)$ (Merkle) or $O(1)$ (incremental accumulator) per grant.*
+Recorded verbatim as the architectural directive it is:
+
+> 未来必须引入 Merkle 树或增量累加器（Incremental Accumulator），将验证复杂度从
+> \(O(N)\) 降至 \(O(\log N)\) 或 \(O(1)\)。
+
+The test that pins it is a price test, not a hash test: run 10 and 10 000 grants
+and assert that per-grant verification time grows by less than the log ratio
+(allowing a 2× envelope for cache effects). Without that assertion, a future
+"optimisation" that keeps a prefix cache can pass every correctness test while
+restoring the linear cost.
+
+**Blast radius of the fix.** Every digest and every stored ledger: the payload
+changes, so the scheme needs a version prefix (`sha256:v3:`), exactly as ERR-003
+needed `v2`. `verify_witness` must be able to read v2 records; `upgrade_witness`
+gains a v2→v3 path that, like the v1→v2 path, **does not** restore a guarantee the
+old record never had. No experiment's *verdict* changes — only its latency
+decomposition — which is why this can ship separately from the cost theory.
+
+**Status.** Open. The measurement is released, the defect is named, the fix is
+specified, and the document that depends on the fix states the precondition.
+Nothing is closed by this entry except the pretence that the overhead is constant.
+
+---
+
 ## Reprocessing
 
 ```bash
-python3 -m unittest discover -s tests            # 1 086 tests, all green
+python3 -m unittest discover -s tests            # 1 106 tests, all green
 python3 -m unittest tests.test_witness_binding -v # the three defects, pinned
 python3 -m experiments.run_experiments           # regenerates the evidence
 cd experiments/cel_paper && ./build.sh           # regenerates numbers, figures, PDF
