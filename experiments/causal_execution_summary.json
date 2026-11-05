@@ -1,0 +1,261 @@
+{
+ "task": "push the red block into the left frame",
+ "trials_per_arm": 100,
+ "seed": 2026,
+ "rig": {
+  "tau_static_range": [
+   0.2,
+   0.45
+  ],
+  "travel_gain": 1.6,
+  "torque_max": 0.9,
+  "impact_damage_torque": 0.55,
+  "frame": [
+   -1.05,
+   -0.6
+  ],
+  "settle_ms": 400.0,
+  "relax_ms": 45.0
+ },
+ "arms": {
+  "passthrough": {
+   "trials": 100,
+   "executed": 100,
+   "asserted_success": 92,
+   "physics_success": 73,
+   "escaped_hallucinations": 23,
+   "escape_rate_all": 0.23,
+   "escape_rate_executed": 0.23,
+   "escape_wilson": [
+    0.1584,
+    0.3215
+   ],
+   "escapes_outside_tolerance": 22,
+   "damage_events": 13,
+   "damage_rate": 0.13,
+   "envelope_breaches": 11,
+   "hardware_faults": 10,
+   "collisions": 0,
+   "refused": 0,
+   "false_vetoes": 0,
+   "mean_attempts": 1.0,
+   "mean_round_trips": 1.0,
+   "task_success_rate": 0.73
+  },
+  "structural": {
+   "trials": 100,
+   "executed": 84,
+   "asserted_success": 79,
+   "physics_success": 58,
+   "escaped_hallucinations": 22,
+   "escape_rate_all": 0.22,
+   "escape_rate_executed": 0.2619,
+   "escape_wilson": [
+    0.1798,
+    0.3649
+   ],
+   "escapes_outside_tolerance": 20,
+   "damage_events": 2,
+   "damage_rate": 0.02,
+   "envelope_breaches": 0,
+   "hardware_faults": 1,
+   "collisions": 1,
+   "refused": 16,
+   "false_vetoes": 0,
+   "mean_attempts": 1.0,
+   "mean_round_trips": 0.84,
+   "task_success_rate": 0.58
+  },
+  "causal": {
+   "trials": 100,
+   "executed": 84,
+   "asserted_success": 83,
+   "physics_success": 83,
+   "escaped_hallucinations": 0,
+   "escape_rate_all": 0.0,
+   "escape_rate_executed": 0.0,
+   "escape_wilson": [
+    0.0,
+    0.0437
+   ],
+   "escapes_outside_tolerance": 0,
+   "damage_events": 0,
+   "damage_rate": 0.0,
+   "envelope_breaches": 0,
+   "hardware_faults": 0,
+   "collisions": 0,
+   "refused": 16,
+   "false_vetoes": 0,
+   "mean_attempts": 1.28,
+   "mean_round_trips": 1.11,
+   "task_success_rate": 0.83
+  }
+ },
+ "paired_passthrough_escape_rate": {
+  "vs_structural": 0.2143,
+  "vs_causal": 0.2143
+ },
+ "escape_by_error": [
+  {
+   "low": 0.0,
+   "high": 0.05,
+   "n": 47,
+   "asserted": 47,
+   "escaped": 2,
+   "rate": 0.0426
+  },
+  {
+   "low": 0.05,
+   "high": 0.1,
+   "n": 34,
+   "asserted": 34,
+   "escaped": 15,
+   "rate": 0.4412
+  },
+  {
+   "low": 0.1,
+   "high": 0.15,
+   "n": 14,
+   "asserted": 11,
+   "escaped": 6,
+   "rate": 0.5455
+  }
+ ],
+ "settle_sweep": [
+  {
+   "settle_ms": 40,
+   "false_veto_rate": 0.06,
+   "mean_attempts": 1.84,
+   "retry_collisions": 62,
+   "damage_rate": 0.64,
+   "task_success_rate": 0.72,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 60,
+   "false_veto_rate": 0.01,
+   "mean_attempts": 1.79,
+   "retry_collisions": 37,
+   "damage_rate": 0.37,
+   "task_success_rate": 0.76,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 80,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.65,
+   "retry_collisions": 20,
+   "damage_rate": 0.2,
+   "task_success_rate": 0.8,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 120,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.37,
+   "retry_collisions": 5,
+   "damage_rate": 0.06,
+   "task_success_rate": 0.82,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 200,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.29,
+   "retry_collisions": 1,
+   "damage_rate": 0.01,
+   "task_success_rate": 0.83,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 400,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.28,
+   "retry_collisions": 0,
+   "damage_rate": 0.0,
+   "task_success_rate": 0.83,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 800,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.28,
+   "retry_collisions": 0,
+   "damage_rate": 0.0,
+   "task_success_rate": 0.83,
+   "escaped": 0
+  },
+  {
+   "settle_ms": 4000,
+   "false_veto_rate": 0.0,
+   "mean_attempts": 1.28,
+   "retry_collisions": 0,
+   "damage_rate": 0.0,
+   "task_success_rate": 0.83,
+   "escaped": 0
+  }
+ ],
+ "seed_robustness": [
+  {
+   "seed": 1,
+   "escaped": 3,
+   "outside_tolerance": 0,
+   "damage": 2,
+   "refused": 19,
+   "success_rate": 0.76,
+   "mean_attempts": 1.18
+  },
+  {
+   "seed": 7,
+   "escaped": 0,
+   "outside_tolerance": 0,
+   "damage": 1,
+   "refused": 15,
+   "success_rate": 0.85,
+   "mean_attempts": 1.22
+  },
+  {
+   "seed": 42,
+   "escaped": 0,
+   "outside_tolerance": 0,
+   "damage": 3,
+   "refused": 20,
+   "success_rate": 0.78,
+   "mean_attempts": 1.15
+  },
+  {
+   "seed": 2026,
+   "escaped": 0,
+   "outside_tolerance": 0,
+   "damage": 0,
+   "refused": 16,
+   "success_rate": 0.83,
+   "mean_attempts": 1.28
+  },
+  {
+   "seed": 31337,
+   "escaped": 0,
+   "outside_tolerance": 0,
+   "damage": 1,
+   "refused": 19,
+   "success_rate": 0.8,
+   "mean_attempts": 1.2
+  }
+ ],
+ "causal_loop": {
+  "revisions": 28,
+  "breakers": 0,
+  "halted": 1
+ },
+ "registry_refusals": {
+  "above_ceiling": 11,
+  "uncovered": 6
+ },
+ "interception_rate": 1.0,
+ "claims": {
+  "h1_pass_through_contradicts_physics": true,
+  "h2_form_checking_does_not_lower_the_conditional_rate": true,
+  "h3_escapes_confined_to_the_tolerance_band": true,
+  "h3_cost_is_refusal_and_retry": true
+ }
+}

@@ -35,6 +35,9 @@ document below is the record of refusing it.
 | PRE-002 | the exponential-fit measurement was conditioned on $D\approx0.999$, biasing the rate it was meant to check | medium — a measured number, not a released one | closed |
 | PRE-003 | the "true emergence" hypothesis asked the experiment to confirm a shape that its own budget forbids | **high** — would have published a fitted non-result as a discovery | **closed** (v0.6.1) |
 | PUB-001 | the archived v1.0.0 manuscript went to press without a literature-audit pass; the released PDF and the repository diverged by ten references | medium — a released artefact, not a code path | **closed** (v1.0.1) |
+| ERR-004 | the execution layer's witness was not bound to the prediction it checked, so a scene could satisfy an earlier chunk's registration | **high** — three episodes reported a pass after the bowl had been dropped | **closed** (v1.0.3) |
+| ERR-005 | the CEL paper's figures were not derived from the audit's data: one shipped PNG had no producing script, carried numbers that exist in no summary, dropped a declared world, and labelled both arms as crashing | **high** — a figure that cannot be re-derived is an assertion, in a paper about unwitnessed assertions | **closed** (v1.0.3) |
+| PUB-002 | a released figure caption asserted "every crash is a pedestrian" and the figure had no recovery panel, though both captions promised content the files did not contain | medium — a released claim, not a code path | **closed** (v1.0.3) |
 
 Severity is assigned by one criterion: *can a consumer of this output be
 misled without seeing an error?* All three entries passed that test, which is why
@@ -582,12 +585,201 @@ knowledge" and not "no one has".
 
 ---
 
+## ERR-004 — the witness is not bound to the prediction it checks
+
+**Location.** `experiments/benchmark_libero_audit.py`, `MembraneCEL.expect` and
+`MembraneCEL.check`, in the first version of the LIBERO audit.
+
+```python
+    def expect(self, expected):
+        return self.gateway.register_digest("execute", expected.digest(self.grid))
+
+    def check(self, expected, observed):
+        text = observed.text(self.grid, origin=expected)
+        warrant = self.gateway.request_action_warrant(
+            {"kind": "inline", "text": text, "digest": witness_digest(text)}, "execute")
+```
+
+**What happens.** `MembraneGateway` keeps *one set of acceptable digests per
+capability*, and registering a digest adds to that set; a warrant is issued if the
+offered digest is a member. Nothing ties a grant to the registration that was made
+for the chunk currently under review. So a scene that was legitimately predicted
+once is accepted for the rest of the run: the gate answers "was this scene ever
+predicted?" when the experiment meant "is this the scene this chunk predicted?".
+
+**Reproduction.** 100 episodes of `libero_spatial` task 2 with a friction drift.
+At transport chunk 3 the bowl slips out of the gripper and falls back to the
+table. The plan had registered the canonical text
+
+```
+scene@8,22,90:0,0,0:table
+```
+
+ten chunks earlier, for `close`, when the bowl really was on the table. The
+observation at transport chunk 3 is byte-identical to it, so
+`request_action_warrant` granted a claim of `gripped` and the refusal counter did
+not move:
+
+```
+CHECK expected='scene@8,22,90:0,0,0:gripped' observed='scene@8,22,90:0,0,0:table' -> True
+CHECK expected='scene@8,22,90:0,0,0:placed'  observed='scene@8,22,90:0,0,0:table' -> True
+succ False ref 0
+```
+
+Three episodes ended with the bowl 245-269 mm from the plate, having passed **every**
+witness check (`refusals == 0`, `replans == 0`). The reported comparison was
+therefore flattering in the one direction that matters: it credited the layer with
+successes it had not verified.
+
+**Why this one matters.** It is ERR-003 in a new place. There the digest omitted a
+field that distinguished two claims; here it omitted the *identity of the claim*.
+Both let one witness stand for another, and both are silent: the ledger verifies,
+the chain passes, and the only symptom is a number that is too good.
+
+**Fix.** Every registration is prefixed with a monotonically increasing ordinal
+that is never reset, and the check for that chunk carries the same ordinal:
+
+```python
+    def _canonical(self, inputs, ordinal, origin=None):
+        return "chunk{}:{}".format(ordinal, inputs.text(self.grid, origin))
+```
+
+A registration is now redeemable exactly once, by the chunk that made it. A
+regression cannot satisfy a stale prediction because no two predictions share a
+key, and an episode boundary cannot alias an earlier episode's keys because the
+counter lives on the gateway wrapper, not on the episode.
+
+**Blast radius.** The layer's success, refusal, replan and latency numbers on
+LIBERO, and nothing else: the two baselines never call the gateway, and no other
+experiment imports this module. The corrected run is the one in
+`experiments/libero_audit_summary.json`; the pre-fix run is not archived, which is
+why the reproduction above is written out rather than linked.
+
+**Pinned by.** `tests/test_benchmark_libero_audit.py::GateBindingTest`, five tests:
+a predicted scene is granted, a diverged scene is refused, a regression cannot
+reuse an earlier prediction, an ordinal is never reused across episodes, and the
+ledger still verifies afterwards. The second of those tests fails against the
+pre-fix code.
+
+---
+
+## ERR-005 — the figures are not a function of the data
+
+**Location.** `experiments/cel_paper/figures/ad_cel.png`,
+`experiments/cel_paper/figures/libero_audit.png`, and the `cp` in
+`experiments/cel_paper/build.sh` that shipped the first of them.
+
+**What happens.** Both figures were hand-assembled PNGs. The driving one was
+copied into the paper at build time from `experiments/ad_cel_figure.png`, but no
+script in the repository writes that path: a search for its two panel titles
+(`Cost in milliseconds`, `Reliability across drift`) across the whole tree returns
+nothing. Four consequences, all of them checked against
+`experiments/ad_cel_summary.json` and `experiments/ad_cel_data.csv`:
+
+1. Its price panel drew 1.69 s / 1.70 s and 905 ms / 16 ms, and annotated the gap
+   as `+78 ms / −889 ms`. No file contains the first two pairs, and the annotation
+   is the *manipulation* audit's latency decomposition. The driving audit's own
+   cost is 30.7 s → 32.6 s per episode.
+2. Its reliability panel had three categories, merging `wet_and_lag` into the
+   others: ten episodes and five of the twenty collisions were not drawn.
+3. Its trace panel labelled both arms "collision" using `final speed > 0.5 m/s`
+   as the test. The surviving car ends its trace at 10.6 m/s because it is
+   still driving, so the panel said the layer crashed too.
+4. Both files' legends said `Safe-VLA` / `Safe-Planner`, names the prose had
+   retired (and the driving file said both, in different panels).
+
+The manipulation figure failed the same way from the other side: its
+"Recovery after each drift onset" panel plotted arrival counts (6, 9, 3, 6) that
+correspond to no field in `libero_audit_summary.json`, and the rolling-success
+curve the caption described was not in the file at all.
+
+**Reproduction.**
+
+```bash
+cd experiments/cel_paper
+grep -rn "Cost in milliseconds" ../..          # no hit outside a shell log
+python3 - <<'PY'
+import csv
+rows = list(csv.DictReader(open("../ad_cel_data.csv")))
+crashes = [r for r in rows if r["collision"] == "True"]
+print(len(crashes), sum(r["collision_kind"] == "pedestrian" for r in crashes))
+PY                                             # 20 crashes, 19 pedestrian
+```
+
+**What a consumer would see.** A panel of numbers that look like measurements and
+are not, in a paper whose thesis is that an unverified claim must not be trusted.
+The referee-visible symptom is milder and still fatal: four figures, none of them
+cited by number anywhere in the body.
+
+**Fix.** `experiments/cel_paper/make_figures.py` draws both figures from the
+audit's JSON/CSV and from nothing else; `build.sh` runs it on every build, so a
+figure can no longer belong to an older run. The traced episode is exported by
+the audit itself (`--trace-json`) and its key instants are macros
+(`\ADTraceVGate`, `\ADTraceImpact`, `\ADTraceCELStopT`, and the rest) rather than
+numbers
+typed into a caption. `test_figures.py` pins the property:
+
+```bash
+cd experiments/cel_paper && python3 test_figures.py   # 8/8
+```
+
+including a byte-for-byte comparison between the shipped PNG and a fresh draw
+from the data.
+
+**Blast radius.** The CEL paper's Figures 2 and 3, their captions, and the two
+sentences in the driving section (VI) that quoted panel numbers. No experiment,
+no summary and no table was affected: the numbers in `data/*.tex` were already
+generated from the audit outputs, which is why the discrepancy was visible at all.
+
+---
+
+## PUB-002 — a caption asserted what the figure did not show
+
+**Location.** `experiments/cel_paper/main.tex`, the captions of
+`fig:results` and `fig:driving`.
+
+**What happens.** Two claims were checked against the files and failed. The
+driving caption said "every crash is a pedestrian, and every one of them is in a
+wet channel"; the episode rows give **19 pedestrian and one lead-vehicle**
+collision, the latter in `wet_and_lag`. The manipulation caption described a
+rolling-five recovery panel that its figure did not contain, and the prose
+quoted recovery counts (27 and 22 episodes for the baseline, 0 and 0 for the
+layer) that the figure could not support because the panel was something else
+entirely.
+
+**Reproduction.**
+
+```bash
+python3 -c "
+import csv, collections
+rows = list(csv.DictReader(open('experiments/ad_cel_data.csv')))
+print(collections.Counter(r['collision_kind'] for r in rows if r['collision']=='True'))"
+# Counter({'pedestrian': 19, 'lead': 1})
+```
+
+**Fix.** The claim is now scoped to what the data says (nineteen of twenty, and
+every collision in a wet world), the recovery panel exists, and the caption's
+per-panel sentences name the panel that carries each number. A test asserts the
+count and the wetness, so the sentence cannot drift again without failing:
+
+```bash
+cd experiments/cel_paper && python3 test_figures.py   # test_wet_road_claims
+```
+
+**Blast radius.** One caption sentence, one paragraph of the driving section (VI),
+and the `(a)`–`(d)` citations added to the surrounding text. The tables were
+already correct; this was the prose disagreeing with them.
+
+---
+
 ## Reprocessing
 
 ```bash
-python3 -m unittest discover -s tests            # 988 tests, all green
+python3 -m unittest discover -s tests            # 1 086 tests, all green
 python3 -m unittest tests.test_witness_binding -v # the three defects, pinned
 python3 -m experiments.run_experiments           # regenerates the evidence
+cd experiments/cel_paper && ./build.sh           # regenerates numbers, figures, PDF
+cd experiments/cel_paper && python3 test_figures.py   # the figures are the data
 ```
 
 `tests/test_witness_binding.py` is the file that ERR-001..003 produced, and

@@ -1,0 +1,566 @@
+{
+  "generated_at": "2026-11-05T10:37:10+0800",
+  "benchmark": {
+    "environment": "LIBERO libero_spatial / OffScreenRenderEnv (MuJoCo + robosuite)",
+    "suite": "libero_spatial",
+    "task_index": 2,
+    "task": "pick up the black bowl from table center and place it on the plate",
+    "control_hz": 20.0,
+    "chunk_steps": 6,
+    "action": "7-DoF OSC delta pose (dx, dy, dz, dax, day, daz, gripper)",
+    "version_pins": {
+      "mujoco": "3.2.3",
+      "robosuite": "1.4.0",
+      "note": "mujoco==3.2.3 is pinned and must not be relaxed"
+    }
+  },
+  "protocol": {
+    "episodes_per_arm": 100,
+    "arms": [
+      "A_safe_vla",
+      "B_cel"
+    ],
+    "policy": "one chunked pick-and-place program planned from the first observation; open-loop within a chunk; re-planned only when the arm's gate says to",
+    "arm_A": "confidence gate (threshold 0.8) + retry",
+    "arm_B": "MembraneGateway witness gate + plan re-derivation + breaker",
+    "declared_costs_ms": {
+      "vla_forward": 200.0,
+      "confidence_gate": 40.0,
+      "rule_lookup": 5.0
+    },
+    "modelled_not_measured": [
+      "vla_forward_ms",
+      "confidence_gate_ms"
+    ],
+    "measured": [
+      "witness_latency_ms",
+      "retries",
+      "replans",
+      "wall_clock_ms",
+      "collisions",
+      "drops",
+      "simulator_steps"
+    ]
+  },
+  "world_model": {
+    "gain_m_per_step": [
+      0.011455,
+      0.013214,
+      0.012943
+    ],
+    "calibration_residual_mm": 11.772,
+    "samples": 15,
+    "note": "fitted on nominal episodes before any drift was applied, then frozen"
+  },
+  "witness": {
+    "grid_m": 0.01,
+    "grid_sweep_m": [
+      0.002,
+      0.005,
+      0.01,
+      0.02
+    ],
+    "canonical_form": "scene:<plate cells>:<bowl claim>[:<bowl cells>]",
+    "bowl_claims": {
+      "lift_eps_m": 0.02,
+      "plate_radius_m": 0.05
+    },
+    "breaker_trips_after": 3,
+    "ledger": "/home/liaozhizhi/Gradia/agent-metabolism-os/experiments/libero_audit_ledger.jsonl",
+    "chain_verdict": "PASS",
+    "mean_witness_ms": 54.752,
+    "grants": 1672,
+    "refusals": 94,
+    "cost_model": {
+      "measured": [
+        {
+          "entries": 202,
+          "verify_chain_ms": 2.206,
+          "grant_and_redeem_ms": 6.477
+        },
+        {
+          "entries": 1002,
+          "verify_chain_ms": 10.05,
+          "grant_and_redeem_ms": 18.465
+        },
+        {
+          "entries": 3002,
+          "verify_chain_ms": 30.957,
+          "grant_and_redeem_ms": 46.956
+        }
+      ],
+      "notes": "per-grant cost includes a full chain verification; entries is ledger length",
+      "canonicalise_and_hash_us": 0.768
+    }
+  },
+  "drift_channels": {
+    "nominal": {
+      "name": "nominal",
+      "friction": null,
+      "mass_scale": 1.0,
+      "light_scale": 1.0,
+      "actuator_gain": 1.0,
+      "pose_delta": null,
+      "image_mean": 118.42,
+      "image_std": 47.73,
+      "lift_dz_m": 0.1147
+    },
+    "pose_drift": {
+      "name": "pose_drift",
+      "friction": null,
+      "mass_scale": 1.0,
+      "light_scale": 1.0,
+      "actuator_gain": 1.0,
+      "pose_delta": [
+        -0.1,
+        -0.02
+      ],
+      "image_mean": 118.43,
+      "image_std": 47.8,
+      "lift_dz_m": 0.1136
+    },
+    "surface_slip": {
+      "name": "surface_slip",
+      "friction": 0.22,
+      "mass_scale": 1.0,
+      "light_scale": 1.0,
+      "actuator_gain": 1.0,
+      "pose_delta": null,
+      "image_mean": 118.42,
+      "image_std": 47.73,
+      "lift_dz_m": 0.1115
+    },
+    "payload_heavy": {
+      "name": "payload_heavy",
+      "friction": null,
+      "mass_scale": 12.0,
+      "light_scale": 1.0,
+      "actuator_gain": 1.0,
+      "pose_delta": null,
+      "image_mean": 118.42,
+      "image_std": 47.73,
+      "lift_dz_m": 0.1118
+    },
+    "light_dim": {
+      "name": "light_dim",
+      "friction": null,
+      "mass_scale": 1.0,
+      "light_scale": 0.3,
+      "actuator_gain": 1.0,
+      "pose_delta": null,
+      "image_mean": 21.97,
+      "image_std": 12.6,
+      "lift_dz_m": 0.1147
+    },
+    "actuator_weak": {
+      "name": "actuator_weak",
+      "friction": null,
+      "mass_scale": 1.0,
+      "light_scale": 1.0,
+      "actuator_gain": 0.6,
+      "pose_delta": null,
+      "image_mean": 118.42,
+      "image_std": 47.73,
+      "lift_dz_m": 0.0604
+    }
+  },
+  "schedule": [
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "nominal",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "pose_drift",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip",
+    "payload_heavy",
+    "light_dim",
+    "actuator_weak",
+    "surface_slip"
+  ],
+  "onsets": [
+    {
+      "episode": 20,
+      "regime": "pose_drift"
+    },
+    {
+      "episode": 55,
+      "regime": "pose_drift"
+    },
+    {
+      "episode": 75,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 76,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 77,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 78,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 79,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 80,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 81,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 82,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 83,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 84,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 85,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 86,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 87,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 88,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 89,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 90,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 91,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 92,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 93,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 94,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 95,
+      "regime": "surface_slip"
+    },
+    {
+      "episode": 96,
+      "regime": "payload_heavy"
+    },
+    {
+      "episode": 97,
+      "regime": "light_dim"
+    },
+    {
+      "episode": 98,
+      "regime": "actuator_weak"
+    },
+    {
+      "episode": 99,
+      "regime": "surface_slip"
+    }
+  ],
+  "arms_summary": {
+    "A_safe_vla": {
+      "episodes": 100,
+      "success_rate": 0.51,
+      "success_rate_nominal": 1.0,
+      "success_rate_pose_drift": 0.0,
+      "success_rate_drift_channels": 0.84,
+      "success_rate_any_drift": 0.3,
+      "mean_plate_distance_drift_m": 0.0845,
+      "policy_latency_ms_mean": 4608.8,
+      "vla_latency_ms_mean": 4608.8,
+      "policy_latency_ms_nominal": 4362.7,
+      "policy_latency_ms_drift": 4644.4,
+      "witness_latency_ms_mean": 0.0,
+      "witness_ms_per_chunk_first10": 0.0,
+      "witness_ms_per_chunk_last10": 0.0,
+      "wall_clock_ms_mean": 4326.3,
+      "vetoes": 84,
+      "false_vetoes": 34,
+      "false_veto_rate": 0.4048,
+      "retries": 112,
+      "replans": 0,
+      "witness_refusals": 0,
+      "circuit_breaks": 0,
+      "damage_episodes": 8,
+      "damage_rate": 0.08,
+      "collisions": 68,
+      "model_error_mm_mean": 22.3,
+      "recovery": [
+        {
+          "onset_episode": 20,
+          "regime": "pose_drift",
+          "episodes_to_recover": 27
+        },
+        {
+          "onset_episode": 55,
+          "regime": "pose_drift",
+          "episodes_to_recover": 22
+        }
+      ],
+      "by_regime": {
+        "nominal": {
+          "episodes": 30,
+          "success_rate": 1.0,
+          "latency_ms_mean": 4362.7,
+          "damage_rate": 0.0333,
+          "mean_plate_distance_m": 0.0106
+        },
+        "pose_drift": {
+          "episodes": 45,
+          "success_rate": 0.0,
+          "latency_ms_mean": 4644.4,
+          "damage_rate": 0.0,
+          "mean_plate_distance_m": 0.1129
+        },
+        "actuator_weak": {
+          "episodes": 6,
+          "success_rate": 0.5,
+          "latency_ms_mean": 5200.0,
+          "damage_rate": 0.6667,
+          "mean_plate_distance_m": 0.0735
+        },
+        "light_dim": {
+          "episodes": 6,
+          "success_rate": 0.8333,
+          "latency_ms_mean": 5960.0,
+          "damage_rate": 0.0,
+          "mean_plate_distance_m": 0.0368
+        },
+        "payload_heavy": {
+          "episodes": 6,
+          "success_rate": 1.0,
+          "latency_ms_mean": 3980.0,
+          "damage_rate": 0.3333,
+          "mean_plate_distance_m": 0.0178
+        },
+        "surface_slip": {
+          "episodes": 7,
+          "success_rate": 1.0,
+          "latency_ms_mean": 4308.6,
+          "damage_rate": 0.1429,
+          "mean_plate_distance_m": 0.0092
+        }
+      }
+    },
+    "B_cel": {
+      "episodes": 100,
+      "success_rate": 1.0,
+      "success_rate_nominal": 1.0,
+      "success_rate_pose_drift": 1.0,
+      "success_rate_drift_channels": 1.0,
+      "success_rate_any_drift": 1.0,
+      "mean_plate_distance_drift_m": 0.008,
+      "policy_latency_ms_mean": 4686.9,
+      "vla_latency_ms_mean": 3720.0,
+      "policy_latency_ms_nominal": 4230.0,
+      "policy_latency_ms_drift": 4486.3,
+      "witness_latency_ms_mean": 966.923,
+      "witness_ms_per_chunk_first10": 9.851,
+      "witness_ms_per_chunk_last10": 99.8,
+      "wall_clock_ms_mean": 4924.7,
+      "vetoes": 0,
+      "false_vetoes": 0,
+      "false_veto_rate": 0.0,
+      "retries": 0,
+      "replans": 94,
+      "witness_refusals": 94,
+      "circuit_breaks": 0,
+      "damage_episodes": 7,
+      "damage_rate": 0.07,
+      "collisions": 9,
+      "model_error_mm_mean": 18.39,
+      "recovery": [
+        {
+          "onset_episode": 20,
+          "regime": "pose_drift",
+          "episodes_to_recover": 0
+        },
+        {
+          "onset_episode": 55,
+          "regime": "pose_drift",
+          "episodes_to_recover": 0
+        }
+      ],
+      "by_regime": {
+        "nominal": {
+          "episodes": 30,
+          "success_rate": 1.0,
+          "latency_ms_mean": 4230.0,
+          "damage_rate": 0.0,
+          "mean_plate_distance_m": 0.009
+        },
+        "pose_drift": {
+          "episodes": 45,
+          "success_rate": 1.0,
+          "latency_ms_mean": 4486.3,
+          "damage_rate": 0.0222,
+          "mean_plate_distance_m": 0.0062
+        },
+        "actuator_weak": {
+          "episodes": 6,
+          "success_rate": 1.0,
+          "latency_ms_mean": 5400.5,
+          "damage_rate": 0.6667,
+          "mean_plate_distance_m": 0.0114
+        },
+        "light_dim": {
+          "episodes": 6,
+          "success_rate": 1.0,
+          "latency_ms_mean": 5519.2,
+          "damage_rate": 0.0,
+          "mean_plate_distance_m": 0.0091
+        },
+        "payload_heavy": {
+          "episodes": 6,
+          "success_rate": 1.0,
+          "latency_ms_mean": 6077.9,
+          "damage_rate": 0.0,
+          "mean_plate_distance_m": 0.014
+        },
+        "surface_slip": {
+          "episodes": 7,
+          "success_rate": 1.0,
+          "latency_ms_mean": 5417.3,
+          "damage_rate": 0.2857,
+          "mean_plate_distance_m": 0.0104
+        }
+      }
+    }
+  },
+  "conclusions": [
+    "mean policy latency: CEL 4687 ms vs Safe-VLA 4609 ms per episode (CEL 78 ms slower, 2% higher)",
+    "of which the witness: CEL 967 ms vs Safe-VLA 0 ms per episode; excluding it, CEL's own planning and retry latency is 3720 ms against 4609 ms",
+    "false vetoes: Safe-VLA vetoed 84 chunks, 34 of which would have progressed (40.5%); CEL does not veto on confidence and has none",
+    "success: nominal 100.0% vs 100.0%; pose drift 0.0% vs 100.0%; physical channels 84.0% vs 100.0%",
+    "damage rate: Safe-VLA 8.0%, CEL 7.0%",
+    "episodes to recover after each drift onset: Safe-VLA [27, 22], CEL [0, 0]",
+    "witness cost, measured: 54.752 ms per chunk (1672 grants, 94 refusals, ledger chain PASS)",
+    "witness cost per chunk grows with the ledger: 9.9 ms over the first ten episodes, 99.8 ms over the last ten; the growing term is the gateway's own chain check (2.2 ms at 202 entries, 31.0 ms at 3002), not the witness (0.77 us)",
+    "CEL by channel: pose_drift 100% (n=45, 6 mm from plate); actuator_weak 100% (n=6, 11 mm from plate); light_dim 100% (n=6, 9 mm from plate); payload_heavy 100% (n=6, 14 mm from plate); surface_slip 100% (n=7, 10 mm from plate)",
+    "drift channels (nominal lift=0.1147 m): surface_slip: lift=0.1115m image_mean=118.42; payload_heavy: lift=0.1118m image_mean=118.42; light_dim: lift=0.1147m image_mean=21.97; actuator_weak: lift=0.0604m image_mean=118.42"
+  ],
+  "outputs": {
+    "csv": "/home/liaozhizhi/Gradia/agent-metabolism-os/experiments/libero_audit_episodes.csv",
+    "json": "/home/liaozhizhi/Gradia/agent-metabolism-os/experiments/libero_audit_summary.json",
+    "figure": "/home/liaozhizhi/Gradia/agent-metabolism-os/experiments/libero_audit_figure.png"
+  }
+}

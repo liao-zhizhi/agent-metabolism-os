@@ -1,0 +1,37 @@
+# The exact environment the numbers in README.md were produced in.
+# Python 3.12.3, Linux x86_64, no display (EGL), no GPU.
+#
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r requirements-bench.txt
+#
+# The venv is 3.5 GB mostly because of robosuite's assets and the CPU torch
+# wheel; neither is needed for the push-table comparison, only for the LIBERO
+# conformance run. Drop robosuite/mujoco/torch and everything except the first
+# block still runs.
+
+# -- harness (required) -------------------------------------------------------
+vla-eval==0.9.0
+
+# -- reporting (required) -----------------------------------------------------
+matplotlib>=3.8
+numpy>=1.26
+
+# -- real LIBERO / MuJoCo conformance run (optional) --------------------------
+# LIBERO itself is a git clone, not a wheel:
+#   git clone --depth 1 https://github.com/Lifelong-Robot-Learning/LIBERO.git /tmp/LIBERO
+# Its requirements.txt pins numpy==1.22.4, gym==0.25.2, transformers==4.21.1 and
+# robomimic==0.2.0; none of those resolve on Python 3.12 (see README §2). The
+# list below is what actually works: the runtime deps installed with --no-deps,
+# and the two pins deliberately dropped.
+robosuite==1.4.0
+mujoco==3.2.3
+torch==2.6.0+cpu
+gym==0.26.2
+bddl==3.6.0
+hydra-core==1.3.8
+thop==0.1.1.post2209072238
+easydict==1.13
+termcolor==3.3.0
+future==1.0.0
+einops==0.8.2
+cloudpickle==3.1.2

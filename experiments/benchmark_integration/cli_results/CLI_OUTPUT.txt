@@ -1,0 +1,42 @@
+=========== arm A (harness CLI, --no-docker) ===========
+2026-11-05 03:26:26 WARNING  vla_eval.orchestrator: push_table_2d_friction_shift accepts 'seed' but config doesn't specify one (using default=0). Set seed explicitly in config params for reproducible results.
+============================================================
+Benchmark: push_table_2d_friction_shift (mode: sync)
+============================================================
+  push_lane_0                               83.3% (50/60)
+  push_lane_1                               33.3% (20/60)
+  push_lane_2                              100.0% (60/60)
+  push_lane_3                               33.3% (20/60)
+  push_lane_4                               83.3% (50/60)
+────────────────────────────────────────────────────────────
+  Overall                                   66.7%
+============================================================
+push_table_2d_friction_shift: 66.7%
+=========== arm C (harness CLI, --no-docker) ===========
+2026-11-05 03:26:41 WARNING  vla_eval.orchestrator: push_table_2d_friction_shift accepts 'seed' but config doesn't specify one (using default=0). Set seed explicitly in config params for reproducible results.
+============================================================
+Benchmark: push_table_2d_friction_shift (mode: sync)
+============================================================
+  push_lane_0                               83.3% (50/60)
+  push_lane_1                               31.7% (19/60)
+  push_lane_2                               50.0% (30/60)
+  push_lane_3                                0.0% (0/60)
+  push_lane_4                                1.7% (1/60)
+────────────────────────────────────────────────────────────
+  Overall                                   33.3%
+============================================================
+push_table_2d_friction_shift: 33.3%
+=========== arm B (harness CLI, --no-docker) ===========
+2026-11-05 03:26:56 WARNING  vla_eval.orchestrator: push_table_2d_friction_shift accepts 'seed' but config doesn't specify one (using default=0). Set seed explicitly in config params for reproducible results.
+============================================================
+Benchmark: push_table_2d_friction_shift (mode: sync)
+============================================================
+  push_lane_0                              100.0% (60/60)
+  push_lane_1                              100.0% (60/60)
+  push_lane_2                              100.0% (60/60)
+  push_lane_3                              100.0% (60/60)
+  push_lane_4                              100.0% (60/60)
+────────────────────────────────────────────────────────────
+  Overall                                  100.0%
+============================================================
+push_table_2d_friction_shift: 100.0%

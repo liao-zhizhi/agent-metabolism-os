@@ -1,0 +1,267 @@
+{
+  "episodes_per_arm_per_suite": 300,
+  "horizon_steps": 30,
+  "physics": "numpy (physics solver: numpy fallback (pybullet and pymunk are not installed) -- circle/segment collisions, impulse resolution, Coulomb friction)",
+  "protocol": "vla-eval 0.9.0 (in-process: harness server, Connection, SyncEpisodeRunner, ResultCollector)",
+  "seed": 11,
+  "server_counters": {
+    "A": {
+      "friction_shift": {
+        "inference_calls": 400,
+        "lookup_calls": 0,
+        "measured_compute_ms": 86.41130200248881,
+        "modelled_inference_ms": 80000.0,
+        "takeovers": 0,
+        "witness_calls": 0
+      },
+      "layout_shift": {
+        "inference_calls": 300,
+        "lookup_calls": 0,
+        "measured_compute_ms": 69.49518801502563,
+        "modelled_inference_ms": 60000.0,
+        "takeovers": 0,
+        "witness_calls": 0
+      },
+      "nominal": {
+        "inference_calls": 300,
+        "lookup_calls": 0,
+        "measured_compute_ms": 57.538211006431084,
+        "modelled_inference_ms": 60000.0,
+        "takeovers": 0,
+        "witness_calls": 0
+      }
+    },
+    "B": {
+      "friction_shift": {
+        "belief": 0.5399999813962044,
+        "corrections": 5,
+        "failures": 5,
+        "inference_calls": 6,
+        "lookup_calls": 299,
+        "measured_compute_ms": 89.32814098352537,
+        "modelled_inference_ms": 34655.0,
+        "takeovers": 0,
+        "witness_calls": 1598
+      },
+      "layout_shift": {
+        "belief": 0.35,
+        "corrections": 0,
+        "failures": 0,
+        "inference_calls": 1,
+        "lookup_calls": 299,
+        "measured_compute_ms": 75.6577669935723,
+        "modelled_inference_ms": 31695.0,
+        "takeovers": 0,
+        "witness_calls": 1500
+      },
+      "nominal": {
+        "belief": 0.35,
+        "corrections": 0,
+        "failures": 0,
+        "inference_calls": 1,
+        "lookup_calls": 299,
+        "measured_compute_ms": 70.88208901041071,
+        "modelled_inference_ms": 31695.0,
+        "takeovers": 0,
+        "witness_calls": 1500
+      }
+    },
+    "C": {
+      "friction_shift": {
+        "inference_calls": 394,
+        "lookup_calls": 0,
+        "measured_compute_ms": 90.61752302386594,
+        "modelled_inference_ms": 78800.0,
+        "takeovers": 100,
+        "witness_calls": 0
+      },
+      "layout_shift": {
+        "inference_calls": 300,
+        "lookup_calls": 0,
+        "measured_compute_ms": 81.8449669641268,
+        "modelled_inference_ms": 60000.0,
+        "takeovers": 4,
+        "witness_calls": 0
+      },
+      "nominal": {
+        "inference_calls": 300,
+        "lookup_calls": 0,
+        "measured_compute_ms": 72.32099900556932,
+        "modelled_inference_ms": 60000.0,
+        "takeovers": 4,
+        "witness_calls": 0
+      }
+    }
+  },
+  "suites": {
+    "friction_shift": [
+      {
+        "arm": "A_passthrough",
+        "assisted_success_rate": 0.6666666666666666,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 266.6666666666667,
+        "mean_steps": 8.0,
+        "mean_success_reported_by_harness": 0.6667,
+        "p95_latency_ms": 400.0,
+        "recovery_episodes": 20.6,
+        "replans": 0,
+        "rolling_recovery_episodes": 29.6,
+        "safety_violation_rate": 0.06666666666666667,
+        "success_rate": 0.6666666666666666,
+        "suite": "friction_shift",
+        "takeovers": 0
+      },
+      {
+        "arm": "B_causal_interface",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 115.51666666666667,
+        "mean_steps": 6.326666666666667,
+        "mean_success_reported_by_harness": 1.0,
+        "p95_latency_ms": 145.0,
+        "recovery_episodes": 1.0,
+        "replans": 5,
+        "rolling_recovery_episodes": 10.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 1.0,
+        "suite": "friction_shift",
+        "takeovers": 0
+      },
+      {
+        "arm": "C_safe_vla",
+        "assisted_success_rate": 0.6666666666666666,
+        "episodes": 300,
+        "false_veto_rate": 0.94,
+        "false_vetoes": 94,
+        "mean_latency_ms": 1262.6666666666667,
+        "mean_steps": 6.79,
+        "mean_success_reported_by_harness": 0.3333,
+        "p95_latency_ms": 3400.0,
+        "recovery_episodes": 35.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 194.0,
+        "safety_violation_rate": 0.06666666666666667,
+        "success_rate": 0.3333333333333333,
+        "suite": "friction_shift",
+        "takeovers": 100
+      }
+    ],
+    "layout_shift": [
+      {
+        "arm": "A_passthrough",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 200.0,
+        "mean_steps": 6.0,
+        "mean_success_reported_by_harness": 1.0,
+        "p95_latency_ms": 200.0,
+        "recovery_episodes": 1.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 10.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 1.0,
+        "suite": "layout_shift",
+        "takeovers": 0
+      },
+      {
+        "arm": "B_causal_interface",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 105.65,
+        "mean_steps": 6.0,
+        "mean_success_reported_by_harness": 1.0,
+        "p95_latency_ms": 105.0,
+        "recovery_episodes": 1.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 10.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 1.0,
+        "suite": "layout_shift",
+        "takeovers": 0
+      },
+      {
+        "arm": "C_safe_vla",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 1.0,
+        "false_vetoes": 4,
+        "mean_latency_ms": 240.0,
+        "mean_steps": 5.92,
+        "mean_success_reported_by_harness": 0.9867,
+        "p95_latency_ms": 200.0,
+        "recovery_episodes": 1.2,
+        "replans": 0,
+        "rolling_recovery_episodes": 10.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 0.9866666666666667,
+        "suite": "layout_shift",
+        "takeovers": 4
+      }
+    ],
+    "nominal": [
+      {
+        "arm": "A_passthrough",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 200.0,
+        "mean_steps": 6.0,
+        "mean_success_reported_by_harness": 1.0,
+        "p95_latency_ms": 200.0,
+        "recovery_episodes": 0.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 0.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 1.0,
+        "suite": "nominal",
+        "takeovers": 0
+      },
+      {
+        "arm": "B_causal_interface",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 0.0,
+        "false_vetoes": 0,
+        "mean_latency_ms": 105.65,
+        "mean_steps": 6.0,
+        "mean_success_reported_by_harness": 1.0,
+        "p95_latency_ms": 105.0,
+        "recovery_episodes": 0.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 0.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 1.0,
+        "suite": "nominal",
+        "takeovers": 0
+      },
+      {
+        "arm": "C_safe_vla",
+        "assisted_success_rate": 1.0,
+        "episodes": 300,
+        "false_veto_rate": 1.0,
+        "false_vetoes": 4,
+        "mean_latency_ms": 240.0,
+        "mean_steps": 5.92,
+        "mean_success_reported_by_harness": 0.9867,
+        "p95_latency_ms": 200.0,
+        "recovery_episodes": 0.0,
+        "replans": 0,
+        "rolling_recovery_episodes": 0.0,
+        "safety_violation_rate": 0.0,
+        "success_rate": 0.9866666666666667,
+        "suite": "nominal",
+        "takeovers": 4
+      }
+    ]
+  },
+  "wall_clock_s": 195.9
+}

@@ -1,0 +1,5 @@
+.venv/
+install_*.log
+__pycache__/
+cli_results/*/*.sqlite
+clone_libero.log

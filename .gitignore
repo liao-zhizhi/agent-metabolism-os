@@ -3,3 +3,24 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+
+# LaTeX build products. The .bbl is deliberately not ignored: the papers ship it
+# so that a reader without bibtex can still build the PDF.
+*.aux
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.xdv
+
+# Witness ledgers are regenerable and large (the driving audit's is 28 MB). The
+# chain head is what a reader needs, and it is recorded twice elsewhere: in
+# *_summary.json and in the *_ledger.jsonl.head anchor, which is committed.
+experiments/*_ledger.jsonl
+
+# Ad-hoc page exports used while reviewing a PDF; they are a screenshot of a
+# build artefact, not a source of it.
+experiments/cel_paper/screenshots/

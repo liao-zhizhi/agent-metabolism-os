@@ -1,0 +1,1074 @@
+{
+ "earliest_year": 2023,
+ "generated_by": "experiments/cel_paper/lit_audit.py",
+ "queries": [
+  {
+   "id": "q1",
+   "query": "\"Causal Execution Layer\"",
+   "sources": {
+    "arxiv": {
+     "returned": 0,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 0
+   },
+   "hits": []
+  },
+  {
+   "id": "q2",
+   "query": "\"Safe VLA\"",
+   "sources": {
+    "arxiv": {
+     "returned": 0,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 20,
+     "kept": 0
+    },
+    "merged_kept": 20
+   },
+   "hits": [
+    {
+     "source": "s2",
+     "id": "2606.21386",
+     "doi": "10.48550/arXiv.2606.21386",
+     "title": "VLA-FAIL: Efficient Task Failure Detection for Finetuned Vision-Language-Action Models",
+     "summary": "Vision-language-action models (VLAs) achieve state-of-the-art performance on many robotic manipulation tasks, yet they can still behave unpredictably in out-of-distribution scenarios. Runtime failure detection is therefore essential for the safe real-world deployment of VLAs.However, existing task failure detectors require computationally expensive action sampling, are based on architectural assumptions that limit their applicability to VLAs, or need access to failure rollouts. We propose VLA-FAIL, a lightweight and broadly applicable failure detection framework for VLAs that combines two novel failure detectors with minimal overhead, without requiring failure data. The first, last-layer Mahalanobis distance (LLMD), detects out-of-distribution states by measuring token-wise deviations in last-layer features relative to the training data. The second, action chunk consistency (ACC), exploits the temporal overlap induced by receding-horizon control and detects failures when consecutive action chunks become inconsistent. To capture the trade-off between detection accuracy and detection latency, we introduce \\textsc{AUCPDT}, a threshold-independent metric that jointly evaluates precision, recall, and detection time. Through extensive real-world and simulation experiments, we demonstrate that LLMD and ACC capture complementary failure modes whose combination enables reliable and early failure detection across diverse tasks, frequently outperforming significantly more expensive baseline methods. Project page: https://vla-fail.github.io/vla-fail-2026",
+     "published": "2026-06-19",
+     "venue": "arXiv.org",
+     "citations": 11,
+     "url": "https://www.semanticscholar.org/paper/d7afe7ad4d8fd8ade44f8aa1231e2702a7c1f403"
+    },
+    {
+     "source": "s2",
+     "id": "2603.05754",
+     "doi": "10.48550/arXiv.2603.05754",
+     "title": "Safe-Night VLA: Seeing the Unseen via Thermal-Perceptive Vision-Language-Action Models for Safety-Critical Manipulation",
+     "summary": "Current Vision-Language-Action (VLA) models rely primarily on RGB perception, preventing them from capturing modalities such as thermal signals that are imperceptible to conventional visual sensors. Moreover, end-to-end generative policies lack explicit safety constraints, making them fragile when encountering obstacles and novel scenarios outside the training distribution. To address these limitations, we propose Safe-Night VLA, a multimodal manipulation framework that enables robots to see the unseen while enforcing rigorous safety constraints for thermal-aware manipulation in unstructured environments. Specifically, Safe-Night VLA integrates long-wave infrared thermal perception into a pre-trained vision-language backbone, enabling semantic reasoning grounded in thermodynamic properties. To ensure safe execution under out-of-distribution conditions, we incorporate a safety filter via control barrier functions, which provide deterministic workspace constraint enforcement during policy execution. We validate our framework through real-world experiments on a Franka manipulator, introducing a novel evaluation paradigm featuring temperature-conditioned manipulation, subsurface target localization, and reflection disambiguation, while maintaining constrained execution at inference time. Results demonstrate that Safe-Night VLA outperforms RGB-only baselines and provide empirical evidence that foundation models can effectively leverage non-visible physical modalities for robust manipulation.",
+     "published": "2026-03-05",
+     "venue": "arXiv.org",
+     "citations": 6,
+     "url": "https://www.semanticscholar.org/paper/7ba4981c126162f83b7fc5748058778731b8ec39"
+    },
+    {
+     "source": "s2",
+     "id": "2606.20698",
+     "doi": "10.48550/arXiv.2606.20698",
+     "title": "SafeDojo: Safe Reinforcement Learning for VLA via Interactive World Model",
+     "summary": "Safe control is a prerequisite for real-world embodied intelligence, for which safe reinforcement learning has emerged as a promising paradigm. However, existing safe reinforcement learning methods either require costly real-world exploration or depend on hand-crafted safety functions. Neither scales to vision-language-action models deployed in open-world physical environments. We propose SafeDojo, a model-based safe reinforcement learning framework that improves vision-language-action policies through world-model imagination. SafeDojo performs online reinforcement learning on top of an interactive video world model. A ResNet success classifier scores predicted future frames, while a lightweight safety head predicts per-step contact probabilities from the current latent context and proposed action chunk, jointly assessing task execution and trajectory safety. These decoupled signals are balanced through Lagrangian-constrained GRPO. On SafeLIBERO Level I, SafeDojo improves average safe-success rate by 8.25 percentage points over the strongest baseline; on the zero-shot Level II setting, it is competitive with the strongest model-free baseline. Real-world Franka deployment further shows the best average task and safe-success rates across five tasks. These results support world-model-based safe reinforcement learning as a promising path toward safer embodied intelligence.",
+     "published": "2026-06-15",
+     "venue": "arXiv.org",
+     "citations": 6,
+     "url": "https://www.semanticscholar.org/paper/53f52a9076adae94a70024e04b14d1c841bb92c5"
+    },
+    {
+     "source": "s2",
+     "id": "2601.13809",
+     "doi": "10.48550/arXiv.2601.13809",
+     "title": "DroneVLA: VLA-Based Aerial Manipulation",
+     "summary": "This work introduces a novel concept of an autonomous aerial manipulation system capable of interpreting high-level natural language commands to retrieve objects and deliver them to a human user. The system is intended to integrate a MediaPipe-based Grounding DINO and a Vision-Language-Action (VLA) model with a custom-built drone equipped with a 1-DOF gripper and an Intel RealSense RGB-D camera. VLA performs semantic reasoning to interpret the intent of a user prompt and generates a prioritized task queue for grasping relevant objects in the scene. Grounding DINO and the dynamic A* planning algorithm are used to navigate and safely relocate the object. To ensure safe and natural interaction during the handover phase, the system employs a human-centric controller driven by MediaPipe. This module provides real-time human pose estimation, allowing the drone to employ visual servoing to maintain a stable, distinct position directly in front of the user, facilitating a comfortable handover. We demonstrate the system's efficacy through real-world experiments for localization and navigation, which resulted in a 16.4 cm, 7.0 cm, and 8.4 cm of max, mean euclidean, and root-mean squared errors, respectively, highlighting the feasibility of VLA for aerial manipulation operations.",
+     "published": "2026-01-20",
+     "venue": "HRI Companion",
+     "citations": 6,
+     "url": "https://www.semanticscholar.org/paper/eb5a072199dfa455ecc0d60bba39f2be63e20acb"
+    },
+    {
+     "source": "s2",
+     "id": "2606.27079",
+     "doi": "10.48550/arXiv.2606.27079",
+     "title": "ForesightSafety-VLA: A Unified Diagnostic Safety Benchmark for Vision-Language-Action Models",
+     "summary": "In embodied intelligence, safety is a prerequisite for reliable robot deployment in the physical world. Current vision-language-action (VLA) models continue to advance toward general-purpose task capability, yet their embodied safety limits remain poorly understood. To address this gap, we introduce ForesightSafety-VLA, a diagnostic benchmark that makes safety the primary evaluation target for VLA systems. We define a 13-category safety taxonomy covering physical interaction safety (Safe-Core), instruction-side safety (Safe-Lang), and perception-side safety (Safe-Vis), and evaluate policies under three controlled dimensions of variation -- scene structure, language command, and visual observation -- so that failure sources can be diagnosed rather than hidden in a single aggregate score. Beyond binary task success, ForesightSafety-VLA measures process-level risk through cumulative safety cost (CC) and risk exposure time (RET), together with a four-quadrant decomposition of safe/unsafe success and failure. We instantiate 66 safety-augmented base scenarios in RoboTwin across 5 embodiments and report results on representative VLA baselines. Across the evaluated baselines, even the strongest policy incurs non-trivial safety cost and unsafe nominal success, while structure and visual variation induce substantially stronger safety degradation than ordinary language variation. These results suggest that embodied safety is tightly coupled to perception, grounding, and control competence rather than being reducible to post-hoc safety filtering alone.",
+     "published": "2026-06-25",
+     "venue": "arXiv.org",
+     "citations": 5,
+     "url": "https://www.semanticscholar.org/paper/53f45137f187170d5577350de3495bf989ed7353"
+    },
+    {
+     "source": "s2",
+     "id": "2606.00515",
+     "doi": "10.48550/arXiv.2606.00515",
+     "title": "PaCo-VLA: Passivity-Shielded Compliance Prior for Contact-Rich Vision-Language-Action Manipulation",
+     "summary": "Contact-rich manipulation demands both high-level semantic reasoning and the safe regulation of high-frequency contact dynamics. While Vision-Language-Action (VLA) models provide unprecedented semantic generalization, their low-rate outputs lack the reliability required for direct plant authority in force-sensitive tasks. To bridge this semantic-to-control gap, we introduce PaCo-VLA, a passivity-shielded compliance prior that recasts the VLA interface. Rather than trusting VLAs with direct motor commands, PaCo-VLA treats network outputs as task-level compliance proposals: semantic bindings, task stages, and admittance schedules. A high-frequency, proposal-independent passivity shield governs these proposals through energy-tank accounting and boundary checks, preventing invalid, stale, or unverified model predictions from bypassing low-level contact physics. This decoupled architecture also enables causal evaluation, isolating semantic contributions from geometric shortcuts. Extensive simulated and real-world connector-insertion experiments demonstrate that PaCo-VLA achieves superior precision over unshielded VLA baselines, sustaining zero passivity violations even under adversarial compliance shifts. This framework establishes a provably sampled-passive runtime contract at the admittance port and provides a runtime interface for deploying foundation models in contact-rich domains.",
+     "published": "2026-05-30",
+     "venue": "arXiv.org",
+     "citations": 3,
+     "url": "https://www.semanticscholar.org/paper/874ff2a3abb2762445f98192b3acab724689b295"
+    },
+    {
+     "source": "s2",
+     "id": "2605.19524",
+     "doi": "10.48550/arXiv.2605.19524",
+     "title": "SafeAlign-VLA: A Negative-Enhanced Safe Alignment Framework for Risk-Aware Autonomous Driving",
+     "summary": "End-to-end autonomous driving systems excel in common scenarios but struggle with safety-critical long-tail cases. Vision-Language-Action (VLA) models are promising due to their strong reasoning capabilities. However, most VLA-based approaches rely on positive expert demonstrations, rarely exploiting negative samples, leading to insufficient understanding of risky behaviors and safety boundaries. To address this limitation, we propose SafeAlign-VLA, a unified negative-enhanced safe alignment framework that incorporates negative data into supervised learning and reinforcement learning. First, we develop a counterfactual safety pairing paradigm to generate structured safety labels and counterfactual positive trajectories from risky scenarios via counterfactual reasoning. Then, a two-stage training strategy is adopted: negative-enhanced supervised fine-tuning for failure feedback and trajectory correction, followed by anchor-based group relative policy optimization that uses positive and negative trajectories as contrastive anchors to steer sampling and penalize high-risk behaviors via group-relative advantages. Experiments on NAVSIM and DeepAccident validate the proposed framework. SafeAlign-VLA achieves 89.1 PDMS on the NAVSIM v1 testset, improving over the baseline without negative data by 1.3%. On DeepAccident, it reduces the collision rate to 3.36%, while achieving 84.2% language accuracy and 85.8% risk prediction accuracy. These results demonstrate the effectiveness of the proposed negative-enhanced safe alignment framework for safe and robust autonomous driving.",
+     "published": "2026-05-19",
+     "venue": "arXiv.org",
+     "citations": 2,
+     "url": "https://www.semanticscholar.org/paper/444f78bbb34d41afa4c7212e13a66a8385329625"
+    },
+    {
+     "source": "s2",
+     "id": "2607.27933",
+     "doi": "",
+     "title": "The Geometry of Flow-Matching Uncertainty: A Cost-free Uncertainty Proxy and Its Application in Flow-based VLA Failure Detection",
+     "summary": "Flow matching (FM) has become a popular action head paradigm for modern embodied models. However, as a conditional generative model, it does not explicitly expose its inherent uncertainty, producing faulty action chunks even when it misinterprets the scene or encounters out-of-distribution (OOD) inputs. Therefore, determining when an FM-generated action can be trusted is essential for safe deployment, yet existing uncertainty estimation methods on real-time control suffer from several issues: extra training budget, high computational overhead, and low generalization ability. In this work, we provide a geometric interpretation of FM uncertainty in the velocity field, showing that uncertainty manifests as deviation from an ideal affine-isotropic contraction field. Building on this observation, we introduce denoising acceleration ($\\mathrm{accel}$), a highly-generalizable and cost-free uncertainty proxy that measures the bending of the denoising trajectory from a single forward pass, without additional model evaluations, training, or resampling. We theoretically and empirically demonstrate that $\\mathrm{accel}$ is a faithful proxy for FM uncertainty and further test its utility in online failure detection. Results show that $\\mathrm{accel}$ identifies failing rollouts well before termination, matching or even outperforming costly resampling- and training-based baselines across settings under realistic deployment budget. Code and demos available at: https://github.com/rrrrrrzy/fm-geometry.",
+     "published": "2026-07-30",
+     "venue": "",
+     "citations": 2,
+     "url": "https://www.semanticscholar.org/paper/bdf7b81477ae8044552c70abbac7f0d5ec00288e"
+    },
+    {
+     "source": "s2",
+     "id": "2608.30122",
+     "doi": "10.48550/arXiv.2608.30122",
+     "title": "Aligning Multi-Trajectory Supervision with Policy Optimization for VLA Driving",
+     "summary": "Vision-language-action (VLA) driving methods increasingly combine multi-trajectory imitation learning with group-relative policy optimization (GRPO), making trajectory selection critical to final performance. However, some high-scoring trajectories that improve imitation can degrade subsequent GRPO by inducing advantage estimates misaligned with the current policy's feasible behavior distribution, driving updates away from safe and compliant behaviors. To address this, we propose a novel framework that aligns multi-trajectory supervision with policy optimization. To address the policy gradient bias induced by infeasible noisy trajectories outside the feasible region, augmented trajectories are constrained to a neighboring manifold of the ground-truth feasible region, and a Pareto-optimality criterion is adopted in place of the conventional aggregate score, retaining only non-dominated candidates and thereby filtering out conflicting samples at the source. To ensure that expanded trajectory supervision is effectively absorbed during policy optimization, we introduce two complementary mechanisms: feasibility-first advantage assignment and dynamic distillation. The former adapts Pareto credit to the feasibility composition of each rollout group and guides fully infeasible groups toward safe references. The latter updates teacher trajectories across refinement rounds to continually transfer useful supervision. Together, they progressively translate the benefits of expanded supervision into policy improvement. On NAVSIM v1 and v2, our method achieves 91.4 PDMS and 89.1 EPDMS, respectively, under single-trajectory inference, and recovers 440 of 658 initially failed scenes, 11.1\\% higher than the original GRPO baseline.",
+     "published": "2026-08-31",
+     "venue": "arXiv.org",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/b4d41d224ee808b1c5b5ed7dc7fab2ab5277fb06"
+    },
+    {
+     "source": "s2",
+     "id": "2609.40007",
+     "doi": "",
+     "title": "Multi-Link Safety Filtering for VLA Policies Around Moving Hazards",
+     "summary": "A vision-language-action (VLA) policy can finish a manipulation task while knocking over objects unrelated to it, so task success alone does not show that the policy is safe to deploy in clutter. We study how to keep a pretrained VLA policy clear of such hazards at run time without retraining it, which requires guarding more of the arm than the end effector, following the hazard as it moves, and sharing onboard compute with the policy. Our training-free shield covers the gripper, wrist, and forearm with five ellipsoids and filters every commanded motion through one barrier program against a keep-out ellipsoid fitted from RGB-D perception at reset. Sparse optical flow then carries that ellipsoid's center along with the hazard, with no repeated detection or refitting. Over six simulated hazard-motion conditions, the shield lowers collision from $65.62\\%$ to $27.27\\%$ and raises safe-success, task completion without collision, from $29.35\\%$ to $50.43\\%$. Ablations show that guarding the arm links protects beyond end-effector shielding, and that tracking recovers most of the protection lost when the hazard estimate is frozen at reset. On heterogeneous edge hardware, the five-ellipsoid barrier runs on the CPU in $2.2$~ms at the 99th percentile, and trimming the vision--language prefix and taking fewer flow-matching steps shortens each $\\pi_{0.5}$ policy call on the integrated GPU from $343$ to $177.3$~ms. On a physical SO-101 arm across four tasks, the arm touched the hazard in 3 of 16 shielded episodes versus 11 of 16 unshielded ones. Project page: https://yathag.github.io/multilink-safety-filter/",
+     "published": "2026-09-30",
+     "venue": "",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/6917b3ee909393d502cba1e243ce032c1a00b167"
+    },
+    {
+     "source": "s2",
+     "id": "2607.13926",
+     "doi": "10.48550/arXiv.2607.13926",
+     "title": "S-squared-VLA: Decoupling Semantic and Spatial Streams in Vision-Language-Action Models for Autonomous Driving",
+     "summary": "Vision-Language Models (VLMs) have demonstrated remarkable potential for high-level reasoning in autonomous driving, yet they fundamentally struggle to generate precise, low-level control actions. This limitation is rooted in a semantic-physical gap caused by the inherent mismatch between discrete language tokens and continuous trajectory planning. While Vision-Language-Action (VLA) architectures attempt to bridge this gap by unifying perception and control into a single policy, this entanglement creates a new bottleneck. Standard VLAs experience a severe spatial representation collapse, which irreversibly degrades the fine-grained spatial and geometric priors essential for safe, boundary-aware navigation. To address this limitation, we propose the S-squared-VLA, which explicitly decouples the semantic and spatial streams in Vision-Language-Action models. The semantic stream leverages hierarchical bridging to extract multi-scale VLM features for robust intent reasoning. In parallel, an independent spatial stream bypasses the autoregressive language bottleneck, directly preserving uncompressed spatial features from the visual encoder. By integrating auxiliary perception supervision, this stream explicitly equips the model with rich spatial and geometric priors. Finally, a dual-stream planning adapter fuses high-level semantic intent with precise spatial constraints via cascaded attention mechanisms. Evaluations on the NAVSIM closed-loop benchmark show that S-squared-VLA achieves a Predictive Driver Model Score (PDMS) of 87.1, establishing a new state-of-the-art for VLA models under a purely supervised fine-tuning (SFT) setting. By mitigating the spatial representation collapse of traditional VLMs, our framework significantly outperforms baselines, achieving the highest No Collision (NC) rate of 98.4 among all evaluated methods.",
+     "published": "2026-07-15",
+     "venue": "arXiv.org",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/290f85a3bc840d61d9a13fea3da0ec516a9f6ff9"
+    },
+    {
+     "source": "s2",
+     "id": "2609.24187",
+     "doi": "",
+     "title": "StenoVLA-3D: 3D-Aware Reasoning VLA for Navigation Through Gastrointestinal Stenoses",
+     "summary": "Autonomous endoscopic navigation requires the policy model to predict actions from texture-poor monocular observations, make safe control decisions, and retain evidence of lesions after they leave the field of view. Existing vision-language-action (VLA) models primarily rely on visual appearance and short-term context, limiting geometric grounding and episode-level reporting. We introduce StenoVLA-3D, a 3D-aware VLA framework for navigating through stenotic regions. We integrate point-maps into the Cosmos-Reason 2 backbone through learned geometry-gated fusion, and also propose a temporal state branch to model traversal progress. Our reasoning-and-action backbone predicts grounded reasoning with actions, while dedicated heads estimate stenosis shape and generate the final lesion report. We further introduce EndoCausal, an episode-level dataset with lesion annotations, actions, and temporally grounded reasoning. On 40 held-out recorded test episodes, StenoVLA-3D reaches 95.2\\% semantic accuracy and 83.4\\% action accuracy. On the physical 3-DoF endoscope, it attains 88.9\\% and 77.8\\% task success in esophageal and colonic phantoms (36 trials each), substantially outperforming the evaluated baselines.",
+     "published": "2026-09-21",
+     "venue": "",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/25b9884b6eaa9acff362666db5baa28c861d5036"
+    },
+    {
+     "source": "s2",
+     "id": "2610.02802",
+     "doi": "",
+     "title": "ManiPhysicsBench: Physics-Based Assessment of Object Preservation in VLA Manipulation",
+     "summary": "Vision-language-action (VLA) models aim to perform diverse manipulation tasks, but task success in existing rigid-body benchmarks does not indicate whether they preserve objects. We introduce ManiPhysicsZoo, which consolidates literature-supported material properties, 3D meshes, and supporting references into reusable object assets. Using these assets, a solver-based assessment computes grasp-specific damage thresholds from object geometry, material properties, and recorded grasp conditions and compares them with recorded contact forces to assess potential deformation and fracture. Building on these components, ManiPhysicsBench evaluates object preservation in LIBERO and SimplerEnv across three physics axes and three difficulty levels. Public VLA checkpoints show a substantial gap between task success and safe success, defined as task completion while preserving the object. Their gripper commands concentrate near full opening and closure, with largely similar aggregate distributions across objects, consistent with binary gripper supervision. We examine how object-specific continuous gripper labels change model behavior by retraining a VLA model. The retrained model shows more object-dependent gripping and higher safe success, but lower task success and limited generalization of object-preserving behavior.",
+     "published": "2026-10-02",
+     "venue": "",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/c7a7a4832863c0f2edd9cb2753bc79bc318a38e6"
+    },
+    {
+     "source": "s2",
+     "id": "2609.34387",
+     "doi": "",
+     "title": "CAR-VLA: Complexity-Aware and Risk-Adaptive Reasoning for Autonomous Driving",
+     "summary": "Existing adaptive reasoning methods for driving Vision-Language-Action (VLA) models primarily focus on whether to reason, overlooking how reasoning should differ across driving situations. Our key insight is that while scene complexity informs reasoning depth, dynamic risk is equally critical for deciding how to reason in time-critical situations. We therefore propose CAR-VLA, a unified driving VLA model that jointly considers scene complexity and dynamic risk to guide reasoning depth, urgency, and focus. CAR-VLA maps four complexity--risk categories to three reasoning modes: \\textit{Fast Intuition} for direct trajectory generation in simple low-risk scenes, \\textit{Slow Thinking} for deliberate reasoning in complex low-risk scenes, and \\textit{Reflex Response} for compact, hazard-focused reasoning in high-risk scenes regardless of complexity. Rather than merely shortening deliberation, Reflex Response centers reasoning on the most critical hazard and the immediate safe response. We train CAR-VLA through progressive supervised learning that links scene assessment, reasoning-mode selection, and trajectory generation, followed by reasoning-augmented reinforcement learning to improve driving quality and reasoning behavior. Experiments on NAVSIM v1(91.1 PDMS), NAVSIM v2(90.3 EPDMS), and Navhard(35.0 EPDMS) demonstrate competitive driving performance. Qualitative comparisons on navtest and in-house high-risk scenarios further illustrate risk-aware reasoning and hazard-responsive trajectory generation. The code for this paper will be released publicly at: https://github.com/chenxl124578/CAR-VLA.git",
+     "published": "2026-09-28",
+     "venue": "",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/d580b15d98f13d43f7645bb1badd8b2ab0ed497e"
+    },
+    {
+     "source": "s2",
+     "id": "2605.02037",
+     "doi": "10.48550/arXiv.2605.02037",
+     "title": "VILAS: A VLA-Integrated Low-cost Architecture with Soft Grasping for Robotic Manipulation",
+     "summary": "We present VILAS, a fully low-cost, modular robotic manipulation platform designed to support end-to-end vision-language-action (VLA) policy learning and deployment on accessible hardware. The system integrates a Fairino FR5 collaborative arm, a Jodell RG52-50 electric gripper, and a dual-camera perception module, unified through a ZMQ-based communication architecture that seamlessly coordinates teleoperation, data collection, and policy deployment within a single framework. To enable safe manipulation of fragile objects without relying on explicit force sensing, we design a kirigami-based soft compliant gripper extension that induces predictable deformation under compressive loading, providing gentle and repeatable contact with delicate targets. We deploy and evaluate three state-of-the-art VLA models on the VILAS platform: pi_0, pi_0.5, and GR00T N1.6. All models are fine-tuned from publicly released pretrained checkpoints using an identical demonstration dataset collected via our teleoperation pipeline. Experiments on a grape grasping task validate the effectiveness of the proposed system, confirming that capable manipulation policies can be successfully trained and deployed on low-cost modular hardware. Our results further provide practical insights into the deployment characteristics of current VLA models in real-world settings.",
+     "published": "2026-05-03",
+     "venue": "arXiv.org",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/ed26d189b1ea3cb2d018127f5e2c311963f799ee"
+    },
+    {
+     "source": "s2",
+     "id": "2502.05450",
+     "doi": "10.48550/arXiv.2502.05450",
+     "title": "ConRFT: A Reinforced Fine-tuning Method for VLA Models via Consistency Policy",
+     "summary": "Vision-Language-Action (VLA) models have shown substantial potential in real-world robotic manipulation. However, fine-tuning these models through supervised learning struggles to achieve robust performance due to limited, inconsistent demonstrations, especially in contact-rich environments. In this paper, we propose a reinforced fine-tuning approach for VLA models, named ConRFT, which consists of offline and online fine-tuning with a unified consistency-based training objective, to address these challenges. In the offline stage, our method integrates behavior cloning and Q-learning to effectively extract policy from a small set of demonstrations and stabilize value estimating. In the online stage, the VLA model is further fine-tuned via consistency policy, with human interventions to ensure safe exploration and high sample efficiency. We evaluate our approach on eight diverse real-world manipulation tasks. It achieves an average success rate of 96.3% within 45-90 minutes of online fine-tuning, outperforming prior supervised methods with a 144% improvement in success rate and 1.9x shorter episode length. This work highlights the potential of integrating reinforcement learning to enhance the performance of VLA models for real-world robotic applications. Videos and code are available at our project website https://cccedric.github.io/conrft/.",
+     "published": "2025-02-08",
+     "venue": "Robotics",
+     "citations": 203,
+     "url": "https://www.semanticscholar.org/paper/84fc714f22535f82c3fbfa28f2883292d2a02167"
+    },
+    {
+     "source": "s2",
+     "id": "2506.09937",
+     "doi": "10.48550/arXiv.2506.09937",
+     "title": "SAFE: Multitask Failure Detection for Vision-Language-Action Models",
+     "summary": "While vision-language-action models (VLAs) have shown promising robotic behaviors across a diverse set of manipulation tasks, they achieve limited success rates when deployed on novel tasks out of the box. To allow these policies to safely interact with their environments, we need a failure detector that gives a timely alert such that the robot can stop, backtrack, or ask for help. However, existing failure detectors are trained and tested only on one or a few specific tasks, while generalist VLAs require the detector to generalize and detect failures also in unseen tasks and novel environments. In this paper, we introduce the multitask failure detection problem and propose SAFE, a failure detector for generalist robot policies such as VLAs. We analyze the VLA feature space and find that VLAs have sufficient high-level knowledge about task success and failure, which is generic across different tasks. Based on this insight, we design SAFE to learn from VLA internal features and predict a single scalar indicating the likelihood of task failure. SAFE is trained on both successful and failed rollouts and is evaluated on unseen tasks. SAFE is compatible with different policy architectures. We test it on OpenVLA, $\\pi_0$, and $\\pi_0$-FAST in both simulated and real-world environments extensively. We compare SAFE with diverse baselines and show that SAFE achieves state-of-the-art failure detection performance and the best trade-off between accuracy and detection time using conformal prediction. More qualitative results and code can be found at the project webpage: https://vla-safe.github.io/",
+     "published": "2025-06-11",
+     "venue": "Neural Information Processing Systems",
+     "citations": 128,
+     "url": "https://www.semanticscholar.org/paper/8165f26c174bd327506242ee898cf18a3abe61cf"
+    },
+    {
+     "source": "s2",
+     "id": "2512.24426",
+     "doi": "10.48550/arXiv.2512.24426",
+     "title": "Counterfactual VLA: Self-Reflective Vision-Language-Action Model with Adaptive Reasoning",
+     "summary": "Recent reasoning-augmented Vision-Language-Action (VLA) models have improved the interpretability of end-to-end autonomous driving by generating intermediate reasoning traces. Yet these models primarily describe what they perceive and intend to do, rarely questioning whether their planned actions are safe or appropriate. This work introduces Counterfactual VLA (CF-VLA), a self-reflective VLA framework that enables the model to reason about and revise its planned actions before execution. CF-VLA first generates time-segmented meta-actions that summarize driving intent, and then performs counterfactual reasoning conditioned on both the meta-actions and the visual context. This step simulates potential outcomes, identifies unsafe behaviors, and outputs corrected meta-actions that guide the final trajectory generation. To efficiently obtain such self-reflective capabilities, we propose a rollout-filter-label pipeline that mines high-value scenes from a base (non-counterfactual) VLA's rollouts and labels counterfactual reasoning traces for subsequent training rounds. Experiments on large-scale driving datasets show that CF-VLA improves trajectory accuracy by up to 17.6%, enhances safety metrics by 20.5%, and exhibits adaptive thinking: it only enables counterfactual reasoning in challenging scenarios. By transforming reasoning traces from one-shot descriptions to causal self-correction signals, CF-VLA takes a step toward self-reflective autonomous driving agents that learn to think before they act.",
+     "published": "2025-12-30",
+     "venue": "arXiv.org",
+     "citations": 28,
+     "url": "https://www.semanticscholar.org/paper/8eb7192f5c3ee6feed62153427afe6d000c56cdb"
+    },
+    {
+     "source": "s2",
+     "id": "10.48550/arXiv.2510.07871",
+     "doi": "10.48550/arXiv.2510.07871",
+     "title": "Team Xiaomi EV-AD VLA: Learning to Navigate Socially Through Proactive Risk Perception - Technical Report for IROS 2025 RoboSense Challenge Social Navigation Track",
+     "summary": "",
+     "published": "2025",
+     "venue": "arXiv.org",
+     "citations": 8,
+     "url": "https://www.semanticscholar.org/paper/d9621f269974599e27ff580103876242983b89a3"
+    },
+    {
+     "source": "s2",
+     "id": "10.1109/ICAISG68699.2025.11452140",
+     "doi": "10.1109/ICAISG68699.2025.11452140",
+     "title": "ExpVLA: Enhancing the Generality of VLA Model via Explainable CoT Reasoning",
+     "summary": "Vision-Language-Action (VLA) models have demonstrated significant progress in enabling robots to interpret natural language instructions and perform complex manipulation tasks. However, their predominantly end-to-end architectures obscure internal reasoning processes, limiting transparency, adaptability, and trustworthiness-critical factors for safe deployment in real-world environments. To address these limitations, we propose Explainable VLA (ExpVLA), a novel framework that introduces visual chain-of-thought (CoT) reasoning as an interpretable intermediate step in robotic decision-making. Our approach leverages predicted next scene images-future frames representing desired intermediate statesas explicit visual representations of the model's planning process. By grounding reasoning directly in pixel space, our method avoids reliance on hand-engineered features and enables effective utilization of unlabeled video data during pretraining. We further design a fusion attention mechanism and action chunking strategy to enhance temporal coherence and execution efficiency. Extensive evaluations across simulation (LIBERO) and real-world benchmarks (Bridge-V2, Franka-Tabletop) demonstrate that ExpVLA significantly outperforms stateof-the-art baselines, particularly in long-horizon and crossenvironment generalization tasks. Crucially, the generated next scene images provide a naturally interpretable window into the model's planning trajectory, advancing both performance and explainability in autonomous robotic systems.",
+     "published": "2025-12-12",
+     "venue": "2025 International Conference on Artificial Intelligence Security and Governance (ICAISG)",
+     "citations": 0,
+     "url": "https://www.semanticscholar.org/paper/b2452af2354922536a12849ba5c7baa0019f1f94"
+    }
+   ]
+  },
+  {
+   "id": "q3",
+   "query": "\"End-to-End Autonomous Driving\"",
+   "sources": {
+    "arxiv": {
+     "returned": 20,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 19
+   },
+   "hits": [
+    {
+     "source": "arxiv",
+     "id": "2608.20890v1",
+     "title": "A Collaborative Multi-Modality Interaction for VLA-based End-to-End Autonomous Driving",
+     "summary": "Vision-Language-Action (VLA) models have emerged as a powerful paradigm for end-to-end autonomous driving by jointly integrating perception, reasoning, and decision making within a unified multimodal framework. However, most existing VLA models formulate end-to-end autonomous driving as a visual question answering task, leading to unreliable and less interpretable decision reasoning. In addition, they fail to establish effective multi-modal interaction across heterogeneous sensors, thereby limiting robust scene perception and reliable driving reasoning in long-tail driving scenarios. To this end, we propose a robust VLA-based end-to-end autonomous driving system that combines multi-modality interaction with multi-trajectory planning and optimization, enabling more reliable, interpretable, and safer driving decisions. Our method comprises three core components: (1) Affinity-Guided Optimal Transport for main-auxiliary modality two-way interaction; (2) Distribution-Consistent Modality Transfer for heterogeneous modality distribution transfer and cross-modal interaction; (3) Multi-modal Multi-Trajectory Planning along with Perception-Oriented Trajectory Refinement for better driving decisions to long-tail driving scenarios. Experimental results in open-loop and closed-loop datasets demonstrate improvements in safety long-horizon driving reasoning and road scene perception over existing driving systems, highlighting the ability of our mutli-modality interaction and multi-trajectory planning and optimization for scalable VLA-based systems.",
+     "published": "2026-08-21",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2608.20890v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2607.23511v1",
+     "title": "MOJITO: Modal Joint Learning for Unified End-to-End Autonomous Driving",
+     "summary": "End-to-end autonomous driving systems commonly follow a cascaded two-stage pipeline where a perception stage compresses multi-modal sensor inputs into a compact context and a downstream planner predicts trajectories conditioned on this context. We argue that this one-way perception-to-planning interface forces sensor inputs into a compact representation, losing the fine-grained details critical for planning. Moreover, by constraining the planner to this compressed context, it is difficult to leverage the rich representations offered by modern vision foundation models. To address these issues, we propose MOJITO, a unified sensor-to-action framework for end-to-end autonomous driving built on modal joint learning. MOJITO removes the cascaded interface and instead performs block-wise Modal Joint Attention that simultaneously updates action, image, and LiDAR features, allowing the planner to directly access multi-modal features during action generation. MOJITO achieves 88.9 PDMS on the NAVSIM v1 dataset and 88.4 EPDMS on the more challenging NAVSIM v2 dataset, setting a new state-of-the-art. Extensive experiments further demonstrate strong scalability, instruction following, and diverse trajectory generation. Code and models are available at https://github.com/mumucc01/MOJITO.",
+     "published": "2026-07-26",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2607.23511v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2601.11475v1",
+     "title": "Generative Scenario Rollouts for End-to-End Autonomous Driving",
+     "summary": "Vision-Language-Action (VLA) models are emerging as highly effective planning models for end-to-end autonomous driving systems. However, current works mostly rely on imitation learning from sparse trajectory annotations and under-utilize their potential as generative models. We propose Generative Scenario Rollouts (GeRo), a plug-and-play framework for VLA models that jointly performs planning and generation of language-grounded future traffic scenes through an autoregressive rollout strategy. First, a VLA model is trained to encode ego vehicle and agent dynamics into latent tokens under supervision from planning, motion, and language tasks, facilitating text-aligned generation. Next, GeRo performs language-conditioned autoregressive generation. Given multi-view images, a scenario description, and ego-action questions, it generates future latent tokens and textual responses to guide long-horizon rollouts. A rollout-consistency loss stabilizes predictions using ground truth or pseudo-labels, mitigating drift and preserving text-action alignment. This design enables GeRo to perform temporally consistent, language-grounded rollouts that support long-horizon reasoning and multi-agent planning. On Bench2Drive, GeRo improves driving score and success rate by +15.7 and +26.2, respectively. By integrating reinforcement learning with generative rollouts, GeRo achieves state-of-the-art closed-loop and open-loop performance, demonstrating strong zero-shot robustness. These results highlight the promise of generative, language-conditioned reasoning as a foundation for safer and more interpretable end-to-end autonomous driving.",
+     "published": "2026-01-16",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2601.11475v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2509.23922v1",
+     "title": "DriveE2E: Closed-Loop Benchmark for End-to-End Autonomous Driving through Real-to-Simulation",
+     "summary": "Closed-loop evaluation is increasingly critical for end-to-end autonomous driving. Current closed-loop benchmarks using the CARLA simulator rely on manually configured traffic scenarios, which can diverge from real-world conditions, limiting their ability to reflect actual driving performance. To address these limitations, we introduce a simple yet challenging closed-loop evaluation framework that closely integrates real-world driving scenarios into the CARLA simulator with infrastructure cooperation. Our approach involves extracting 800 dynamic traffic scenarios selected from a comprehensive 100-hour video dataset captured by high-mounted infrastructure sensors, and creating static digital twin assets for 15 real-world intersections with consistent visual appearance. These digital twins accurately replicate the traffic and environmental characteristics of their real-world counterparts, enabling more realistic simulations in CARLA. This evaluation is challenging due to the diversity of driving behaviors, locations, weather conditions, and times of day at complex urban intersections. In addition, we provide a comprehensive closed-loop benchmark for evaluating end-to-end autonomous driving models. Project URL: \\href{https://github.com/AIR-THU/DriveE2E}{https://github.com/AIR-THU/DriveE2E}.",
+     "published": "2025-09-28",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2509.23922v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2506.11419v1",
+     "title": "FocalAD: Local Motion Planning for End-to-End Autonomous Driving",
+     "summary": "In end-to-end autonomous driving,the motion prediction plays a pivotal role in ego-vehicle planning. However, existing methods often rely on globally aggregated motion features, ignoring the fact that planning decisions are primarily influenced by a small number of locally interacting agents. Failing to attend to these critical local interactions can obscure potential risks and undermine planning reliability. In this work, we propose FocalAD, a novel end-to-end autonomous driving framework that focuses on critical local neighbors and refines planning by enhancing local motion representations. Specifically, FocalAD comprises two core modules: the Ego-Local-Agents Interactor (ELAI) and the Focal-Local-Agents Loss (FLA Loss). ELAI conducts a graph-based ego-centric interaction representation that captures motion dynamics with local neighbors to enhance both ego planning and agent motion queries. FLA Loss increases the weights of decision-critical neighboring agents, guiding the model to prioritize those more relevant to planning. Extensive experiments show that FocalAD outperforms existing state-of-the-art methods on the open-loop nuScenes datasets and closed-loop Bench2Drive benchmark. Notably, on the robustness-focused Adv-nuScenes dataset, FocalAD achieves even greater improvements, reducing the average colilision rate by 41.9% compared to DiffusionDrive and by 15.6% compared to SparseDrive.",
+     "published": "2025-06-13",
+     "venue": "FocalAD: Local Motion Planning for End-to-End Autonomous Driving. Automot. Innov. (2026)",
+     "url": "https://arxiv.org/abs/2506.11419v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2505.21581v4",
+     "title": "CogAD: Cognitive-Hierarchy Guided End-to-End Autonomous Driving",
+     "summary": "While end-to-end autonomous driving has advanced significantly, prevailing methods remain fundamentally misaligned with human cognitive principles in both perception and planning. In this paper, we propose CogAD, a novel end-to-end autonomous driving model that emulates the hierarchical cognition mechanisms of human drivers. CogAD implements dual hierarchical mechanisms: global-to-local context processing for human-like perception and intent-conditioned multi-mode trajectory generation for cognitively-inspired planning. The proposed method demonstrates three principal advantages: comprehensive environmental understanding through hierarchical perception, robust planning exploration enabled by multi-level planning, and diverse yet reasonable multi-modal trajectory generation facilitated by dual-level uncertainty modeling. Extensive experiments on nuScenes and Bench2Drive demonstrate that CogAD achieves state-of-the-art performance in end-to-end planning, exhibiting particular superiority in long-tail scenarios and robust generalization to complex real-world driving conditions.",
+     "published": "2025-05-27",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2505.21581v4"
+    },
+    {
+     "source": "arxiv",
+     "id": "2509.13926v1",
+     "title": "MAP: End-to-End Autonomous Driving with Map-Assisted Planning",
+     "summary": "In recent years, end-to-end autonomous driving has attracted increasing attention for its ability to jointly model perception, prediction, and planning within a unified framework. However, most existing approaches underutilize the online mapping module, leaving its potential to enhance trajectory planning largely untapped. This paper proposes MAP (Map-Assisted Planning), a novel map-assisted end-to-end trajectory planning framework. MAP explicitly integrates segmentation-based map features and the current ego status through a Plan-enhancing Online Mapping module, an Ego-status-guided Planning module, and a Weight Adapter based on current ego status. Experiments conducted on the DAIR-V2X-seq-SPD dataset demonstrate that the proposed method achieves a 16.6% reduction in L2 displacement error, a 56.2% reduction in off-road rate, and a 44.5% improvement in overall score compared to the UniV2X baseline, even without post-processing. Furthermore, it achieves top ranking in Track 2 of the End-to-End Autonomous Driving through V2X Cooperation Challenge of MEIS Workshop @CVPR2025, outperforming the second-best model by 39.5% in terms of overall score. These results highlight the effectiveness of explicitly leveraging semantic map features in planning and suggest new directions for improving structure design in end-to-end autonomous driving systems. Our code is available at https://gitee.com/kymkym/map.git",
+     "published": "2025-09-17",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2509.13926v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2503.13047v2",
+     "title": "InsightDrive: Insight Scene Representation for End-to-End Autonomous Driving",
+     "summary": "Conventional end-to-end autonomous driving methods often rely on explicit global scene representations, which typically consist of 3D object detection, online mapping, and motion prediction. In contrast, human drivers selectively attend to task-relevant regions and implicitly reason over the broader traffic context. Motivated by this observation, we introduce a lightweight end-to-end autonomous driving framework, InsightDrive. Unlike approaches that directly embed large language models (LLMs), InsightDrive introduces an Insight scene representation that jointly models attention-centric explicit scene representation and reasoning-centric implicit scene representation, so that scene understanding aligns more closely with human cognitive patterns for trajectory planning. To this end, we employ Chain-of-Thought (CoT) instructions to model human driving cognition and design a task-level Mixture-of-Experts (MoE) adapter that injects this knowledge into the autonomous driving model at negligible parameter cost. We further condition the planner on both explicit and implicit scene representations and employ a diffusion-based generative policy, which produces robust trajectory predictions and decisions. The overall framework establishes a knowledge distillation pipeline that transfers human driving knowledge to LLMs and subsequently to onboard models. Extensive experiments on the nuScenes and Navsim benchmarks demonstrate that InsightDrive achieves significant improvements over conventional scene representation approaches.",
+     "published": "2025-03-17",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2503.13047v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2512.00723v1",
+     "title": "TrajDiff: End-to-end Autonomous Driving without Perception Annotation",
+     "summary": "End-to-end autonomous driving systems directly generate driving policies from raw sensor inputs. While these systems can extract effective environmental features for planning, relying on auxiliary perception tasks, developing perception annotation-free planning paradigms has become increasingly critical due to the high cost of manual perception annotation. In this work, we propose TrajDiff, a Trajectory-oriented BEV Conditioned Diffusion framework that establishes a fully perception annotation-free generative method for end-to-end autonomous driving. TrajDiff requires only raw sensor inputs and future trajectory, constructing Gaussian BEV heatmap targets that inherently capture driving modalities. We design a simple yet effective trajectory-oriented BEV encoder to extract the TrajBEV feature without perceptual supervision. Furthermore, we introduce Trajectory-oriented BEV Diffusion Transformer (TB-DiT), which leverages ego-state information and the predicted TrajBEV features to directly generate diverse yet plausible trajectories, eliminating the need for handcrafted motion priors. Beyond architectural innovations, TrajDiff enables exploration of data scaling benefits in the annotation-free setting. Evaluated on the NAVSIM benchmark, TrajDiff achieves 87.5 PDMS, establishing state-of-the-art performance among all annotation-free methods. With data scaling, it further improves to 88.5 PDMS, which is comparable to advanced perception-based approaches. Our code and model will be made publicly available.",
+     "published": "2025-11-30",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2512.00723v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2512.16055v2",
+     "title": "Driving in Corner Case: A Real-World Adversarial Closed-Loop Evaluation Platform for End-to-End Autonomous Driving",
+     "summary": "Safety-critical corner cases, difficult to collect in the real world, are crucial for evaluating end-to-end autonomous driving. Adversarial interaction is an effective method to generate such safety-critical corner cases. While existing adversarial evaluation methods are built for models operating in simplified simulation environments, adversarial evaluation for real-world end-to-end autonomous driving has been little explored. To address this challenge, we propose a closed-loop evaluation platform for end-to-end autonomous driving, which can generate adversarial interactions in real-world scenes. In our platform, the real-world image generator cooperates with an adversarial traffic policy to evaluate various end-to-end models trained on real-world data. The generator, based on flow matching, efficiently and stably generates real-world images according to the traffic environment information. The efficient adversarial surrounding vehicle policy is designed to model challenging interactions and create corner cases that current autonomous driving systems struggle to handle. Experimental results demonstrate that the platform can generate realistic driving images efficiently. Through evaluating the end-to-end models such as UniAD and VAD, we demonstrate that based on the adversarial policy, our platform evaluates the performance degradation of the tested model in corner cases. This result indicates that this platform can effectively detect the model's potential issues, which will facilitate the safety and robustness of end-to-end autonomous driving.",
+     "published": "2025-12-18",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2512.16055v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2503.23463v2",
+     "title": "OpenDriveVLA: Towards End-to-end Autonomous Driving with Large Vision Language Action Model",
+     "summary": "We present OpenDriveVLA, a Vision Language Action model designed for end-to-end autonomous driving, built upon open-source large language models. OpenDriveVLA generates spatially grounded driving actions by leveraging multimodal inputs, including 2D and 3D instance-aware visual representations, ego vehicle states, and language commands. To bridge the modality gap between driving visual representations and language embeddings, we introduce a hierarchical vision language alignment process, projecting both 2D and 3D structured visual tokens into a unified semantic space. Furthermore, we incorporate structured agent environment ego interaction modeling into the autoregressive decoding process, enabling the model to capture fine-grained spatial dependencies and behavior-aware dynamics critical for reliable trajectory planning. Extensive experiments on the nuScenes dataset demonstrate that OpenDriveVLA achieves state-of-the-art results across open-loop trajectory planning and driving-related question answering tasks. Qualitative analyses further illustrate its capability to follow high-level driving commands and generate trajectories under challenging scenarios, highlighting its potential for next-generation end-to-end autonomous driving.",
+     "published": "2025-03-30",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2503.23463v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2407.06546v2",
+     "title": "Exploring the Causality of End-to-End Autonomous Driving",
+     "summary": "Deep learning-based models are widely deployed in autonomous driving areas, especially the increasingly noticed end-to-end solutions. However, the black-box property of these models raises concerns about their trustworthiness and safety for autonomous driving, and how to debug the causality has become a pressing concern. Despite some existing research on the explainability of autonomous driving, there is currently no systematic solution to help researchers debug and identify the key factors that lead to the final predicted action of end-to-end autonomous driving. In this work, we propose a comprehensive approach to explore and analyze the causality of end-to-end autonomous driving. First, we validate the essential information that the final planning depends on by using controlled variables and counterfactual interventions for qualitative analysis. Then, we quantitatively assess the factors influencing model decisions by visualizing and statistically analyzing the response of key model inputs. Finally, based on the comprehensive study of the multi-factorial end-to-end autonomous driving system, we have developed a strong baseline and a tool for exploring causality in the close-loop simulator CARLA. It leverages the essential input sources to obtain a well-designed model, resulting in highly competitive capabilities. As far as we know, our work is the first to unveil the mystery of end-to-end autonomous driving and turn the black box into a white one. Thorough close-loop experiments demonstrate that our method can be applied to end-to-end autonomous driving solutions for causality debugging. Code will be available at https://github.com/bdvisl/DriveInsight.",
+     "published": "2024-07-09",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2407.06546v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2402.11502v3",
+     "title": "GenAD: Generative End-to-End Autonomous Driving",
+     "summary": "Directly producing planning results from raw sensors has been a long-desired solution for autonomous driving and has attracted increasing attention recently. Most existing end-to-end autonomous driving methods factorize this problem into perception, motion prediction, and planning. However, we argue that the conventional progressive pipeline still cannot comprehensively model the entire traffic evolution process, e.g., the future interaction between the ego car and other traffic participants and the structural trajectory prior. In this paper, we explore a new paradigm for end-to-end autonomous driving, where the key is to predict how the ego car and the surroundings evolve given past scenes. We propose GenAD, a generative framework that casts autonomous driving into a generative modeling problem. We propose an instance-centric scene tokenizer that first transforms the surrounding scenes into map-aware instance tokens. We then employ a variational autoencoder to learn the future trajectory distribution in a structural latent space for trajectory prior modeling. We further adopt a temporal model to capture the agent and ego movements in the latent space to generate more effective future trajectories. GenAD finally simultaneously performs motion prediction and planning by sampling distributions in the learned structural latent space conditioned on the instance tokens and using the learned temporal model to generate futures. Extensive experiments on the widely used nuScenes benchmark show that the proposed GenAD achieves state-of-the-art performance on vision-centric end-to-end autonomous driving with high efficiency. Code: https://github.com/wzzheng/GenAD.",
+     "published": "2024-02-18",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2402.11502v3"
+    },
+    {
+     "source": "arxiv",
+     "id": "2403.12176v5",
+     "title": "Safety Implications of Explainable Artificial Intelligence in End-to-End Autonomous Driving",
+     "summary": "The end-to-end learning pipeline is gradually creating a paradigm shift in the ongoing development of highly autonomous vehicles (AVs), largely due to advances in deep learning, the availability of large-scale training datasets, and improvements in integrated sensor devices. However, a lack of explainability in real-time decisions with contemporary learning methods impedes user trust and attenuates the widespread deployment and commercialization of such vehicles. Moreover, the issue is exacerbated when these vehicles are involved in or cause traffic accidents. Consequently, explainability in end-to-end autonomous driving is essential to build trust in vehicular automation. With that said, automotive researchers have not yet rigorously explored safety benefits and consequences of explanations in end-to-end autonomous driving. This paper aims to bridge the gaps between these topics and seeks to answer the following research question: What are safety implications of explanations in end-to-end autonomous driving? In this regard, we first revisit established safety and explainability concepts in end-to-end driving. Furthermore, we present critical case studies and show the pivotal role of explanations in enhancing driving safety. Finally, we describe insights from empirical studies and reveal potential value, limitations, and caveats of practical explainable AI methods with respect to their potential impacts on safety of end-to-end driving.",
+     "published": "2024-03-18",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2403.12176v5"
+    },
+    {
+     "source": "arxiv",
+     "id": "2403.19098v2",
+     "title": "GraphAD: Interaction Scene Graph for End-to-end Autonomous Driving",
+     "summary": "Modeling complicated interactions among the ego-vehicle, road agents, and map elements has been a crucial part for safety-critical autonomous driving. Previous works on end-to-end autonomous driving rely on the attention mechanism for handling heterogeneous interactions, which fails to capture the geometric priors and is also computationally intensive. In this paper, we propose the Interaction Scene Graph (ISG) as a unified method to model the interactions among the ego-vehicle, road agents, and map elements. With the representation of the ISG, the driving agents aggregate essential information from the most influential elements, including the road agents with potential collisions and the map elements to follow. Since a mass of unnecessary interactions are omitted, the more efficient scene-graph-based framework is able to focus on indispensable connections and leads to better performance. We evaluate the proposed method for end-to-end autonomous driving on the nuScenes dataset. Compared with strong baselines, our method significantly outperforms in the full-stack driving tasks, including perception, prediction, and planning. Code will be released at https://github.com/zhangyp15/GraphAD.",
+     "published": "2024-03-28",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2403.19098v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2412.02689v2",
+     "title": "Data Scaling Laws for Imitation Learning-Based End-to-End Autonomous Driving",
+     "summary": "The end-to-end autonomous driving paradigm has recently attracted lots of attention due to its scalability. However, existing methods are constrained by the limited scale of real-world data, which hinders a comprehensive exploration of the scaling laws associated with end-to-end autonomous driving. To address this issue, we collected substantial data from various driving scenarios and behaviors and conducted an extensive study on the scaling laws of existing imitation learning-based end-to-end autonomous driving paradigms. Specifically, approximately 4 million demonstrations from 23 different scenario types were gathered, amounting to over 30,000 hours of driving demonstrations. We performed open-loop evaluations and closed-loop simulation evaluations in 1,400 diverse driving demonstrations (1,300 for open-loop and 100 for closed-loop) under stringent assessment conditions. Through experimental analysis, we discovered that (1) the performance of the driving model exhibits a power-law relationship with the amount of data, but this is not the case in closed-loop evaluation. The inconsistency between the two assessments shifts our focus toward the distribution of data rather than merely expanding its volume. (2) a small increase in the quantity of long-tailed data can significantly improve the performance for the corresponding scenarios; (3) appropriate scaling of data enables the model to achieve combinatorial generalization in novel scenes and actions. Our results highlight the critical role of data scaling in improving the generalizability of models across diverse autonomous driving scenarios, assuring safe deployment in the real world.. Project repository: https://github.com/ucaszyp/Driving-Scaling-Law",
+     "published": "2024-12-03",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2412.02689v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2307.04370v2",
+     "title": "Recent Advancements in End-to-End Autonomous Driving using Deep Learning: A Survey",
+     "summary": "End-to-End driving is a promising paradigm as it circumvents the drawbacks associated with modular systems, such as their overwhelming complexity and propensity for error propagation. Autonomous driving transcends conventional traffic patterns by proactively recognizing critical events in advance, ensuring passengers' safety and providing them with comfortable transportation, particularly in highly stochastic and variable traffic settings. This paper presents a comprehensive review of the End-to-End autonomous driving stack. It provides a taxonomy of automated driving tasks wherein neural networks have been employed in an End-to-End manner, encompassing the entire driving process from perception to control, while addressing key challenges encountered in real-world applications. Recent developments in End-to-End autonomous driving are analyzed, and research is categorized based on underlying principles, methodologies, and core functionality. These categories encompass sensorial input, main and auxiliary output, learning approaches ranging from imitation to reinforcement learning, and model evaluation techniques. The survey incorporates a detailed discussion of the explainability and safety aspects. Furthermore, it assesses the state-of-the-art, identifies challenges, and explores future possibilities. We maintained the latest advancements and their corresponding open-source implementations at https://github.com/Pranav-chib/Recent-Advancements-in-End-to-End-Autonomous-Driving-using-Deep-Learning.",
+     "published": "2023-07-10",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2307.04370v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2311.08100v4",
+     "title": "PPAD: Iterative Interactions of Prediction and Planning for End-to-end Autonomous Driving",
+     "summary": "We present a new interaction mechanism of prediction and planning for end-to-end autonomous driving, called PPAD (Iterative Interaction of Prediction and Planning Autonomous Driving), which considers the timestep-wise interaction to better integrate prediction and planning. An ego vehicle performs motion planning at each timestep based on the trajectory prediction of surrounding agents (e.g., vehicles and pedestrians) and its local road conditions. Unlike existing end-to-end autonomous driving frameworks, PPAD models the interactions among ego, agents, and the dynamic environment in an autoregressive manner by interleaving the Prediction and Planning processes at every timestep, instead of a single sequential process of prediction followed by planning. Specifically, we design ego-to-agent, ego-to-map, and ego-to-BEV interaction mechanisms with hierarchical dynamic key objects attention to better model the interactions. The experiments on the nuScenes benchmark show that our approach outperforms state-of-the-art methods.",
+     "published": "2023-11-14",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2311.08100v4"
+    },
+    {
+     "source": "arxiv",
+     "id": "2306.16927v3",
+     "title": "End-to-end Autonomous Driving: Challenges and Frontiers",
+     "summary": "The autonomous driving community has witnessed a rapid growth in approaches that embrace an end-to-end algorithm framework, utilizing raw sensor input to generate vehicle motion plans, instead of concentrating on individual tasks such as detection and motion prediction. End-to-end systems, in comparison to modular pipelines, benefit from joint feature optimization for perception and planning. This field has flourished due to the availability of large-scale datasets, closed-loop evaluation, and the increasing need for autonomous driving algorithms to perform effectively in challenging scenarios. In this survey, we provide a comprehensive analysis of more than 270 papers, covering the motivation, roadmap, methodology, challenges, and future trends in end-to-end autonomous driving. We delve into several critical challenges, including multi-modality, interpretability, causal confusion, robustness, and world models, amongst others. Additionally, we discuss current advancements in foundation models and visual pre-training, as well as how to incorporate these techniques within the end-to-end driving framework. we maintain an active repository that contains up-to-date literature and open-source projects at https://github.com/OpenDriveLab/End-to-end-Autonomous-Driving.",
+     "published": "2023-06-29",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2306.16927v3"
+    }
+   ]
+  },
+  {
+   "id": "q4",
+   "query": "\"World Model\" robot manipulation",
+   "sources": {
+    "arxiv": {
+     "returned": 20,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 12
+   },
+   "hits": [
+    {
+     "source": "arxiv",
+     "id": "2605.22882v4",
+     "title": "GEM-4D: Geometry-Enhanced Video World Models for Robot Manipulation",
+     "summary": "Video world models can generate realistic futures from a single instruction, but they often fail to track the same physical points consistently across time. As a result, the generated videos appear plausible, yet lack the physical grounding required for reliable action execution, such as robot manipulation. We present GEM-4D, a geometry-grounded video world model that resolves this limitation by injecting dense 4D correspondence supervision distilled from a pretrained geometry foundation model into the video generative backbone during training. This supervision enables the model to jointly capture appearance and geometric structure while retaining a single-stream architecture with no additional inference cost. We further introduce an inverse dynamics module that converts correspondence-consistent video rollouts into executable robot trajectories, enabling direct deployment in both real-world and simulated manipulation. GEM-4D achieves state-of-the-art performance on both video prediction and geometric consistency across both simulation and realistic scenarios and improves real-world manipulation success from 61% to 81%. Additional results are available at https://gem-4d.github.io/.",
+     "published": "2026-05-20",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2605.22882v4"
+    },
+    {
+     "source": "arxiv",
+     "id": "2610.08780v1",
+     "title": "DepthWorld: 3D World Model for Robot Manipulation",
+     "summary": "World models offer a data-driven alternative to traditional simulators for robotics, with applications spanning policy evaluation, improvement, and planning. All of these uses depend on faithful 3D geometry, yet current video-based world models are trained on RGB alone and produce rollouts that look correct frame-by-frame but do not compose into a consistent 3D world. Closing this gap requires progress on two fronts: large-scale 3D supervision for manipulation, and an architecture that can absorb it without disturbing strong pretrained video priors. We introduce a calibration pipeline that combines learned stereo depth with a joint factor graph, pooling all episodes collected from the same physical robot to recover its shared kinematic parameters alongside per-scene extrinsics. Applied to the DROID dataset, this yields DROID-3D, a calibrated 3D dataset providing dense metric depth and recalibrated multi-view extrinsics (achieving <0.7 px reprojection error on 90% of episodes for external cameras). We then train DepthWorld, a Stable Video Diffusion-based world model that jointly predicts multi-view RGB and depth via spatial latent tiling, leaving the pretrained Variational Autoencoder (VAE) unchanged. Depth supervision improves RGB prediction itself by +1.48 dB PSNR over an identical RGB-only baseline at equal training budget, while simultaneously yielding accurate metric depth for downstream geometric reasoning.",
+     "published": "2026-10-06",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2610.08780v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.09030v3",
+     "title": "PlayWorld: Learning Robot World Models from Autonomous Play",
+     "summary": "Action-conditioned video models offer a promising path to building general-purpose robot simulators that can improve directly from data. Yet, despite training on large-scale robot datasets, current state-of-the-art video models still struggle to predict physically consistent robot-object interactions that are crucial in robotic manipulation. To close this gap, we present PlayWorld, a simple, scalable, and fully autonomous pipeline for training high-fidelity video world simulators from interaction experience. In contrast to prior approaches that rely on success-biased human demonstrations, PlayWorld is the first system capable of learning entirely from unsupervised robot self-play, enabling naturally scalable data collection while capturing complex, long-tailed physical interactions essential for modeling realistic object dynamics. Experiments across diverse manipulation tasks show that PlayWorld generates high-quality, physically consistent predictions for contact-rich interactions that are not captured by world models trained on human-collected data. We further demonstrate the versatility of PlayWorld in enabling fine-grained failure prediction and policy evaluation, with up to 40% improvements over human-collected data. Finally, we demonstrate how PlayWorld enables reinforcement learning in the world model, improving policy performance by 65% in success rates when deployed in the real world.",
+     "published": "2026-03-09",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.09030v3"
+    },
+    {
+     "source": "arxiv",
+     "id": "2606.06061v1",
+     "title": "A Conversational Framework for Human-Robot Collaborative Manipulation with Distributed Generative AI models",
+     "summary": "This paper presents a distributed conversational framework for human-robot collaborative manipulation that integrates local language and vision-language models (VLMs) with a Robot Operating System 2 (ROS 2)-based execution stack. Language understanding, visual grounding, orchestration, and motion execution run as separate ROS 2 nodes, enabling flexible deployment across distributed hardware while maintaining a responsive control loop. From free-form user commands, the system generates structured action requests for pick, place, and handover. It uses a VLM to return image-space targets, which are converted into metric robot-frame goals using depth and calibration. A web dashboard exposes intermediate intent and grounding overlays (pixel, depth, and robot-frame) and requires explicit operator confirmation before any motion is executed. Experiments on a Franka FR3 platform evaluate end-to-end task reliability and latency under increasing working table scene ambiguity and compare alternative LLM/VLM configurations in the same pipeline. Code and full documentation are available at [github.com/cogrob-tuni/franka-llm](https://github.com/cogrob-tuni/franka-llm).",
+     "published": "2026-06-04",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2606.06061v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2602.06643v2",
+     "title": "Humanoid Manipulation Interface: Humanoid Whole-Body Manipulation from Robot-Free Demonstrations",
+     "summary": "Current approaches for humanoid whole-body manipulation, primarily relying on teleoperation or visual sim-to-real reinforcement learning, are hindered by hardware logistics and complex reward engineering. Consequently, demonstrated autonomous skills remain limited and are typically restricted to controlled environments. In this paper, we present the Humanoid Manipulation Interface (HuMI), a portable and efficient framework for learning diverse whole-body manipulation tasks across various environments. HuMI enables robot-free data collection by capturing rich whole-body motion using portable hardware. This data drives a hierarchical learning pipeline that translates human motions into dexterous and feasible humanoid skills. Extensive experiments across five whole-body tasks--including kneeling, squatting, tossing, walking, and bimanual manipulation--demonstrate that HuMI achieves a 3x increase in data collection efficiency compared to teleoperation and attains a 70% success rate in unseen environments.",
+     "published": "2026-02-06",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2602.06643v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2506.00613v3",
+     "title": "WorldGym: World Model as An Environment for Policy Evaluation",
+     "summary": "Evaluating robot control policies is difficult: real-world testing is costly, and handcrafted simulators require manual effort to improve in realism and generality. We propose a world-model-based policy evaluation environment (WorldGym), an autoregressive, action-conditioned video generation model which serves as a proxy to real world environments. Policies are evaluated via Monte Carlo rollouts in the world model, with a vision-language model providing rewards. We evaluate a set of VLA-based real-robot policies in the world model using only initial frames from real robots, and show that policy success rates within the world model highly correlate with real-world success rates. Moreoever, we show that WorldGym is able to preserve relative policy rankings across different policy versions, sizes, and training checkpoints. Due to requiring only a single start frame as input, the world model further enables efficient evaluation of robot policies' generalization ability on novel tasks and environments. We find that modern VLA-based robot policies still struggle to distinguish object shapes and can become distracted by adversarial facades of objects. While generating highly realistic object interaction remains challenging, WorldGym faithfully emulates robot motions and offers a practical starting point for safe and reproducible policy evaluation before deployment.",
+     "published": "2025-05-31",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2506.00613v3"
+    },
+    {
+     "source": "arxiv",
+     "id": "2504.08184v1",
+     "title": "Leveraging Passive Compliance of Soft Robotics for Physical Human-Robot Collaborative Manipulation",
+     "summary": "This work represents an initial benchmark of a large-scale soft robot performing physical, collaborative manipulation of a long, extended object with a human partner. The robot consists of a pneumatically-actuated, three-link continuum soft manipulator mounted to an omni-directional mobile base. The system level configuration of the robot and design of the collaborative manipulation (co-manipulation) study are presented. The initial results, both quantitative and qualitative, are directly compared to previous similar human-human co-manipulation studies. These initial results show promise in the ability for large-scale soft robots to perform comparably to human partners acting as non-visual followers in a co-manipulation task. Furthermore, these results challenge traditional soft robot strength limitations and indicate potential for applications requiring strength and adaptability.",
+     "published": "2025-04-11",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2504.08184v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2509.19958v1",
+     "title": "Generalist Robot Manipulation beyond Action Labeled Data",
+     "summary": "Recent advances in generalist robot manipulation leverage pre-trained Vision-Language Models (VLMs) and large-scale robot demonstrations to tackle diverse tasks in a zero-shot manner. A key challenge remains: scaling high-quality, action-labeled robot demonstration data, which existing methods rely on for robustness and generalization. To address this, we propose a method that benefits from videos without action labels - featuring humans and/or robots in action - enhancing open-vocabulary performance and enabling data-efficient learning of new tasks. Our method extracts dense, dynamic 3D point clouds at the hand or gripper location and uses a proposed 3D dynamics predictor for self-supervision. This predictor is then tuned to an action predictor using a smaller labeled dataset for action alignment. We show that our method not only learns from unlabeled human and robot demonstrations - improving downstream generalist robot policies - but also enables robots to learn new tasks without action labels (i.e., out-of-action generalization) in both real-world and simulated settings.",
+     "published": "2025-09-24",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2509.19958v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2507.11460v1",
+     "title": "Human-Robot collaboration in surgery: Advances and challenges towards autonomous surgical assistants",
+     "summary": "Human-robot collaboration in surgery represents a significant area of research, driven by the increasing capability of autonomous robotic systems to assist surgeons in complex procedures. This systematic review examines the advancements and persistent challenges in the development of autonomous surgical robotic assistants (ASARs), focusing specifically on scenarios where robots provide meaningful and active support to human surgeons. Adhering to the PRISMA guidelines, a comprehensive literature search was conducted across the IEEE Xplore, Scopus, and Web of Science databases, resulting in the selection of 32 studies for detailed analysis. Two primary collaborative setups were identified: teleoperation-based assistance and direct hands-on interaction. The findings reveal a growing research emphasis on ASARs, with predominant applications currently in endoscope guidance, alongside emerging progress in autonomous tool manipulation. Several key challenges hinder wider adoption, including the alignment of robotic actions with human surgeon preferences, the necessity for procedural awareness within autonomous systems, the establishment of seamless human-robot information exchange, and the complexities of skill acquisition in shared workspaces. This review synthesizes current trends, identifies critical limitations, and outlines future research directions essential to improve the reliability, safety, and effectiveness of human-robot collaboration in surgical environments.",
+     "published": "2025-07-15",
+     "venue": "2025 IEEE International Conference on Robot and Human Interactive Communication (ROMAN)",
+     "url": "https://arxiv.org/abs/2507.11460v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2409.18121v1",
+     "title": "Robot See Robot Do: Imitating Articulated Object Manipulation with Monocular 4D Reconstruction",
+     "summary": "Humans can learn to manipulate new objects by simply watching others; providing robots with the ability to learn from such demonstrations would enable a natural interface specifying new behaviors. This work develops Robot See Robot Do (RSRD), a method for imitating articulated object manipulation from a single monocular RGB human demonstration given a single static multi-view object scan. We first propose 4D Differentiable Part Models (4D-DPM), a method for recovering 3D part motion from a monocular video with differentiable rendering. This analysis-by-synthesis approach uses part-centric feature fields in an iterative optimization which enables the use of geometric regularizers to recover 3D motions from only a single video. Given this 4D reconstruction, the robot replicates object trajectories by planning bimanual arm motions that induce the demonstrated object part motion. By representing demonstrations as part-centric trajectories, RSRD focuses on replicating the demonstration's intended behavior while considering the robot's own morphological limits, rather than attempting to reproduce the hand's motion. We evaluate 4D-DPM's 3D tracking accuracy on ground truth annotated 3D part trajectories and RSRD's physical execution performance on 9 objects across 10 trials each on a bimanual YuMi robot. Each phase of RSRD achieves an average of 87% success rate, for a total end-to-end success rate of 60% across 90 trials. Notably, this is accomplished using only feature fields distilled from large pretrained vision models -- without any task-specific training, fine-tuning, dataset collection, or annotation. Project page: https://robot-see-robot-do.github.io",
+     "published": "2024-09-26",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2409.18121v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2312.07214v3",
+     "title": "Exploring Large Language Models to Facilitate Variable Autonomy for Human-Robot Teaming",
+     "summary": "In a rapidly evolving digital landscape autonomous tools and robots are becoming commonplace. Recognizing the significance of this development, this paper explores the integration of Large Language Models (LLMs) like Generative pre-trained transformer (GPT) into human-robot teaming environments to facilitate variable autonomy through the means of verbal human-robot communication. In this paper, we introduce a novel framework for such a GPT-powered multi-robot testbed environment, based on a Unity Virtual Reality (VR) setting. This system allows users to interact with robot agents through natural language, each powered by individual GPT cores. By means of OpenAI's function calling, we bridge the gap between unstructured natural language input and structure robot actions. A user study with 12 participants explores the effectiveness of GPT-4 and, more importantly, user strategies when being given the opportunity to converse in natural language within a multi-robot environment. Our findings suggest that users may have preconceived expectations on how to converse with robots and seldom try to explore the actual language and cognitive capabilities of their robot collaborators. Still, those users who did explore where able to benefit from a much more natural flow of communication and human-like back-and-forth. We provide a set of lessons learned for future research and technical implementations of similar systems.",
+     "published": "2023-12-12",
+     "venue": "Front. Robot. AI 11:1347538 2024",
+     "url": "https://arxiv.org/abs/2312.07214v3"
+    },
+    {
+     "source": "arxiv",
+     "id": "2307.02427v2",
+     "title": "FOCUS: Object-Centric World Models for Robotics Manipulation",
+     "summary": "Understanding the world in terms of objects and the possible interplays with them is an important cognition ability, especially in robotics manipulation, where many tasks require robot-object interactions. However, learning such a structured world model, which specifically captures entities and relationships, remains a challenging and underexplored problem. To address this, we propose FOCUS, a model-based agent that learns an object-centric world model. Thanks to a novel exploration bonus that stems from the object-centric representation, FOCUS can be deployed on robotics manipulation tasks to explore object interactions more easily. Evaluating our approach on manipulation tasks across different settings, we show that object-centric world models allow the agent to solve tasks more efficiently and enable consistent exploration of robot-object interactions. Using a Franka Emika robot arm, we also showcase how FOCUS could be adopted in real-world settings.",
+     "published": "2023-07-05",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2307.02427v2"
+    }
+   ]
+  },
+  {
+   "id": "q5",
+   "query": "\"Physical Hallucination\"",
+   "sources": {
+    "arxiv": {
+     "returned": 15,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 15
+   },
+   "hits": [
+    {
+     "source": "arxiv",
+     "id": "2603.17499v8",
+     "title": "A Tutorial on Learning-Based Radio Map Construction: Data, Paradigms, and Physics-Awareness",
+     "summary": "Radio maps (RMs) provide the digital representation of the wireless propagation environment, mapping complex geographical and topological boundary conditions to critical spatial-spectral metrics that range from received signal strength to full channel state information matrices. The integration of artificial intelligence into next generation wireless networks further necessitates the accurate construction of RMs as a foundational prerequisite for electromagnetic digital twins. This paper presents a comprehensive survey of learning-based RM construction, systematically addressing three intertwined dimensions: data, paradigms, and physics-awareness. From the data perspective, we review physical measurement campaigns, ray tracing simulation engines, and publicly available benchmark datasets, identifying their respective strengths and fundamental limitations. From the paradigm perspective, we establish a core taxonomy that categorizes RM construction into source-aware forward prediction and \\added{source-agnostic} inverse reconstruction, and examine five principal neural architecture families spanning convolutional neural networks, vision transformers, graph neural networks, generative adversarial networks, and diffusion models. We further survey optics-inspired methods adapted from neural radiance fields and 3D Gaussian splatting for continuous wireless radiation field modeling. From the physics-awareness perspective, we introduce a three-level integration framework encompassing data-level feature engineering, loss-level partial differential equation regularization, and \\added{architecture-level} structural isomorphism. Open challenges including foundation model development, physical hallucination detection, and amortized inference for real-time deployment are discussed to outline future research directions.",
+     "published": "2026-03-18",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.17499v8"
+    },
+    {
+     "source": "arxiv",
+     "id": "2610.26069v2",
+     "title": "Risk Decomposition for Hallucination-Aware Video Sampling",
+     "summary": "Despite achieving high visual fidelity, video models still suffer from physical hallucinations, limiting their reliability as world simulators. Existing methods leverage model-internal or external signals to improve physical plausibility, but their roles and limitations require a unified explanation. We propose a two-dimensional physical-hallucination risk framework that defines low-density sampling risk and high-density drifting risk. The first risk captures generations assigned low likelihood by the video model, for example, a ball suddenly teleporting despite the model favoring continuous motion, while the second risk captures physical inconsistencies in high-likelihood generations, for example, a ball bouncing progressively higher without additional energy. Our analysis explains how model-internal signals steer sampling toward higher-density regions of the learned distribution to address low-density sampling risk. However, higher model likelihood does not guarantee physical plausibility, motivating external guidance to address high-density drifting risk. Based on this framework, we develop Hallucination-Aware Sampler (HA-Sampler), which applies external physical guidance within latent refinement to generate physically plausible videos, and HA-Scorer, which derives a likelihood-based signal from the generator itself for evaluating generated videos using continuous normalizing flow (CNF), with coarse ODE integration and finite-difference divergence estimates. Experiments on Physics-IQ and VideoPhy benchmarks support our theoretical analysis and demonstrate that our methods outperform the compared sampling and scoring SOTA baselines.",
+     "published": "2026-10-19",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2610.26069v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.26759v1",
+     "title": "Physics-Aware Diffusion for LiDAR Point Cloud Densification",
+     "summary": "LiDAR perception is severely limited by the distance-dependent sparsity of distant objects. While diffusion models can recover dense geometry, they suffer from prohibitive latency and physical hallucinations manifesting as ghost points. We propose Scanline-Consistent Range-Aware Diffusion, a framework that treats densification as probabilistic refinement rather than generation. By leveraging Partial Diffusion (SDEdit) on a coarse prior, we achieve high-fidelity results in just 156ms. Our novel Ray-Consistency loss and Negative Ray Augmentation enforce sensor physics to suppress artifacts. Our method achieves state-of-the-art results on KITTI-360 and nuScenes, directly boosting off-the-shelf 3D detectors without retraining. Code will be made available.",
+     "published": "2026-03-23",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.26759v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.09756v1",
+     "title": "Epistemic Closure: Autonomous Mechanism Completion for Physically Consistent Simulation",
+     "summary": "The integration of Large Language Models (LLMs) into scientific discovery is currently hindered by the Implicit Context problem, where governing equations extracted from literature contain invisible thermodynamic assumptions (e.g., undrained conditions) that standard generative models fail to recognize. This leads to Physical Hallucination: the generation of syntactically correct solvers that faithfully execute physically invalid laws. Here, we introduce a Neuro-Symbolic Generative Agent that functions as a cognitive supervisor atop traditional numerical engines. By encapsulating physical laws into modular Constitutive Skills and leveraging latent intrinsic priors, the Agent employs a Chain-of-Thought reasoning workflow to autonomously validate, prune, and complete physical mechanisms. We demonstrate this capability on the challenge of thermal pressurization in low-permeability sandstone. While a standard literature-retrieval baseline erroneously predicts catastrophic material failure by blindly adopting a rigid \"undrained\" simplification, our Agent autonomously identifies the system as operating in a drained regime (Deborah number De << 1) via dimensionless scaling analysis. Consequently, it inductively completes the missing dissipation mechanism (Darcy flow) required to satisfy boundary constraints, predicting a stable stress path consistent with experimental reality. This work establishes a paradigm where AI agents transcend the role of coding assistants to act as epistemic partners, capable of reasoning about and correcting the theoretical assumptions embedded in scientific data.",
+     "published": "2026-03-10",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.09756v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.27195v2",
+     "title": "AutoMS: Multi-Agent Evolutionary Search for Cross-Physics Inverse Microstructure Design",
+     "summary": "Designing microstructures with coupled cross-physics objectives is a fundamental challenge where traditional topology optimization is often computationally prohibitive and deep generative models frequently suffer from physical hallucinations. We introduce AutoMS, a multi-agent neuro-symbolic framework that reformulates inverse design as an LLM-driven evolutionary search. AutoMS leverages LLMs as semantic navigators to decompose complex requirements and coordinate agent workflows, while a novel Simulation-Aware Evolutionary Search (SAES) mechanism handles low-level numerical optimization via local gradient approximation and directed parameter updates. This architecture achieves a state-of-the-art 83.8% success rate on 17 diverse cross-physics tasks, significantly outperforming both traditional evolutionary algorithms and existing agentic baselines. By decoupling open-ended semantic orchestration from simulation-grounded numerical search, AutoMS provides a robust pathway for navigating complex physical landscapes that remain intractable for standard generative or purely linguistic approaches.",
+     "published": "2026-03-28",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.27195v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2601.13247v2",
+     "title": "Aligning Agentic World Models via Knowledgeable Experience Learning",
+     "summary": "Current Large Language Models (LLMs) exhibit a critical modal disconnect: they possess vast semantic knowledge but lack the procedural grounding to respect the immutable laws of the physical world. Consequently, while these agents implicitly function as world models, their simulations often suffer from physical hallucinations-generating plans that are logically sound but physically unexecutable. Existing alignment strategies predominantly rely on resource-intensive training or fine-tuning, which attempt to compress dynamic environmental rules into static model parameters. However, such parametric encapsulation is inherently rigid, struggling to adapt to the open-ended variability of physical dynamics without continuous, costly retraining. To bridge this gap, we introduce WorldMind, a framework that autonomously constructs a symbolic World Knowledge Repository by synthesizing environmental feedback. Specifically, it unifies Process Experience to enforce physical feasibility via prediction errors and Goal Experience to guide task optimality through successful trajectories. Experiments on EB-ALFRED and EB-Habitat demonstrate that WorldMind achieves superior performance compared to baselines with remarkable cross-model and cross-environment transferability.",
+     "published": "2026-01-19",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2601.13247v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.12639v2",
+     "title": "RoboStereo: Dual-Tower 4D Embodied World Models for Unified Policy Optimization",
+     "summary": "Scalable Embodied AI faces fundamental constraints due to prohibitive costs and safety risks of real-world interaction. While Embodied World Models (EWMs) offer promise through imagined rollouts, existing approaches suffer from geometric hallucinations and lack unified optimization frameworks for practical policy improvement. We introduce RoboStereo, a symmetric dual-tower 4D world model that employs bidirectional cross-modal enhancement to ensure spatiotemporal geometric consistency and alleviate physics hallucinations. Building upon this high-fidelity 4D simulator, we present the first unified framework for world-model-based policy optimization: (1) Test-Time Policy Augmentation (TTPA) for pre-execution verification, (2) Imitative-Evolutionary Policy Learning (IEPL) leveraging visual perceptual rewards to learn from expert demonstrations, and (3) Open-Exploration Policy Learning (OEPL) enabling autonomous skill discovery and self-correction. Comprehensive experiments demonstrate RoboStereo achieves state-of-the-art generation quality, with our unified framework delivering >97% average relative improvement on fine-grained manipulation tasks.",
+     "published": "2026-03-13",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.12639v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2608.07905v1",
+     "title": "GraphThink: Graph-Enhanced LLM Thinking for Long-Horizon Embodied Task Planning",
+     "summary": "Embodied agents using LLM-based planners often struggle with physical hallucinations, poor generalization to long-horizon tasks, and lack of environmental awareness. We propose GraphThink, a novel framework that integrates a task graph to provide structured knowledge for robust planning and a scene graph to maintain environmental memory for event-driven replanning. Specifically, the task graph guides LLM thinking through contextual prompting and iterative refinement, effectively mitigating planning hallucinations. Furthermore, within the GRPO framework, the task graph offers delicate reward design to train the LLM planner, enhancing long-horizon planning capabilities and improving generalization. Finally, an event-driven replanning module, powered by the scene graph, enables closed-loop environment awareness and error correction. GraphThink achieves state-of-the-art performance on the ALFRED benchmark. In particular, our high-level planner surpasses leading API-based LLMs on both the validation set and held-out long-horizon tasks, underscoring its robust zero-shot and few-shot capabilities. Additional evaluations further demonstrate strong out-of-distribution generalization to novel tasks and environments.",
+     "published": "2026-08-08",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2608.07905v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2609.33104v1",
+     "title": "VPTwin: Real-Sim-Real Video Prediction for Robotic Manipulation Planning",
+     "summary": "While action-conditioned video prediction provides an intuitive world model for robotics, purely data-driven predictors often suffer from compounding errors and physically implausible hallucinations in long-horizon rollouts, severely undermining downstream action planning. We propose VPTwin, a Real-Sim-Real video prediction framework that anchors real-world future prediction using real-synchronized simulation twins. For a target manipulation task, a VLM reconstructs an executable digital twin from a real demonstration episode. To accommodate the ill-posed estimation of unobserved physical properties, Isaac Sim simulates multiple forward dynamic rollouts across randomized physical configurations under candidate action trajectories. Using these rollouts as in-context references, VPTwin harmonizes both domains, using simulation dynamics to enforce physical plausibility while capturing unmodeled contact interactions from real video. Furthermore, we establish a predictive planning loop using VPTwin to visually verify VLM-proposed actions and guide reliable real-world execution. Evaluations show substantial reductions in physical hallucinations during video prediction and marked improvements in manipulation planning performance.",
+     "published": "2026-09-27",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2609.33104v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2607.05787v1",
+     "title": "DeSeG: Decoupling Semantic Intent and Geometric Constraints for Physically Plausible Human-Scene Interaction",
+     "summary": "Synthesizing physically plausible human-scene interactions (HSI) remains a critical challenge in computer vision and the development of human avatars. Although recent generative models enable diverse motion synthesis, they suffer from an inductive bias referred to as semantic-geometric entanglement. Because spatial constraints often strongly correlate with specific actions in training data, monolithic models will learn the shortcut bias, aggressively overriding the semantic intent when faced with strict geometric cues. Furthermore, this entanglement exacerbates physical hallucinations, such as body-scene penetrations. To address these limitations, we propose DeSeG, a hierarchical framework that explicitly decouples semantic intent from geometric constraints. First, we introduce a Residual Semantic Planner that encodes textual instructions and canonicalized goal voxels into a compact latent space, enabling fine-grained semantic control independent of spatial trajectories. Second, we propose a physics regularized diffusion executor that incorporates differentiable repulsive potential fields directly into the diffusion objective, enforcing collision-aware motion generation. Extensive experiments on the Lingo dataset demonstrate that DeSeG achieves state-of-the-art performance, reducing mean scene penetration by 47% and improving semantic alignment by 29% over the SOTA baselines.",
+     "published": "2026-07-07",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2607.05787v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2602.11757v1",
+     "title": "Code2Worlds: Empowering Coding LLMs for 4D World Generation",
+     "summary": "Achieving spatial intelligence requires moving beyond visual plausibility to build world simulators grounded in physical laws. While coding LLMs have advanced static 3D scene generation, extending this paradigm to 4D dynamics remains a critical frontier. This task presents two fundamental challenges: multi-scale context entanglement, where monolithic generation fails to balance local object structures with global environmental layouts; and a semantic-physical execution gap, where open-loop code generation leads to physical hallucinations lacking dynamic fidelity. We introduce Code2Worlds, a framework that formulates 4D generation as language-to-simulation code generation. First, we propose a dual-stream architecture that disentangles retrieval-augmented object generation from hierarchical environmental orchestration. Second, to ensure dynamic fidelity, we establish a physics-aware closed-loop mechanism in which a PostProcess Agent scripts dynamics, coupled with a VLM-Motion Critic that performs self-reflection to iteratively refine simulation code. Evaluations on the Code4D benchmark show Code2Worlds outperforms baselines with a 41% SGS gain and 49% higher Richness, while uniquely generating physics-aware dynamics absent in prior static methods. Code: https://github.com/AIGeeksGroup/Code2Worlds. Website: https://aigeeksgroup.github.io/Code2Worlds.",
+     "published": "2026-02-12",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2602.11757v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.15797v2",
+     "title": "OMNIFLOW: A Physics-Grounded Multimodal Agent for Generalized Scientific Reasoning",
+     "summary": "Large Language Models (LLMs) have demonstrated exceptional logical reasoning capabilities but frequently struggle with the continuous spatiotemporal dynamics governed by Partial Differential Equations (PDEs), often resulting in non-physical hallucinations. Existing approaches typically resort to costly, domain-specific fine-tuning, which severely limits cross-domain generalization and interpretability. To bridge this gap, we propose OMNIFLOW, a neuro-symbolic architecture designed to ground frozen multimodal LLMs in fundamental physical laws without requiring domain-specific parameter updates. OMNIFLOW introduces a novel \\textit{Semantic-Symbolic Alignment} mechanism that projects high-dimensional flow tensors into topological linguistic descriptors, enabling the model to perceive physical structures rather than raw pixel values. Furthermore, we construct a Physics-Guided Chain-of-Thought (PG-CoT) workflow that orchestrates reasoning through dynamic constraint injection (e.g., mass conservation) and iterative reflexive verification. We evaluate OMNIFLOW on a comprehensive benchmark spanning microscopic turbulence, theoretical Navier-Stokes equations, and macroscopic global weather forecasting. Empirical results demonstrate that OMNIFLOW significantly outperforms traditional deep learning baselines in zero-shot generalization and few-shot adaptation tasks. Crucially, it offers transparent, physically consistent reasoning reports, marking a paradigm shift from black-box fitting to interpretable scientific reasoning.",
+     "published": "2026-03-16",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.15797v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2605.13775v2",
+     "title": "RoboEvolve: Co-Evolving Planner-Simulator for Robotic Manipulation with Limited Data",
+     "summary": "The scalability of robotic manipulation is fundamentally bottlenecked by the scarcity of task-aligned physical interaction data. While vision-language models (VLMs) and video generation models (VGMs) hold promise for autonomous data synthesis, they suffer from semantic-spatial misalignment and physical hallucinations, respectively. To bridge this gap, we introduce RoboEvolve, a novel framework that couples a VLM planner and a VGM simulator into a mutually reinforcing co-evolutionary loop. Bootstrapped for self-evolution with unlabeled seed images, RoboEvolve leverages a cognitive-inspired dual-phase mechanism: (i) daytime exploration fosters physically grounded behavioral discovery through a semantic-controlled multi-granular reward, and (ii) nighttime consolidation mines \"near-miss\" failures to stabilize policy optimization. Guided by an autonomous progressive curriculum, the system naturally scales from simple atomic actions to complex tasks. Extensive experiments demonstrate that RoboEvolve (I) achieves superior effectiveness, elevating base planners by 30 absolute points and amplifying simulator success by 48% on average; (II) exhibits extreme data efficiency, surpassing fully supervised baselines with merely 500 unlabeled seeds--a 50X reduction in initial RL data; (III) demonstrates robust continual learning without catastrophic forgetting; and (IV) extends to low-level control, improving cold-started LingBot-VA from 78.7% to 98.7% average task success on LIBERO using environment feedback. Together, these results demonstrate the applicability of our co-evolutionary framework to both internally supervised generative learning and environment-grounded action learning.",
+     "published": "2026-05-13",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2605.13775v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.23983v2",
+     "title": "SafeFlow: Real-Time Text-Driven Humanoid Whole-Body Control via Physics-Guided Rectified Flow and Selective Safety Gating",
+     "summary": "Recent advances in real-time interactive text-driven motion generation have enabled humanoids to perform diverse behaviors. However, kinematics-only generators often exhibit physical hallucinations, producing motion trajectories that are physically infeasible to track with a downstream motion tracking controller or unsafe for real-world deployment. These failures often arise from the lack of explicit physics-aware objectives for real-robot execution and become more severe under out-of-distribution (OOD) user inputs. Hence, we propose SafeFlow, a text-driven humanoid whole-body control framework that combines physics-guided motion generation with a 3-Stage Safety Gate driven by explicit risk indicators. SafeFlow adopts a two-level architecture. At the high level, we generate motion trajectories using Physics-Guided Rectified Flow Matching in a VAE latent space to improve real-robot executability, and further accelerate sampling via Reflow to reduce the number of function evaluations (NFE) for real-time control. The 3-Stage Safety Gate enables selective execution by detecting semantic OOD prompts using a Mahalanobis score in text-embedding space, filtering unstable generations via a directional sensitivity discrepancy metric, and enforcing final hard kinematic constraints such as joint and velocity limits before passing the generated trajectory to a low-level motion tracking controller. Extensive experiments on the Unitree G1 demonstrate that SafeFlow outperforms diffusion- and retargeting-based baselines in success rate, physical compliance, and inference speed while preserving motion diversity, with consistent gains across three downstream tracking controllers.",
+     "published": "2026-03-25",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.23983v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2509.22642v2",
+     "title": "WoW: Towards a World omniscient World model Through Embodied Interaction",
+     "summary": "Humans develop an understanding of intuitive physics through active interaction with the world. This approach is in stark contrast to current video models, such as Sora, which rely on passive observation and therefore struggle with grasping physical causality. This observation leads to our central hypothesis: authentic physical intuition of the world model must be grounded in extensive, causally rich interactions with the real world. To test this hypothesis, we present WoW, a 14-billion-parameter generative world model trained on 2 million robot interaction trajectories. Our findings reveal that the model's understanding of physics is a probabilistic distribution of plausible outcomes, leading to stochastic instabilities and physical hallucinations. Furthermore, we demonstrate that this emergent capability can be actively constrained toward physical realism by SOPHIA, where vision-language model agents evaluate the DiT-generated output and guide its refinement by iteratively evolving the language instructions. In addition, a co-trained Inverse Dynamics Model translates these refined plans into executable robotic actions, thus closing the imagination-to-action loop. We establish WoWBench, a new benchmark focused on physical consistency and causal reasoning in video, where WoW achieves state-of-the-art performance in both human and autonomous evaluation, demonstrating strong ability in physical causality, collision dynamics, and object permanence. Our work provides systematic evidence that large-scale, real-world interaction is a cornerstone for developing physical intuition in AI. Models, data, and benchmarks will be open-sourced.",
+     "published": "2025-09-26",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2509.22642v2"
+    }
+   ]
+  },
+  {
+   "id": "q6",
+   "query": "\"Metabolic Solidification\"",
+   "sources": {
+    "arxiv": {
+     "returned": 0,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 0
+   },
+   "hits": []
+  },
+  {
+   "id": "q7",
+   "query": "\"safety filter\" vision-language-action",
+   "sources": {
+    "arxiv": {
+     "returned": 20,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 20
+   },
+   "hits": [
+    {
+     "source": "arxiv",
+     "id": "2608.17095v1",
+     "title": "Inference-Time Attention Steering for Vision-Language-Action Driving Models",
+     "summary": "Vision-language-action (VLA) driving models couple a reasoning stage with a diffusion-based trajectory decoder, but do not give a direct way to redirect attention toward safety-critical actors at inference time without retraining. We studied a bounded additive pre-softmax attention bias on the visual tokens of detector localized traffic actors on Alpamayo-R1's Qwen3-VL backbone. It is applied as a fail open forward pre-hook with no weight changes. On 50 lane-change scenarios from the Physical AI World Model Synthetic dataset. The trajectory decoder shows a monotonic dose response in the bias magnitude, separate from a paired zero bias control at every tested magnitude. It reaches $\\approx 17$\\,cm mean displacement with lateral shifts up to $\\sim 140$\\ cm at the clamp. A layer ablation places the action-relevant signal in late layers, where the effect increases with the number of hooked layers (2.0cm for the first 8 layers; 67.6cm for all 36). A per call injection audit explains why the Chain-of-Causation text never changes. The mask based bias never reaches the reasoning pathway in this serving stack, so the invariance is verified exposure, not robustness. Steered trajectories tend to shift toward the attended actor, suggesting the bias governs where the model looks rather than encoding a target behavior.",
+     "published": "2026-08-17",
+     "venue": "European Conference on Computer Vision 2026",
+     "url": "https://arxiv.org/abs/2608.17095v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.13782v1",
+     "title": "Your Vision-Language-Action Model Already Has Attention Heads For Path Deviation Detection",
+     "summary": "Vision-Language-Action (VLA) models have demonstrated strong potential for predicting semantic actions in navigation tasks, demonstrating the ability to reason over complex linguistic instructions and visual contexts. However, they are fundamentally hindered by visual-reasoning hallucinations that lead to trajectory deviations. Addressing this issue has conventionally required training external critic modules or relying on complex uncertainty heuristics. In this work, we discover that monitoring a few attention heads within a frozen VLA model can accurately detect path deviations without incurring additional computational overhead. We refer to these heads, which inherently capture the spatiotemporal causality between historical visual sequences and linguistic instructions, as Navigation Heads. Using these heads, we propose an intuitive, training-free anomaly-detection framework that monitors their signals to detect hallucinations in real time. Surprisingly, among over a thousand attention heads, a combination of just three is sufficient to achieve a 44.6 % deviation detection rate with a low false-positive rate of 11.7 %. Furthermore, upon detecting a deviation, we bypass the heavy VLA model and trigger a lightweight Reinforcement Learning (RL) policy to safely execute a shortest-path rollback. By integrating this entire detection-to-recovery pipeline onto a physical robot, we demonstrate its practical robustness. All source code will be publicly available.",
+     "published": "2026-03-14",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.13782v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2607.10797v1",
+     "title": "Compositional Context Fine-Tuning Vision-Language Model for Complex Assembly Action Understanding from Videos",
+     "summary": "Assembly action understanding is a key enabler for effective human-robot collaborative assembly, yet it remains challenging due to subtle motions and fine-grained hand-object interactions. We adapt vision-language models (VLMs) to this challenging domain with Compositional Context Fine-Tuning (CCFT), a method that decomposes assembly actions into semantic elements (Verb, Object, Tool) and fine-tunes VLMs to recognize each action element using templated question-answering pairs. This approach ensures near-deterministic outputs. To enable efficient and effective multi-task learning under limited data, a Layer-Partitioned Alternating Training (LP-AT) method is presented, which assigns distinct model layers to recognize specific action elements through element-specific low-rank adapters. LP-AT alternates weight updates across element-specific adapters, reducing cross-task interference while enabling per-adapter hyperparameter optimization. Furthermore, we create HA-ViD-VQA and IKEA-ASM-VQA datasets from existing assembly video datasets. Extensive experiments on these datasets demonstrate that our method consistently outperforms strong action recognition baselines while providing interpretable element-level predictions that can support diverse downstream applications.",
+     "published": "2026-07-12",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2607.10797v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2608.14047v3",
+     "title": "Evolve Vision-Language-Action Model into an Agent with On-the-fly Tool-use",
+     "summary": "This paper integrates end-to-end Visual-Language-Action (VLA) models with agentic tool-use to propose Agentic Robot with Tool-use (ART). ART is a tool-injection framework that tunes any VLA model to leverage off-the-shelf tool modules for low-level vision, high-level affordance, and embodiment enhancement. Compared to vanilla VLA models with a whole continuous action solution space, ART reduces the complexity of the action solution space through tool-use, which not only improves generalizability across different tasks but also reduces data dependency. To demonstrate the advantages (high generalizability and low data dependency) of this framework, we first built a dataset of 30K tool-use trajectories and action demonstrations, which is much smaller than those used by baseline methods. We then designed a training regimen for long-trajectory tool-use reasoning in challenging environments. Experiments show that ART achieves a 20% higher success rate than mainstream baselines on simulation and real-world tasks, such as pick-and-place in the dark at novel viewpoints. Empirical results highlight the benefits of an agent-based approach: modular tool utilization enables more efficient training, lightweight deployment, and scalable integration of new tools. This design fosters robustness, adaptability, and extensibility, paving the way for the practical deployment of VLA systems in complex real-world scenarios.",
+     "published": "2026-08-14",
+     "venue": "Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Findings (CVPRF), 2026, pp. 1346-1357",
+     "url": "https://arxiv.org/abs/2608.14047v3"
+    },
+    {
+     "source": "arxiv",
+     "id": "2609.40007v1",
+     "title": "Multi-Link Safety Filtering for VLA Policies Around Moving Hazards",
+     "summary": "A vision-language-action (VLA) policy can finish a manipulation task while knocking over objects unrelated to it, so task success alone does not show that the policy is safe to deploy in clutter. We study how to keep a pretrained VLA policy clear of such hazards at run time without retraining it, which requires guarding more of the arm than the end effector, following the hazard as it moves, and sharing onboard compute with the policy. Our training-free shield covers the gripper, wrist, and forearm with five ellipsoids and filters every commanded motion through one barrier program against a keep-out ellipsoid fitted from RGB-D perception at reset. Sparse optical flow then carries that ellipsoid's center along with the hazard, with no repeated detection or refitting. Over six simulated hazard-motion conditions, the shield lowers collision from $65.62\\%$ to $27.27\\%$ and raises safe-success, task completion without collision, from $29.35\\%$ to $50.43\\%$. Ablations show that guarding the arm links protects beyond end-effector shielding, and that tracking recovers most of the protection lost when the hazard estimate is frozen at reset. On heterogeneous edge hardware, the five-ellipsoid barrier runs on the CPU in $2.2$~ms at the 99th percentile, and trimming the vision--language prefix and taking fewer flow-matching steps shortens each $π_{0.5}$ policy call on the integrated GPU from $343$ to $177.3$~ms. On a physical SO-101 arm across four tasks, the arm touched the hazard in 3 of 16 shielded episodes versus 11 of 16 unshielded ones. Project page: https://yathag.github.io/multilink-safety-filter/",
+     "published": "2026-09-30",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2609.40007v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2601.11404v2",
+     "title": "ACoT-VLA: Action Chain-of-Thought for Vision-Language-Action Models",
+     "summary": "Vision-Language-Action models have emerged as essential generalist robot policies for diverse manipulation tasks, conventionally relying on directly translating multimodal inputs into actions via Vision-Language Model embeddings. Recent advancements have introduced explicit intermediary reasoning-such as sub-task prediction (language) or goal image synthesis (vision)-to guide action generation. However, these intermediate reasoning are often indirect and inherently limited in their capacity to convey the full, granular information required for precise action execution. Instead, we posit that the most effective form of reasoning is one that deliberates directly in the action space. We introduce Action Chain-of-Thought (ACoT), a paradigm where the reasoning process itself is formulated as a structured sequence of coarse action intents that guide the final policy. In this paper, we propose ACoT-VLA, a novel architecture that materializes the ACoT paradigm. Specifically, we introduce two complementary components: an Explicit Action Reasoner (EAR) and Implicit Action Reasoner (IAR). The former proposes coarse reference trajectories as explicit action-level reasoning steps, while the latter extracts latent action priors from internal representations of multimodal input, co-forming an ACoT that conditions the downstream action head to enable grounded policy learning. Extensive experiments in real-world and simulation environments demonstrate the superiority of our proposed method. Code is available at: https://github.com/AgibotTech/ACoT-VLA.",
+     "published": "2026-01-16",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2601.11404v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2606.09749v1",
+     "title": "Your Model Already Knows: Attention-Guided Safety Filter for Vision-Language-Action Models",
+     "summary": "Vision-Language-Action (VLA) models have demonstrated impressive end-to-end performance across a variety of robotic manipulation tasks. However, these policies offer no guarantees against collisions with task-irrelevant objects in the scene. Existing safety filters sidestep this problem by querying a vision-language model (VLM) to identify obstacles and their locations. This, however, is too slow to run in the control loop and can only be invoked at episode initialization, leaving the filter unable to track moving obstacles. We discover that a small number of attention heads within a VLA model reliably localize the object the policy intends to approach. These heads can be exploited within a training-free safety framework that obtains the active target from the attention heads at every step, treats the remainder of the scene as obstacles, and feeds these into a Control Barrier Function (CBF) filter. Together with a lightweight real-time object tracker, this allows for collision avoidance for non-static obstacles. We evaluate our framework on SafeLIBERO, which we extend with moving obstacles. On the original static benchmark, our method performs comparably to an oracle that uses privileged simulator state to identify the target, emulating a VLM-based identification step run once at episode initialization. On the dynamic variant, where the oracle's init-time target assignment becomes stale, our method substantially outperforms it by 43%, on average. Our findings suggest that the perceptual signals needed for real-time safety filtering are already present within VLA policies and can be exploited without additional training or heavy auxiliary models.",
+     "published": "2026-06-08",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2606.09749v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.14604v2",
+     "title": "Tactile Modality Fusion for Vision-Language-Action Models",
+     "summary": "We propose TacFiLM, a lightweight modality-fusion approach that integrates visual-tactile signals into vision-language-action (VLA) models. While advances in VLAs have introduced robot policies that are both generalizable and semantically grounded, these models mainly rely on vision-based perception. Vision alone, however, cannot capture the complex interaction dynamics that occur during contact-rich manipulation, including contact forces, surface friction, compliance, and shear. While recent attempts to integrate tactile signals into VLA models often increase complexity through token concatenation or large-scale pretraining, the heavy computational demands of behaviour models necessitate lightweight fusion strategies. To address these challenges, TacFiLM outlines a post-training finetuning approach that conditions intermediate visual features on pretrained tactile representations using feature-wise linear modulation (FiLM). Experimental results on insertion and drawer opening tasks demonstrate consistent improvements in success rate, direct task performance, completion time, and force stability across both in-distribution and out-of-distribution tasks. Together, these results support our method as an effective approach to integrating tactile signals into VLA models, improving contact-rich manipulation behaviours. Project page: https://charliem7.github.io/projects/TacFilm/",
+     "published": "2026-03-15",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.14604v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2610.15666v1",
+     "title": "A Persian Vision-Language-Action Dataset and Benchmark for Ambiguity- and Infeasibility-Aware Instruction-to-Plan Grounding",
+     "summary": "Converting natural-language instructions into executable action plans conditioned on a scene image is a core capability for embodied human-robot interaction, but existing benchmarks target English, simulated or video-grounded environments, and largely assume instructions are clear and executable. We introduce the first Persian vision-language-action dataset for this task: 258 instances over 230 real household/office photographs, annotated with reference plans, deliberate ambiguity and infeasibility labels, disambiguating question-answer pairs, and an auto-generated chain-of-thought rationale for training. Using this resource, we ablate retrieval-augmentation, chain-of-thought prompting, and an agentic disambiguation step, evaluated with an LLM-as-judge protocol and a new metric, PGOS-FA, extending prior work (PG2S) with step-order sensitivity, an over-generation penalty, and Persian-adapted embeddings. Paired statistical testing across 36 comparisons shows retrieval-augmentation is a large, robustly significant effect, while finer-grained additions are directionally consistent but not statistically distinguishable from noise at this scale, and the LLM-judge metric has near-zero power where PGOS-FA succeeds. A blind human-correlation study on 79 real outputs shows PGOS-FA tracks human judgment at least as closely as the LLM-judge. Testing generalization beyond the ablation's single backbone, we find that most of the gap between an open-weight and a substantially stronger closed planner is attributable to open-weight model generation rather than to the closed model's capability specifically, and that our best configuration significantly outperforms an independently reproduced external baseline despite a weaker backbone. The dataset, PGOS-FA implementation, and evaluation code will be made available upon reasonable request.",
+     "published": "2026-10-11",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2610.15666v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.14523v1",
+     "title": "VLA-Thinker: Boosting Vision-Language-Action Models through Thinking-with-Image Reasoning",
+     "summary": "Vision-Language-Action (VLA) models have shown promising capabilities for embodied intelligence, but most existing approaches rely on text-based chain-of-thought reasoning where visual inputs are treated as static context. This limits the ability of the model to actively revisit the environment and resolve ambiguities during long-horizon tasks. We propose VLA-Thinker, a thinking-with-image reasoning framework that models perception as a dynamically invocable reasoning action. To train such a system, we introduce a two-stage training pipeline consisting of (1) an SFT cold-start phase with curated visual Chain-of-Thought data to activate structured reasoning and tool-use behaviors, and (2) GRPO-based reinforcement learning to align complete reasoning-action trajectories with task-level success. Extensive experiments on LIBERO and RoboTwin 2.0 benchmarks demonstrate that VLA-Thinker significantly improves manipulation performance, achieving 97.5% success rate on LIBERO and strong gains across long-horizon robotic tasks. Project and Codes: https://cywang735.github.io/VLA-Thinker/ .",
+     "published": "2026-03-15",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.14523v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2608.00315v1",
+     "title": "Towards General Language-Conditioned Latent Safety Filters",
+     "summary": "Robot policies are becoming increasingly general, with vision-language-action (VLA) models enabling a single policy to execute diverse tasks specified in natural language. Safe deployment, however, requires adapting not only to new tasks but also to varying safety requirements across users, environments, and applications. Existing safety filters remain largely constraint-specific and thus must be redesigned or relearned when safety requirements change. In this paper, we investigate language-conditioned safety filtering, in which a Hamilton-Jacobi safety actor and critic are conditioned on language-specified constraints. We evaluate this formulation across pick-and-place, table-wiping, and block-stacking tasks in the vision-based setting, examining its ability to enforce language-specified constraints and transfer to unseen constraint instances within the evaluated constraint families. Our experiments provide evidence that language-conditioned safety filters reduce constraint violations and exhibit partial transfer to unseen constraint instances.",
+     "published": "2026-07-31",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2608.00315v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2603.25740v1",
+     "title": "Drive My Way: Preference Alignment of Vision-Language-Action Model for Personalized Driving",
+     "summary": "Human driving behavior is inherently personal, which is shaped by long-term habits and influenced by short-term intentions. Individuals differ in how they accelerate, brake, merge, yield, and overtake across diverse situations. However, existing end-to-end autonomous driving systems either optimize for generic objectives or rely on fixed driving modes, lacking the ability to adapt to individual preferences or interpret natural language intent. To address this gap, we propose Drive My Way (DMW), a personalized Vision-Language-Action (VLA) driving framework that aligns with users' long-term driving habits and adapts to real-time user instructions. DMW learns a user embedding from our personalized driving dataset collected across multiple real drivers and conditions the policy on this embedding during planning, while natural language instructions provide additional short-term guidance. Closed-loop evaluation on the Bench2Drive benchmark demonstrates that DMW improves style instruction adaptation, and user studies show that its generated behaviors are recognizable as each driver's own style, highlighting personalization as a key capability for human-centered autonomous driving. Our data and code are available at https://dmw-cvpr.github.io/.",
+     "published": "2026-03-26",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2603.25740v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2606.21493v1",
+     "title": "Semi-Supervised Vision-Language-Action Model",
+     "summary": "Vision-Language-Action (VLA) models enable robots to predict actions directly from visual observations and language instructions, but adapting them to new environments still depends on costly action-labeled demonstrations. To reduce this dependence, we study semi-supervised VLA adaptation under limited supervision signals, where only a small portion of trajectories contain robot actions and the remaining trajectories provide action-unlabeled vision-language observations. Unlike standard semi-supervised learning, the missing supervision is an embodied action signal that must be visually grounded, language-consistent, physically feasible, and temporally stable. To address this problem, we propose SemiVLA, a self-distilled teacher-student framework that learns from reliable pseudo-actions on unlabeled trajectories. SemiVLA introduces a VLA-specific reliability controller to assess vision-language alignment, action feasibility, and temporal transition consistency, and further updates the teacher through a Bottleneck-Projected Alignment Update to avoid noisy feedback contamination. With OpenVLA as the backbone, SemiVLA consistently improves multiple PEFT strategies across LIBERO and CALVIN. Under 10\\% labeled trajectories, SemiVLA with Selective LoRA achieves 89.0\\% average success on LIBERO, outperforming supervised LoRA by 8.0 points without extra inference cost.",
+     "published": "2026-06-19",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2606.21493v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2608.10484v1",
+     "title": "Lost in Reconstruction: Aligning Action Representations with Language in Vision-Language-Action Models",
+     "summary": "Action verbs describe not only the physical outcomes of actions, but also how those actions are performed. Yet action representations in vision-language-action models (VLAs) are typically optimized for reconstruction under L1/L2 losses in raw action space, where numerical proximity need not reflect linguistically meaningful distinctions. On BridgeV2, we show that action trajectories contain verb-grounding information beyond visual state changes, and that reconstruction-only discrete tokenization systematically erodes this information. To address this problem, we introduce SALT, a Semantically ALigned action Tokenizer that augments a VQ-VAE-style tokenizer with an auxiliary objective requiring a frozen vision-language model to recover the episode instruction from quantized action latents. Policies trained with SALT achieve 71.9% average success in SimplerEnv, compared with 42.7% for a reconstruction-only VQ-VAE tokenizer and 31.2% for FAST. SALT also develops verb-specialized codes while maintaining reconstruction fidelity. These results show that robot action trajectories provide a source of language grounding and that preserving this structure in action representations can substantially improve language-conditioned control.",
+     "published": "2026-08-11",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2608.10484v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2605.07474v1",
+     "title": "ForgeVLA: Federated Vision-Language-Action Learning without Language Annotations",
+     "summary": "Vision-Language-Action (VLA) models hold great promise for general-purpose robotic intelligence, yet scaling up such models is severely bottlenecked by the high cost of acquiring annotated training data. Fortunately, vision-equipped robots deployed across various domains already produce abundant vision-action pairs that can be leveraged to scale up VLA training more efficiently. However, these raw data cannot be centrally aggregated due to various constraints and also exhibit severe heterogeneity. To address these challenges, in this paper, we propose ForgeVLA, a federated VLA training framework that learns VLA models from distributed vision-action pairs without centralizing raw data or requiring manual annotations. Specifically, each client in ForgeVLA is equipped with an embodied instruction classifier that maps vision-action pairs to a predefined instruction set, recovering the missing language modality and forming complete vision-language-action triplets. Beyond triplet construction, we also identify vision-language feature collapse as a critical challenge that has been largely overlooked in prior federated VLA research. To mitigate this issue, ForgeVLA combines a client-side contrastive planning loss with a server-side adaptive aggregation strategy to learn task-discriminative representations efficiently. Extensive experiments across multiple benchmarks show that ForgeVLA significantly outperforms other baselines, and ablation studies further validate the contribution of each component.",
+     "published": "2026-05-08",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2605.07474v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2512.11769v1",
+     "title": "BLURR: A Boosted Low-Resource Inference for Vision-Language-Action Models",
+     "summary": "Vision-language-action (VLA) models enable impressive zero shot manipulation, but their inference stacks are often too heavy for responsive web demos or high frequency robot control on commodity GPUs. We present BLURR, a lightweight inference wrapper that can be plugged into existing VLA controllers without retraining or changing model checkpoints. Instantiated on the pi-zero VLA controller, BLURR keeps the original observation interfaces and accelerates control by combining an instruction prefix key value cache, mixed precision execution, and a single step rollout schedule that reduces per step computation. In our SimplerEnv based evaluation, BLURR maintains task success rates comparable to the original controller while significantly lowering effective FLOPs and wall clock latency. We also build an interactive web demo that allows users to switch between controllers and toggle inference options in real time while watching manipulation episodes. This highlights BLURR as a practical approach for deploying modern VLA policies under tight compute budgets.",
+     "published": "2025-12-12",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2512.11769v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2508.15201v2",
+     "title": "Survey of Vision-Language-Action Models for Embodied Manipulation",
+     "summary": "Embodied intelligence systems, which enhance agent capabilities through continuous environment interactions, have garnered significant attention from both academia and industry. Vision-Language-Action models, inspired by advancements in large foundation models, serve as universal robotic control frameworks that substantially improve agent-environment interaction capabilities in embodied intelligence systems. This expansion has broadened application scenarios for embodied AI robots. This survey comprehensively reviews VLA models for embodied manipulation. Firstly, it chronicles the developmental trajectory of VLA architectures. Subsequently, we conduct a detailed analysis of current research across 5 critical dimensions: VLA model structures, training datasets, pre-training methods, post-training methods, and model evaluation. Finally, we synthesize key challenges in VLA development and real-world deployment, while outlining promising future research directions.",
+     "published": "2025-08-21",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2508.15201v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2512.22615v2",
+     "title": "Dream-VL & Dream-VLA: Open Vision-Language and Vision-Language-Action Models with Diffusion Language Model Backbone",
+     "summary": "While autoregressive Large Vision-Language Models (VLMs) have achieved remarkable success, their sequential generation often limits their efficacy in complex visual planning and dynamic robotic control. In this work, we investigate the potential of constructing Vision-Language Models upon diffusion-based large language models (dLLMs) to overcome these limitations. We introduce Dream-VL, an open diffusion-based VLM (dVLM) that achieves state-of-the-art performance among previous dVLMs. Dream-VL is comparable to top-tier AR-based VLMs trained on open data on various benchmarks but exhibits superior potential when applied to visual planning tasks. Building upon Dream-VL, we introduce Dream-VLA, a dLLM-based Vision-Language-Action model (dVLA) developed through continuous pre-training on open robotic datasets. We demonstrate that the natively bidirectional nature of this diffusion backbone serves as a superior foundation for VLA tasks, inherently suited for action chunking and parallel generation, leading to significantly faster convergence in downstream fine-tuning. Dream-VLA achieves top-tier performance of 97.2% average success rate on LIBERO, 71.4% overall average on SimplerEnv-Bridge, and 60.5% overall average on SimplerEnv-Fractal, surpassing leading models such as $π_0$ and GR00T-N1. We also validate that dVLMs surpass AR baselines on downstream tasks across different training objectives. We release both Dream-VL and Dream-VLA to facilitate further research in the community.",
+     "published": "2025-12-27",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2512.22615v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2505.04769v2",
+     "title": "Vision-Language-Action (VLA) Models: Concepts, Progress, Applications and Challenges",
+     "summary": "Vision-Language-Action (VLA) models mark a transformative advancement in artificial intelligence, aiming to unify perception, natural language understanding, and embodied action within a single computational framework. This foundational review presents a comprehensive synthesis of recent advancements in Vision-Language-Action models, systematically organized across five thematic pillars that structure the landscape of this rapidly evolving field. We begin by establishing the conceptual foundations of VLA systems, tracing their evolution from cross-modal learning architectures to generalist agents that tightly integrate vision-language models (VLMs), action planners, and hierarchical controllers. Our methodology adopts a rigorous literature review framework, covering over 80 VLA models published in the past three years. Key progress areas include architectural innovations, efficient training strategies, and real-time inference accelerations. We explore diverse application domains such as autonomous vehicles, medical and industrial robotics, precision agriculture, humanoid robotics, and augmented reality. We analyzed challenges and propose solutions including agentic adaptation and cross-embodiment planning. Furthermore, we outline a forward-looking roadmap where VLA models, VLMs, and agentic AI converge to strengthen socially aligned, adaptive, and general-purpose embodied agents. This work, is expected to serve as a foundational reference for advancing intelligent, real-world robotics and artificial general intelligence. The project repository is available on GitHub as https://github.com/Applied-AI-Research-Lab/Vision-Language-Action-Models-Concepts-Progress-Applications-and-Challenges. [Index Terms: Vision Language Action, VLA, Vision Language Models, VLMs, Action Tokenization, NLP]",
+     "published": "2025-05-07",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2505.04769v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2506.19850v1",
+     "title": "Unified Vision-Language-Action Model",
+     "summary": "Vision-language-action models (VLAs) have garnered significant attention for their potential in advancing robotic manipulation. However, previous approaches predominantly rely on the general comprehension capabilities of vision-language models (VLMs) to generate action signals, often overlooking the rich temporal and causal structure embedded in visual observations. In this paper, we present UniVLA, a unified and native multimodal VLA model that autoregressively models vision, language, and action signals as discrete token sequences. This formulation enables flexible multimodal tasks learning, particularly from large-scale video data. By incorporating world modeling during post-training, UniVLA captures causal dynamics from videos, facilitating effective transfer to downstream policy learning--especially for long-horizon tasks. Our approach sets new state-of-the-art results across several widely used simulation benchmarks, including CALVIN, LIBERO, and Simplenv-Bridge, significantly surpassing previous methods. For example, UniVLA achieves 95.5% average success rate on LIBERO benchmark, surpassing pi0-FAST's 85.5%. We further demonstrate its broad applicability on real-world ALOHA manipulation and autonomous driving.",
+     "published": "2025-06-24",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2506.19850v1"
+    }
+   ]
+  },
+  {
+   "id": "q8",
+   "query": "\"runtime verification\" robot manipulation",
+   "sources": {
+    "arxiv": {
+     "returned": 20,
+     "kept": 0
+    },
+    "semanticscholar": {
+     "returned": 0,
+     "kept": 0
+    },
+    "merged_kept": 12
+   },
+   "hits": [
+    {
+     "source": "arxiv",
+     "id": "2606.06061v1",
+     "title": "A Conversational Framework for Human-Robot Collaborative Manipulation with Distributed Generative AI models",
+     "summary": "This paper presents a distributed conversational framework for human-robot collaborative manipulation that integrates local language and vision-language models (VLMs) with a Robot Operating System 2 (ROS 2)-based execution stack. Language understanding, visual grounding, orchestration, and motion execution run as separate ROS 2 nodes, enabling flexible deployment across distributed hardware while maintaining a responsive control loop. From free-form user commands, the system generates structured action requests for pick, place, and handover. It uses a VLM to return image-space targets, which are converted into metric robot-frame goals using depth and calibration. A web dashboard exposes intermediate intent and grounding overlays (pixel, depth, and robot-frame) and requires explicit operator confirmation before any motion is executed. Experiments on a Franka FR3 platform evaluate end-to-end task reliability and latency under increasing working table scene ambiguity and compare alternative LLM/VLM configurations in the same pipeline. Code and full documentation are available at [github.com/cogrob-tuni/franka-llm](https://github.com/cogrob-tuni/franka-llm).",
+     "published": "2026-06-04",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2606.06061v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2602.06643v2",
+     "title": "Humanoid Manipulation Interface: Humanoid Whole-Body Manipulation from Robot-Free Demonstrations",
+     "summary": "Current approaches for humanoid whole-body manipulation, primarily relying on teleoperation or visual sim-to-real reinforcement learning, are hindered by hardware logistics and complex reward engineering. Consequently, demonstrated autonomous skills remain limited and are typically restricted to controlled environments. In this paper, we present the Humanoid Manipulation Interface (HuMI), a portable and efficient framework for learning diverse whole-body manipulation tasks across various environments. HuMI enables robot-free data collection by capturing rich whole-body motion using portable hardware. This data drives a hierarchical learning pipeline that translates human motions into dexterous and feasible humanoid skills. Extensive experiments across five whole-body tasks--including kneeling, squatting, tossing, walking, and bimanual manipulation--demonstrate that HuMI achieves a 3x increase in data collection efficiency compared to teleoperation and attains a 70% success rate in unseen environments.",
+     "published": "2026-02-06",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2602.06643v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2504.08184v1",
+     "title": "Leveraging Passive Compliance of Soft Robotics for Physical Human-Robot Collaborative Manipulation",
+     "summary": "This work represents an initial benchmark of a large-scale soft robot performing physical, collaborative manipulation of a long, extended object with a human partner. The robot consists of a pneumatically-actuated, three-link continuum soft manipulator mounted to an omni-directional mobile base. The system level configuration of the robot and design of the collaborative manipulation (co-manipulation) study are presented. The initial results, both quantitative and qualitative, are directly compared to previous similar human-human co-manipulation studies. These initial results show promise in the ability for large-scale soft robots to perform comparably to human partners acting as non-visual followers in a co-manipulation task. Furthermore, these results challenge traditional soft robot strength limitations and indicate potential for applications requiring strength and adaptability.",
+     "published": "2025-04-11",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2504.08184v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2509.19958v1",
+     "title": "Generalist Robot Manipulation beyond Action Labeled Data",
+     "summary": "Recent advances in generalist robot manipulation leverage pre-trained Vision-Language Models (VLMs) and large-scale robot demonstrations to tackle diverse tasks in a zero-shot manner. A key challenge remains: scaling high-quality, action-labeled robot demonstration data, which existing methods rely on for robustness and generalization. To address this, we propose a method that benefits from videos without action labels - featuring humans and/or robots in action - enhancing open-vocabulary performance and enabling data-efficient learning of new tasks. Our method extracts dense, dynamic 3D point clouds at the hand or gripper location and uses a proposed 3D dynamics predictor for self-supervision. This predictor is then tuned to an action predictor using a smaller labeled dataset for action alignment. We show that our method not only learns from unlabeled human and robot demonstrations - improving downstream generalist robot policies - but also enables robots to learn new tasks without action labels (i.e., out-of-action generalization) in both real-world and simulated settings.",
+     "published": "2025-09-24",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2509.19958v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2507.11460v1",
+     "title": "Human-Robot collaboration in surgery: Advances and challenges towards autonomous surgical assistants",
+     "summary": "Human-robot collaboration in surgery represents a significant area of research, driven by the increasing capability of autonomous robotic systems to assist surgeons in complex procedures. This systematic review examines the advancements and persistent challenges in the development of autonomous surgical robotic assistants (ASARs), focusing specifically on scenarios where robots provide meaningful and active support to human surgeons. Adhering to the PRISMA guidelines, a comprehensive literature search was conducted across the IEEE Xplore, Scopus, and Web of Science databases, resulting in the selection of 32 studies for detailed analysis. Two primary collaborative setups were identified: teleoperation-based assistance and direct hands-on interaction. The findings reveal a growing research emphasis on ASARs, with predominant applications currently in endoscope guidance, alongside emerging progress in autonomous tool manipulation. Several key challenges hinder wider adoption, including the alignment of robotic actions with human surgeon preferences, the necessity for procedural awareness within autonomous systems, the establishment of seamless human-robot information exchange, and the complexities of skill acquisition in shared workspaces. This review synthesizes current trends, identifies critical limitations, and outlines future research directions essential to improve the reliability, safety, and effectiveness of human-robot collaboration in surgical environments.",
+     "published": "2025-07-15",
+     "venue": "2025 IEEE International Conference on Robot and Human Interactive Communication (ROMAN)",
+     "url": "https://arxiv.org/abs/2507.11460v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2503.05652v2",
+     "title": "BEHAVIOR Robot Suite: Streamlining Real-World Whole-Body Manipulation for Everyday Household Activities",
+     "summary": "Real-world household tasks present significant challenges for mobile manipulation robots. An analysis of existing robotics benchmarks reveals that successful task performance hinges on three key whole-body control capabilities: bimanual coordination, stable and precise navigation, and extensive end-effector reachability. Achieving these capabilities requires careful hardware design, but the resulting system complexity further complicates visuomotor policy learning. To address these challenges, we introduce the BEHAVIOR Robot Suite (BRS), a comprehensive framework for whole-body manipulation in diverse household tasks. Built on a bimanual, wheeled robot with a 4-DoF torso, BRS integrates a cost-effective whole-body teleoperation interface for data collection and a novel algorithm for learning whole-body visuomotor policies. We evaluate BRS on five challenging household tasks that not only emphasize the three core capabilities but also introduce additional complexities, such as long-range navigation, interaction with articulated and deformable objects, and manipulation in confined spaces. We believe that BRS's integrated robotic embodiment, data collection interface, and learning framework mark a significant step toward enabling real-world whole-body manipulation for everyday household tasks. BRS is open-sourced at https://behavior-robot-suite.github.io/",
+     "published": "2025-03-07",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2503.05652v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2409.18121v1",
+     "title": "Robot See Robot Do: Imitating Articulated Object Manipulation with Monocular 4D Reconstruction",
+     "summary": "Humans can learn to manipulate new objects by simply watching others; providing robots with the ability to learn from such demonstrations would enable a natural interface specifying new behaviors. This work develops Robot See Robot Do (RSRD), a method for imitating articulated object manipulation from a single monocular RGB human demonstration given a single static multi-view object scan. We first propose 4D Differentiable Part Models (4D-DPM), a method for recovering 3D part motion from a monocular video with differentiable rendering. This analysis-by-synthesis approach uses part-centric feature fields in an iterative optimization which enables the use of geometric regularizers to recover 3D motions from only a single video. Given this 4D reconstruction, the robot replicates object trajectories by planning bimanual arm motions that induce the demonstrated object part motion. By representing demonstrations as part-centric trajectories, RSRD focuses on replicating the demonstration's intended behavior while considering the robot's own morphological limits, rather than attempting to reproduce the hand's motion. We evaluate 4D-DPM's 3D tracking accuracy on ground truth annotated 3D part trajectories and RSRD's physical execution performance on 9 objects across 10 trials each on a bimanual YuMi robot. Each phase of RSRD achieves an average of 87% success rate, for a total end-to-end success rate of 60% across 90 trials. Notably, this is accomplished using only feature fields distilled from large pretrained vision models -- without any task-specific training, fine-tuning, dataset collection, or annotation. Project page: https://robot-see-robot-do.github.io",
+     "published": "2024-09-26",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2409.18121v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2410.10550v1",
+     "title": "Users' Perception on Appropriateness of Robotic Coaching Assistant's Disclosure Behaviors",
+     "summary": "Social robots have emerged as valuable contributors to individuals' well-being coaching. Notably, their integration into long-term human coaching trials shows particular promise, emphasizing a complementary role alongside human coaches rather than outright replacement. In this context, robots serve as supportive entities during coaching sessions, offering insights based on their knowledge about users' well-being and activity. Traditionally, such insights have been gathered through methods like written self-reports or wearable data visualizations. However, the disclosure of people's information by a robot raises concerns regarding privacy, appropriateness, and trust. To address this, we conducted an initial study with [n = 22] participants to quantify their perceptions of privacy regarding disclosures made by a robot coaching assistant. The study was conducted online, presenting participants with six prerecorded scenarios illustrating various types of information disclosure and the robot's role, ranging from active on-demand to proactive communication conditions.",
+     "published": "2024-10-14",
+     "venue": "2024 IEEE International Conference on Robotics and Automation Workshop on Robot Trust for Symbiotic Societies (RTSS)",
+     "url": "https://arxiv.org/abs/2410.10550v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2406.19464v2",
+     "title": "ManiWAV: Learning Robot Manipulation from In-the-Wild Audio-Visual Data",
+     "summary": "Audio signals provide rich information for the robot interaction and object properties through contact. This information can surprisingly ease the learning of contact-rich robot manipulation skills, especially when the visual information alone is ambiguous or incomplete. However, the usage of audio data in robot manipulation has been constrained to teleoperated demonstrations collected by either attaching a microphone to the robot or object, which significantly limits its usage in robot learning pipelines. In this work, we introduce ManiWAV: an 'ear-in-hand' data collection device to collect in-the-wild human demonstrations with synchronous audio and visual feedback, and a corresponding policy interface to learn robot manipulation policy directly from the demonstrations. We demonstrate the capabilities of our system through four contact-rich manipulation tasks that require either passively sensing the contact events and modes, or actively sensing the object surface materials and states. In addition, we show that our system can generalize to unseen in-the-wild environments by learning from diverse in-the-wild human demonstrations.",
+     "published": "2024-06-27",
+     "venue": "arXiv",
+     "url": "https://arxiv.org/abs/2406.19464v2"
+    },
+    {
+     "source": "arxiv",
+     "id": "2401.02684v1",
+     "title": "Robot Vulnerability and the Elicitation of User Empathy",
+     "summary": "This paper describes a between-subjects Amazon Mechanical Turk study (n = 220) that investigated how a robot's affective narrative influences its ability to elicit empathy in human observers. We first conducted a pilot study to develop and validate the robot's affective narratives. Then, in the full study, the robot used one of three different affective narrative strategies (funny, sad, neutral) while becoming less functional at its shopping task over the course of the interaction. As the functionality of the robot degraded, participants were repeatedly asked if they were willing to help the robot. The results showed that conveying a sad narrative significantly influenced the participants' willingness to help the robot throughout the interaction and determined whether participants felt empathetic toward the robot throughout the interaction. Furthermore, a higher amount of past experience with robots also increased the participants' willingness to help the robot. This work suggests that affective narratives can be useful in short-term interactions that benefit from emotional connections between humans and robots.",
+     "published": "2024-01-05",
+     "venue": "2022 31st IEEE International Conference on Robot and Human Interactive Communication (RO-MAN) pages 52-58",
+     "url": "https://arxiv.org/abs/2401.02684v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2405.12628v1",
+     "title": "Play Everywhere: A Temporal Logic based Game Environment Independent Approach for Playing Soccer with Robots",
+     "summary": "Robots playing soccer often rely on hard-coded behaviors that struggle to generalize when the game environment change. In this paper, we propose a temporal logic based approach that allows robots' behaviors and goals to adapt to the semantics of the environment. In particular, we present a hierarchical representation of soccer in which the robot selects the level of operation based on the perceived semantic characteristics of the environment, thus modifying dynamically the set of rules and goals to apply. The proposed approach enables the robot to operate in unstructured environments, just as it happens when humans go from soccer played on an official field to soccer played on a street. Three different use cases set in different scenarios are presented to demonstrate the effectiveness of the proposed approach.",
+     "published": "2024-05-21",
+     "venue": "Lecture Notes in Computer Science ((LNAI,volume 14140)) Included in the following conference series: Robot World Cup RoboCup 2023: Robot World Cup XXVI",
+     "url": "https://arxiv.org/abs/2405.12628v1"
+    },
+    {
+     "source": "arxiv",
+     "id": "2312.07214v3",
+     "title": "Exploring Large Language Models to Facilitate Variable Autonomy for Human-Robot Teaming",
+     "summary": "In a rapidly evolving digital landscape autonomous tools and robots are becoming commonplace. Recognizing the significance of this development, this paper explores the integration of Large Language Models (LLMs) like Generative pre-trained transformer (GPT) into human-robot teaming environments to facilitate variable autonomy through the means of verbal human-robot communication. In this paper, we introduce a novel framework for such a GPT-powered multi-robot testbed environment, based on a Unity Virtual Reality (VR) setting. This system allows users to interact with robot agents through natural language, each powered by individual GPT cores. By means of OpenAI's function calling, we bridge the gap between unstructured natural language input and structure robot actions. A user study with 12 participants explores the effectiveness of GPT-4 and, more importantly, user strategies when being given the opportunity to converse in natural language within a multi-robot environment. Our findings suggest that users may have preconceived expectations on how to converse with robots and seldom try to explore the actual language and cognitive capabilities of their robot collaborators. Still, those users who did explore where able to benefit from a much more natural flow of communication and human-like back-and-forth. We provide a set of lessons learned for future research and technical implementations of similar systems.",
+     "published": "2023-12-12",
+     "venue": "Front. Robot. AI 11:1347538 2024",
+     "url": "https://arxiv.org/abs/2312.07214v3"
+    }
+   ]
+  }
+ ],
+ "failures": [
+  "q1:arxiv",
+  "q1:semanticscholar",
+  "q2:arxiv",
+  "q3:semanticscholar",
+  "q4:semanticscholar",
+  "q5:semanticscholar",
+  "q6:arxiv",
+  "q6:semanticscholar",
+  "q7:semanticscholar",
+  "q8:semanticscholar"
+ ]
+}

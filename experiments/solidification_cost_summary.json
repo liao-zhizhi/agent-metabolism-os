@@ -1,0 +1,273 @@
+{
+ "tasks": 1000,
+ "seed": 42,
+ "prices": {
+  "full": 1.0,
+  "compiled": 0.01
+ },
+ "rhos": [
+  0.0,
+  0.1,
+  0.3,
+  0.5
+ ],
+ "by_rho": {
+  "0.0": {
+   "A": {
+    "tasks": 1000,
+    "total_cost": 1000.0,
+    "mean_cost": 1.0,
+    "steady_marginal_cost": 1.0,
+    "revalidations": 0,
+    "kappa_measured": 1.0,
+    "steady_floor": 0.01,
+    "savings_vs_arm_a": 0.0,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 0
+   },
+   "B": {
+    "tasks": 1000,
+    "total_cost": 10.99,
+    "mean_cost": 0.01099,
+    "steady_marginal_cost": 0.01,
+    "revalidations": 1,
+    "kappa_measured": 0.999,
+    "steady_floor": 0.01,
+    "savings_vs_arm_a": 0.989,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 0
+   }
+  },
+  "0.1": {
+   "A": {
+    "tasks": 1000,
+    "total_cost": 1000.0,
+    "mean_cost": 1.0,
+    "steady_marginal_cost": 1.0,
+    "revalidations": 0,
+    "kappa_measured": 1.0,
+    "steady_floor": 0.11,
+    "savings_vs_arm_a": 0.0,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 95
+   },
+   "B": {
+    "tasks": 1000,
+    "total_cost": 105.99,
+    "mean_cost": 0.10599,
+    "steady_marginal_cost": 0.085,
+    "revalidations": 96,
+    "kappa_measured": 0.904,
+    "steady_floor": 0.11,
+    "savings_vs_arm_a": 0.894,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 95
+   }
+  },
+  "0.3": {
+   "A": {
+    "tasks": 1000,
+    "total_cost": 1000.0,
+    "mean_cost": 1.0,
+    "steady_marginal_cost": 1.0,
+    "revalidations": 0,
+    "kappa_measured": 1.0,
+    "steady_floor": 0.31,
+    "savings_vs_arm_a": 0.0,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 308
+   },
+   "B": {
+    "tasks": 1000,
+    "total_cost": 317.99,
+    "mean_cost": 0.31799,
+    "steady_marginal_cost": 0.32,
+    "revalidations": 308,
+    "kappa_measured": 0.692,
+    "steady_floor": 0.31,
+    "savings_vs_arm_a": 0.682,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 308
+   }
+  },
+  "0.5": {
+   "A": {
+    "tasks": 1000,
+    "total_cost": 1000.0,
+    "mean_cost": 1.0,
+    "steady_marginal_cost": 1.0,
+    "revalidations": 0,
+    "kappa_measured": 1.0,
+    "steady_floor": 0.51,
+    "savings_vs_arm_a": 0.0,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 476
+   },
+   "B": {
+    "tasks": 1000,
+    "total_cost": 486.99,
+    "mean_cost": 0.48699,
+    "steady_marginal_cost": 0.44,
+    "revalidations": 477,
+    "kappa_measured": 0.523,
+    "steady_floor": 0.51,
+    "savings_vs_arm_a": 0.513,
+    "failures": 0,
+    "damage_events": 0,
+    "drift_events": 476
+   }
+  }
+ },
+ "floor_model": "c_c + rho * c_v",
+ "floor_tolerance": {
+  "0.0": 0.02,
+  "0.1": 0.0636,
+  "0.3": 0.0972,
+  "0.5": 0.1061
+ },
+ "break_even_rho": 0.99,
+ "compound_knee": 0.75,
+ "tasks_to_90pct_steady": {
+  "0.0": 11,
+  "0.1": 16,
+  "0.3": 11,
+  "0.5": 2
+ },
+ "critical_budgets": {
+  "0.0": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    0.25,
+    1.2525252525252526
+   ],
+   [
+    0.5,
+    1.505050505050505
+   ],
+   [
+    1.0,
+    2.01010101010101
+   ],
+   [
+    2.0,
+    3.0202020202020203
+   ]
+  ],
+  "0.1": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    0.25,
+    1.2805836139169473
+   ],
+   [
+    0.5,
+    1.5611672278338944
+   ],
+   [
+    1.0,
+    2.1223344556677888
+   ],
+   [
+    2.0,
+    3.244668911335578
+   ]
+  ],
+  "0.3": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    0.25,
+    1.3607503607503608
+   ],
+   [
+    0.5,
+    1.7215007215007216
+   ],
+   [
+    1.0,
+    2.4430014430014433
+   ],
+   [
+    2.0,
+    3.8860028860028866
+   ]
+  ],
+  "0.5": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    0.25,
+    1.505050505050505
+   ],
+   [
+    0.5,
+    2.01010101010101
+   ],
+   [
+    1.0,
+    3.0202020202020203
+   ],
+   [
+    2.0,
+    5.040404040404041
+   ]
+  ],
+  "0.9": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    0.25,
+    3.525252525252526
+   ],
+   [
+    0.5,
+    6.050505050505052
+   ],
+   [
+    1.0,
+    11.101010101010104
+   ],
+   [
+    2.0,
+    21.202020202020208
+   ]
+  ]
+ },
+ "headline_rho_0_1": {
+  "A_total": 1000.0,
+  "B_total": 105.99,
+  "A_mean": 1.0,
+  "steady_marginal_cost": 0.085,
+  "floor_if_world_were_frozen": 0.01,
+  "fraction_of_cost_eliminated": 0.915,
+  "savings_vs_full_derivation": 0.894,
+  "kappa_measured": 0.904,
+  "revalidations": 96
+ },
+ "claims": {
+  "h1_cost_falls_below_arm_a_at_every_rho": true,
+  "h2_floor_is_c_c_plus_rho_c_v": true,
+  "h2_floor_is_not_c_c_unless_rho_is_zero": true,
+  "h3_compiling_still_pays_below_break_even": true,
+  "h3_kappa_falls_with_drift": true
+ }
+}

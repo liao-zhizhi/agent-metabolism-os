@@ -1,0 +1,35 @@
+# Evaluation entry for the harness CLI:
+#
+#   .venv/bin/python -m experiments.benchmark_integration.serve_arm --arm B --port 8123 &
+#   PYTHONPATH=. .venv/bin/vla-eval run --no-docker -c cel_eval.yaml \
+#       --server-url ws://127.0.0.1:8123 --output-dir experiments/benchmark_integration/cli_results/B
+#
+# ``benchmark:`` is the harness's import-string form, so this file is enough for
+# the CLI to construct our environment, step it with its own runner, and write
+# its own result JSON. ``regime_windows`` is a 50-episode-per-regime friction
+# schedule; the benchmark expands it in order, so every arm that starts a run
+# from the same config sees the same worlds in the same order.
+output_dir: ./experiments/benchmark_integration/cli_results/default
+mode: sync
+
+benchmarks:
+  - benchmark: experiments.benchmark_integration.env_adapter:PushTableBenchmark
+    name: push_table_2d
+    subname: friction_shift
+    max_steps: 30
+    episodes_per_task: 60
+    max_tasks: 5
+    params:
+      suite: friction_shift
+      regime_windows:
+        - [0.35, 50]
+        - [0.18, 50]
+        - [0.35, 50]
+        - [0.54, 50]
+        - [0.18, 50]
+        - [0.54, 50]
+
+server:
+  url: ws://127.0.0.1:8123
+  timeout: 60
+  image_format: raw

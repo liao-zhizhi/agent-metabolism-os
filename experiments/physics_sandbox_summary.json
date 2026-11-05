@@ -1,0 +1,140 @@
+{
+  "arms": {
+    "A_blind_vla": {
+      "damage_events": 150,
+      "damage_per_1000": 150.0,
+      "drift": {
+        "mean_ms": 200.0,
+        "pushes": 250,
+        "recovery": 50.0,
+        "success_rate": 0.0
+      },
+      "false_veto_rate": 0.0,
+      "false_vetoes": 0,
+      "human_calls": 0,
+      "latency_components_ms": {
+        "human": 0.0,
+        "lookup": 0.0,
+        "vla": 200000.0,
+        "witness": 0.0
+      },
+      "mean_latency_ms": 200.0,
+      "ms_per_sequence": 1000.0,
+      "ms_per_success": 266.6666666666667,
+      "push_success_rate": 0.75,
+      "pushes": 1000,
+      "refusals": 0,
+      "sequence_success_rate": 0.725,
+      "total_latency_ms": 200000.0
+    },
+    "B_causal_interface": {
+      "damage_events": 3,
+      "damage_per_1000": 3.0,
+      "drift": {
+        "mean_ms": 33.1,
+        "pushes": 250,
+        "recovery": 1.6,
+        "success_rate": 0.988
+      },
+      "false_veto_rate": 0.0,
+      "false_vetoes": 0,
+      "human_calls": 0,
+      "latency_components_ms": {
+        "human": 0.0,
+        "lookup": 4970.0,
+        "vla": 4200.0,
+        "witness": 20100.0
+      },
+      "mean_latency_ms": 29.27,
+      "ms_per_sequence": 146.35,
+      "ms_per_success": 29.417085427135678,
+      "push_success_rate": 0.995,
+      "pushes": 1000,
+      "refusals": 0,
+      "sequence_success_rate": 0.975,
+      "total_latency_ms": 29270.0
+    },
+    "C_safe_vla": {
+      "damage_events": 4,
+      "damage_per_1000": 4.0,
+      "drift": {
+        "mean_ms": 323.2,
+        "pushes": 250,
+        "recovery": 2.0,
+        "success_rate": 0.98
+      },
+      "false_veto_rate": 0.6153846153846154,
+      "false_vetoes": 16,
+      "human_calls": 26,
+      "latency_components_ms": {
+        "human": 78000.0,
+        "lookup": 0.0,
+        "vla": 194800.0,
+        "witness": 0.0
+      },
+      "mean_latency_ms": 272.8,
+      "ms_per_sequence": 1364.0,
+      "ms_per_success": 275.83417593528816,
+      "push_success_rate": 0.989,
+      "pushes": 1000,
+      "refusals": 26,
+      "sequence_success_rate": 0.95,
+      "total_latency_ms": 272800.0
+    }
+  },
+  "drift": {
+    "events": [
+      {
+        "friction": 0.18,
+        "push_index": 6
+      },
+      {
+        "friction": 0.54,
+        "push_index": 86
+      },
+      {
+        "friction": 0.18,
+        "push_index": 212
+      },
+      {
+        "friction": 0.54,
+        "push_index": 761
+      },
+      {
+        "friction": 0.18,
+        "push_index": 876
+      }
+    ],
+    "fraction_of_pushes_in_drift": 0.25,
+    "hazard_per_push": 0.01,
+    "nominal_friction": 0.35,
+    "regimes": [
+      0.18,
+      0.35,
+      0.54
+    ],
+    "window": 50
+  },
+  "engine": "numpy",
+  "latency_model_ms": {
+    "compiled_lookup": 5.0,
+    "confidence_threshold": 0.8,
+    "human_takeover": 3000.0,
+    "mechanical_witness": 20.0,
+    "note": "assumed constants, not measured on hardware; see the module docstring for what each operation is",
+    "vla_forward_pass": 200.0
+  },
+  "physics": {
+    "block_restitution": 0.6,
+    "damage_impact_speed_m_s": 0.8,
+    "dt_s": 0.005,
+    "table_m": [
+      0.95,
+      0.7
+    ],
+    "wall_restitution": 0.35
+  },
+  "pushes": 1000,
+  "sdks_available": [],
+  "sequences": 200
+}
