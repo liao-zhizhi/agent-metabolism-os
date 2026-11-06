@@ -409,6 +409,14 @@ python3 demo_one_person_company.py      # 3 agents, 1 liar, exits non-zero if it
 **See it running.** [`product_mvp/`](product_mvp/) wraps this ledger in a FastAPI
 service and a dashboard, so the two-sided rule can be watched instead of read:
 
+**Live instance: <https://demo.silicon-probe.com>** — `core_version 1.0.10`, permanent domain.
+Read endpoints (`/api/v1/stats`, `/api/v1/ledger`, `/api/v1/ledger/verify`) are anonymous, so the
+whole chain can be inspected and re-verified without a credential. Writing charges trust against an
+agent id and therefore requires a demo key; open an issue with your use case to request one. No key
+is published in this repository or any other.
+
+Or run it locally:
+
 ```bash
 cd product_mvp && docker compose up --build     # http://localhost:8000
 ```
