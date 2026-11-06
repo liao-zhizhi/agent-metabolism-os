@@ -78,7 +78,7 @@ docker compose up --build      # http://localhost:8000
 ```
 
 > 构建上下文就是 `product_mvp/` 本身。核心库不靠 `COPY ../agent_metabolism`
-> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.8`）解到
+> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.9`）解到
 > `/app/core`——因为 Hugging Face Space 只能从自己仓库的根目录构建，没有"指向上级
 > 目录"这个选项。一个 Dockerfile 同时适用本地与 Space，比两份会逐渐走样的配置更可靠。
 > 只有 `docker` 没有 compose 插件时：
@@ -286,3 +286,13 @@ Serverless 每个请求可能是全新冷启动、文件系统只读（除 `/tmp
 - **状态在内存里。** 重启清空账本。设了 `CEL_LEDGER_LOG` 会把链追加到磁盘，但**重放进信任账本没做**——重启后是"有历史文件、无历史信任"。
 - **`witness` 是调用方给的。** 服务信任这个布尔值；`artefact` 给真实路径时会被 sha256 摘要，这才让 PASS 落在字节上而不是句子上。要让见证本身不可伪造，得接 `agent-harness-audit` 里的 `MembraneGateway`（它要 artefact + digest 才发 warrant），那是另一层，本 MVP 没接。
 - **前端每 2 秒轮询**，不是 WebSocket。演示够用，几十个并发也够用；上千个就不够了。
+
+---
+
+## 七、许可证
+
+MIT，见仓库根目录的 [`LICENSE`](../LICENSE)。版权人 Zhizhi Liao，年份 2026。
+
+MIT 授予你使用、复制、修改、合并、发布、分发、再许可和销售的权利，唯一义务是保留版权声明和许可声明。它同时带有担保与责任免责条款：软件按 "AS IS" 提供，作者不为由此产生的损害负责。
+
+它**不授予认证**。本文件顶部的 PHYSICAL SAFETY DISCLAIMER 说明了这份许可被授予的适用范围：仅供研究与评估；在物理系统中做商业部署，需要本项目不提供、也无法背书的独立正式审计。许可证说的是"你能拿代码做什么"，免责声明说的是"这代码不是什么"，两者要一起读。

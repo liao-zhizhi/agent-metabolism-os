@@ -1064,3 +1064,20 @@ cross-package tests reach `harness-audit-sidecar` through `sys.path` and **skip*
 when the adjacent checkout is absent, so the suite never acquires a hard
 dependency on it; a small in-test double pins the protocol those tests rely on,
 so a change on either side fails here instead of silently agreeing with itself.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Copyright (c) 2026 Zhizhi Liao.
+
+The MIT License is the instrument that grants permission: use, copy, modify, merge,
+publish, distribute, sublicense, and sell, subject only to keeping the copyright and
+permission notice. It also carries the warranty and liability disclaimer that makes
+the grant workable — the Software is provided "AS IS", and the author is not liable
+for damages arising from it.
+
+It does **not** grant a certification. The physical safety disclaimer at the top of
+this file states the scope the licence is granted in: research and evaluation use
+only, and a commercial deployment in a physical system needs an independent formal
+audit that this project does not perform and cannot vouch for. The two documents are
+meant to be read together — the licence says what you may do with the code, the
+notice says what the code is not.

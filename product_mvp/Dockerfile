@@ -23,7 +23,7 @@ FROM python:3.12-slim
 
 # The core library, by release tag. Bump this line and the image follows the
 # repository; leave it and the image stays reproducible.
-ARG CEL_CORE_REF=v1.0.8
+ARG CEL_CORE_REF=v1.0.9
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
