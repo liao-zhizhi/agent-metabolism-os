@@ -78,7 +78,7 @@ docker compose up --build      # http://localhost:8000
 ```
 
 > 构建上下文就是 `product_mvp/` 本身。核心库不靠 `COPY ../agent_metabolism`
-> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.9`）解到
+> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.10`）解到
 > `/app/core`——因为 Hugging Face Space 只能从自己仓库的根目录构建，没有"指向上级
 > 目录"这个选项。一个 Dockerfile 同时适用本地与 Space，比两份会逐渐走样的配置更可靠。
 > 只有 `docker` 没有 compose 插件时：

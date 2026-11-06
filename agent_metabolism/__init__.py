@@ -189,7 +189,7 @@ from .scheduler import (
     LLMResponse,
 )
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 
 __all__ = [
     "DEFAULT_INVENTIONS",
