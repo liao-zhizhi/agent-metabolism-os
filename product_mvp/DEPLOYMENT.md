@@ -84,7 +84,7 @@ at the root:
 ```
 
 The core library is **not** copied in: the Dockerfile fetches the pinned release
-tarball (`ARG CEL_CORE_REF=v1.0.7`) and unpacks it to `/app/core`, which
+tarball (`ARG CEL_CORE_REF=v1.0.8`) and unpacks it to `/app/core`, which
 `CEL_CORE_PATH` points at. One Dockerfile works locally and on the Space, and the
 bytes are the bytes of the tag.
 

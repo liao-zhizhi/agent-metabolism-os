@@ -10,6 +10,43 @@ pinned: false
 
 # CEL — 因果执行与信任监控台 (MVP)
 
+> ## ⚠️ PHYSICAL SAFETY DISCLAIMER — READ BEFORE USE
+>
+> **Not certified for physical systems. Research and evaluation use only.**
+>
+> The source code, the test suites, and the CEL Console (the "Software") in this
+> repository are provided solely for research, experimentation, and internal
+> evaluation. They are not designed, not tested, and not validated for use in any
+> safety-critical or physical-world system.
+>
+> **No certification is granted or implied.** Using this open-source Software does
+> **not** constitute, and must not be represented as, a Physical Safety
+> Certification, a conformity assessment, or a regulatory approval. No audit,
+> certification mark, or endorsement of any kind is issued by the author
+> (Zhizhi Liao) or by this project. Any commercial deployment of the Software in a
+> physical system — including but not limited to robotics, autonomous vehicles,
+> industrial control, medical devices, or aerospace — must undergo independent
+> formal safety auditing and certification by a qualified third party. Any such
+> deployment is made entirely outside the scope of this project and has no
+> connection to it.
+>
+> **No liability for physical-world harm.** To the maximum extent permitted by
+> applicable law, the author (Zhizhi Liao) assumes no responsibility or liability
+> whatsoever for any direct, indirect, incidental, special, consequential, or
+> exemplary damages arising out of or relating to the use of, or inability to use,
+> the Software — including but not limited to personal injury, damage to or
+> destruction of robots or other property, autonomous driving incidents, loss or
+> corruption of data, loss of profits, or business interruption — whether in
+> contract, tort (including negligence), strict liability, or otherwise, and even
+> if advised of the possibility of such damage.
+>
+> **No warranty.** The Software is provided "AS IS", without warranty of any kind,
+> express or implied, including but not limited to the warranties of
+> merchantability, fitness for a particular purpose, title, and non-infringement.
+>
+> Nothing in this notice excludes or limits any liability that cannot be excluded
+> or limited under applicable law. This notice is a condition of use.
+
 一个 FastAPI 服务 + 一块暗黑极客风监控大屏，演示三件事：
 
 1. **假完成会被拦住**（不是靠模型自查，是靠"见证"与"声明"的两边对账）；
@@ -41,7 +78,7 @@ docker compose up --build      # http://localhost:8000
 ```
 
 > 构建上下文就是 `product_mvp/` 本身。核心库不靠 `COPY ../agent_metabolism`
-> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.7`）解到
+> 搬运，而是在构建时按**发布 tag** 下载（`ARG CEL_CORE_REF=v1.0.8`）解到
 > `/app/core`——因为 Hugging Face Space 只能从自己仓库的根目录构建，没有"指向上级
 > 目录"这个选项。一个 Dockerfile 同时适用本地与 Space，比两份会逐渐走样的配置更可靠。
 > 只有 `docker` 没有 compose 插件时：
