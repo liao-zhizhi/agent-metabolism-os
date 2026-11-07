@@ -169,6 +169,75 @@ function toast(message, kind = "fail") {
   toastTimer = setTimeout(() => { node.hidden = true; }, 5200);
 }
 
+/* ------------------------------------------------------- independence (D5) */
+
+/* ``n_eff = n / (1 + (n-1)rho)``, and the screen is where it is most tempting
+ * to overstate it. Two rules, both about not lying with styling:
+ *
+ *   1. **No alarm.** This number does not reject anything. Red, "已隔离",
+ *      "已拒绝", a warning triangle -- each of those would tell the operator an
+ *      enforcement action happened, and none did. The tones are information
+ *      (slate) and absence (grey). ``tests/test_api.py`` reads this file's CSS
+ *      and fails if the independence rules reach for the red token.
+ *   2. **Null is displayed as null.** ``uncalibrated`` in grey, not an em-dash
+ *      and not the headcount. A blank would read as "6 agents"; the headcount is
+ *      the exact overstatement D5 names.
+ *
+ * ``independenceText`` is pure -- no DOM, no globals -- so the render can be
+ * executed in a test instead of pattern-matched. See ``tests/render_probe.js``.
+ */
+const INDEPENDENCE_TOOLTIP =
+  "This is a dashboard metric, not an enforcement gate. " +
+  "No request is rejected based on this value.";
+
+function independenceText(ind) {
+  if (!ind || typeof ind !== "object") {
+    return { text: "—", tone: "unknown", detail: "暂无数据" };
+  }
+
+  const raw = Number(ind.n_raw ?? 0);
+  const eff = ind.n_effective;
+  const rho = ind.rho;
+
+  if (eff === null || eff === undefined) {
+    return {
+      text: "n_effective: uncalibrated",
+      tone: "uncalibrated",
+      // Says *why* without implying a problem to fix: nobody declared a
+      // lineage, so the correlation is unknown, so there is no honest number.
+      detail: ind.status === "partial"
+        ? "相关性未标定 · 部分智能体未声明谱系"
+        : "相关性未标定 · 尚无智能体声明谱系",
+    };
+  }
+
+  if (!raw) {
+    return { text: "—", tone: "unknown", detail: "尚无智能体" };
+  }
+
+  const rhoText = (rho === null || rho === undefined)
+    ? ""
+    : ` (ρ=${Number(rho).toFixed(2)})`;
+  return {
+    text: `${Number(eff).toFixed(1)} / ${raw}${rhoText}`,
+    tone: "calibrated",
+    // ``bound: "upper"`` comes from the server and is repeated here rather than
+    // re-derived: a self-declared lineage can only inflate this number, and an
+    // operator reading it as a measurement is the failure mode to avoid.
+    detail: ind.bound === "upper" ? "基于谱系声明 · 独立性的上界" : "基于谱系声明",
+  };
+}
+
+function paintIndependence(ind) {
+  const row = el("independence-row");
+  if (!row) return;  // older cached page, newer bundle: render nothing rather than throw
+  const view = independenceText(ind);
+  const value = el("independence-value");
+  value.textContent = view.text;
+  value.className = "independence-value tone-" + view.tone;
+  el("independence-detail").textContent = view.detail;
+}
+
 /* ----------------------------------------------------------------- metrics */
 
 function paintStats(s) {
@@ -210,6 +279,7 @@ function paintStats(s) {
 
   paintAuth(Boolean(s.auth_enabled));
   paintTrial(s.write_policy);
+  paintIndependence(s.independence);
   paintAgents(s.agents || []);
 }
 

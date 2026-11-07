@@ -183,6 +183,22 @@
 
     <div id="agents-block" class="agents-block">
       <h3>在册智能体</h3>
+
+      <!-- D5：有效审计人数。这一行刻意长得不像告警——中性的信息色、没有
+           红色、没有"已隔离/已拒绝"这类词，因为 n_effective 只是一个展示
+           数字，没有任何请求因为它被拒绝。把它的样式做成告警，等于在屏幕上
+           谎报一次拦截。灰色 = 未标定（相关性还没有人声明），蓝色 = 已计算。 -->
+      <div class="independence"
+           id="independence-row"
+           title="This is a dashboard metric, not an enforcement gate. No request is rejected based on this value.">
+        <span class="independence-label">有效审计人数（基于谱系声明）</span>
+        <strong class="independence-value tone-unknown" id="independence-value">—</strong>
+        <span class="independence-detail" id="independence-detail">尚无智能体</span>
+        <span class="independence-gate" id="independence-gate">
+          This is a dashboard metric, not an enforcement gate. No request is rejected based on this value.
+        </span>
+      </div>
+
       <ul id="agents-list" class="agents-list">
         <li class="agents-empty">尚无智能体提交过事务</li>
       </ul>

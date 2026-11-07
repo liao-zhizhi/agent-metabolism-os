@@ -68,7 +68,7 @@ x=(E,\,T,\,W,\,H)\;=\;(\text{能荷},\ \text{信任},\ \text{独立见证},\ \te
 | **D3** 休眠/死亡判定 | ✅ | ✅ | ❌ **未强制** | `classify()` / `liquidate()` 无运行时调用点；`DORMANT/DEAD` 只存在于 `dynamics.py` |
 | **D3.2** 唤醒首拍 | ✅ | ✅ | ⚠️ **代码强制 / 零流量** | `EnergyAccount.awaiting_first_beat` + `DualBeatScheduler.execute`；`restore()` 无生产调用者 |
 | **D4** 适应度乘法 | ✅ | ✅ | ❌ **未强制** | `GenomeAudit` / `AdoptionGate` 无运行时调用点；`solidify()` 只在 `experiments/` |
-| **D5** 克隆虚报 | ✅ | ✅ | ⚠️ **已接入响应 / 非拦截** | `cel_engine.stats()` 计算 `n_effective`（`GET /api/v1/stats` 返回 `n_raw` / `n_effective`），ρ 由**声明谱系**的成对 Jaccard 估计；无人被拒绝 |
+| **D5** 克隆虚报 | ✅ | ✅ | ⚠️ **已接入响应 / 非拦截** | `cel_engine.stats()` 计算 `n_effective`（`GET /api/v1/stats` 返回 `n_raw` / `n_effective`），ρ 由**声明谱系**的成对 Jaccard 估计；大屏用中性信息色渲染并注明"非拦截"；无人被拒绝 |
 | **D6** 毒性溢出 | ✅ | ✅ | ❌ **未强制** | `spillover()` / `reproduction_number()` 无运行时调用点；L7 裂解只在 demo/audit |
 
 三条必须说清的事实：
@@ -511,6 +511,7 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 > 1. **数字进了响应** —— 是。`n_effective` 是 API 字段，不再是只在 demo 里算出来的表。
 > 2. **`ρ` 是估计，且是自报的** —— 声明通道 `POST /api/v1/lineage` 的填写者**不一定是被计数的那个 agent**：声明记在请求体里的 `agent_id` 上，不记在发送它的凭证上，因此任何持钥匙的调用方都能替别人声明，把竞争对手的集群说成同源即可压低其 `n_eff`。加上激励是单向的（共享谱系**降低** `n_eff`，独立谱系**提高**它），这个数字只能是独立性的**上界**，响应里用 `bound: "upper"` 标出，不叫它测量值。今天这样能成立，只因为它**不参与任何判定**；一旦它开始当闸门用，声明必须先能归因（每 agent 独立凭证，或第三方背书）。
 > 3. **没有拒绝** —— 它只用于显示。没有任何请求因为 `n_eff` 过低而被拒，所以按 §0.1 的判据它**不是 ✅**：✅ 的定义是"违反会被拒绝"，而这里没有任何东西会因为相关性高而被挡住。
+> 3a. **大屏的渲染方式也是这条判据的一部分** —— `templates/index.html` 与 `static/app.js` 用中性信息色（`--slate`）显示已计算值、用灰色（`--text-faint`）显示 `n_effective: uncalibrated`，并明确写出 "This is a dashboard metric, not an enforcement gate. No request is rejected based on this value."。用红色或"已隔离"来渲染一个不拦截的数字，就是在屏幕上谎报一次拦截；所以 `tests/test_api.py` 会读取 `style.css` 里 `.independence*` 规则并在其中搜 `--red` / `--amber`，一旦有人"让它醒目一点"就失败。
 >
 > 一个必要的默认：**未声明谱系的 agent 不按 1 计入**，整个生态视图返回 `n_effective: null` 且 `status: "uncalibrated"`。沉默不给分，否则"什么都不说"就是通往最高法定人数的最省事路径。混合声明（部分有、部分无）同样返回 `null`（`status: "partial"`）：把一个实测重叠和一个假设重叠平均，得到的是一个对错误对象精确的数字。
 >

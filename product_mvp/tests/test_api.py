@@ -9,8 +9,11 @@ on a bare interpreter.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -280,6 +283,22 @@ class HttpTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+def _six_agents(client, tokens: str) -> None:
+    """Book six verified passes and declare one lineage token each.
+
+    ``tokens`` is a format string: ``"prompt:v{0}"`` gives every agent a distinct
+    lineage (independent), ``"prompt:shared"`` gives all six the same one
+    (clones). Written once because the engine tests and the render tests must be
+    driving the *same* fleet -- two copies drifting apart would let the HTTP
+    tests pass while the screen rendered something else.
+    """
+    for i in range(6):
+        name = "agent-%d" % i
+        client.post("/api/v1/verify", json=grounded(agent_id=name))
+        body = {"agent_id": name, "tokens": [tokens.format(i)]}
+        assert client.post("/api/v1/lineage", json=body).status_code == 200
+
+
 class IndependenceApiTests(unittest.TestCase):
     """D5 must be in the *response*, not just in the engine.
 
@@ -291,24 +310,15 @@ class IndependenceApiTests(unittest.TestCase):
         _reset()
         self.client = TestClient(app)
 
-    def _six(self, tokens) -> None:
-        for i in range(6):
-            name = "agent-%d" % i
-            self.client.post("/api/v1/verify", json=grounded(agent_id=name))
-            body = {"agent_id": name, "tokens": [tokens.format(i)]}
-            self.assertEqual(
-                self.client.post("/api/v1/lineage", json=body).status_code, 200
-            )
-
     def test_stats_exposes_both_counts(self) -> None:
-        self._six("prompt:shared")
+        _six_agents(self.client, "prompt:shared")
         stats = self.client.get("/api/v1/stats").json()
         self.assertEqual(stats["n_raw"], 6)
         self.assertEqual(stats["n_effective"], 1.0)
         self.assertEqual(stats["independence"]["status"], "declared")
 
     def test_six_independent_agents_are_worth_six(self) -> None:
-        self._six("prompt:v{0}")
+        _six_agents(self.client, "prompt:v{0}")
         stats = self.client.get("/api/v1/stats").json()
         self.assertEqual(stats["n_raw"], 6)
         self.assertEqual(stats["n_effective"], 6.0)
@@ -350,6 +360,161 @@ class IndependenceApiTests(unittest.TestCase):
     def test_an_empty_agent_id_is_refused(self) -> None:
         response = self.client.post("/api/v1/lineage", json={"tokens": ["p"]})
         self.assertEqual(response.status_code, 400)
+
+
+#: The disclaimer that must appear both as a tooltip and as visible small print.
+#: Module-level so the render tests and the static-page tests cannot disagree
+#: about it -- which is the drift this string is most likely to suffer.
+INDEPENDENCE_TOOLTIP = (
+    "This is a dashboard metric, not an enforcement gate. "
+    "No request is rejected based on this value."
+)
+
+#: Executing the renderer needs node; the static page tests do not.
+HAVE_NODE = shutil.which("node") is not None
+
+
+@unittest.skipUnless(HAVE_NODE, "node is required to execute the renderer")
+class IndependenceRenderTests(unittest.TestCase):
+    """The D5 line on the dashboard, rendered -- not pattern-matched.
+
+    ``tests/render_probe.js`` loads the real ``static/app.js`` into a ``vm``
+    context and calls ``independenceText`` on a payload shaped exactly like
+    ``stats.independence``. Searching the source for a literal would pass on a
+    branch nothing calls; running the function cannot.
+
+    The end-to-end cases below feed the payload that ``GET /api/v1/stats``
+    actually returned, so the probe cannot drift from the wire format either.
+    """
+
+    def setUp(self) -> None:
+        _reset()
+        self.client = TestClient(app)
+
+    def _render(self, independence):
+        proc = subprocess.run(
+            ["node", str(ROOT / "tests" / "render_probe.js"), json.dumps(independence)],
+            capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(
+            proc.returncode, 0,
+            "render probe failed: {}\n{}".format(proc.returncode, proc.stderr),
+        )
+        return json.loads(proc.stdout)
+
+    def test_six_clones_render_as_one_of_six(self) -> None:
+        _six_agents(self.client, "prompt:shared")
+        stats = self.client.get("/api/v1/stats").json()
+        view = self._render(stats["independence"])
+        self.assertEqual(view["text"], "1.0 / 6 (ρ=1.00)")
+        self.assertEqual(view["tone"], "calibrated")
+
+    def test_six_independent_agents_render_as_six_of_six(self) -> None:
+        _six_agents(self.client, "prompt:v{0}")
+        stats = self.client.get("/api/v1/stats").json()
+        view = self._render(stats["independence"])
+        self.assertEqual(view["text"], "6.0 / 6 (ρ=0.00)")
+        self.assertEqual(view["tone"], "calibrated")
+
+    def test_null_renders_as_uncalibrated_not_as_a_blank(self) -> None:
+        """The case that matters: no number must not become a number.
+
+        An em-dash or a blank would let a reader supply the headcount, which is
+        the six-fold overstatement D5 exists to name. The word has to be there.
+        """
+        for i in range(3):
+            self.client.post("/api/v1/verify", json=grounded(agent_id="s%d" % i))
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertIsNone(stats["n_effective"])
+        view = self._render(stats["independence"])
+        self.assertEqual(view["text"], "n_effective: uncalibrated")
+        self.assertEqual(view["tone"], "uncalibrated")
+        self.assertNotIn("3", view["text"])
+
+    def test_a_partly_declared_fleet_also_renders_uncalibrated(self) -> None:
+        _six_agents(self.client, "prompt:shared")
+        # A seventh agent that never declared a lineage makes the fleet partial.
+        self.client.post("/api/v1/verify", json=grounded(agent_id="silent"))
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertIsNone(stats["n_effective"])
+        view = self._render(stats["independence"])
+        self.assertEqual(view["text"], "n_effective: uncalibrated")
+        self.assertIn("部分", view["detail"])
+
+    def test_an_empty_fleet_renders_a_dash_not_a_zero(self) -> None:
+        # "0.0 / 0" would read as a measured result about a fleet with no agents.
+        view = self._render(self.client.get("/api/v1/stats").json()["independence"])
+        self.assertEqual(view["text"], "—")
+        self.assertEqual(view["tone"], "unknown")
+
+    def test_the_render_is_not_an_alarm(self) -> None:
+        """It reports; it does not reject. So it must not look like a rejection.
+
+        Checked on the rendered strings rather than the source: the values an
+        operator can read are the ones that could mislead.
+        """
+        _six_agents(self.client, "prompt:shared")
+        calibrated = self._render(
+            self.client.get("/api/v1/stats").json()["independence"]
+        )
+        _reset()
+        self.client = TestClient(app)
+        self.client.post("/api/v1/verify", json=grounded(agent_id="solo"))
+        uncalibrated = self._render(
+            self.client.get("/api/v1/stats").json()["independence"]
+        )
+        banned = ("已隔离", "已拒绝", "已拦截", "阻断", "警告", "ALERT", "BLOCKED")
+        for view in (calibrated, uncalibrated):
+            for word in banned:
+                with self.subTest(word=word, text=view["text"]):
+                    self.assertNotIn(word, view["text"] + view["detail"])
+
+    def test_the_tooltip_is_the_required_sentence(self) -> None:
+        view = self._render({"n_raw": 6, "n_effective": 1.0, "rho": 1.0})
+        self.assertEqual(view["tooltip"], INDEPENDENCE_TOOLTIP)
+
+
+class IndependencePresentationTests(unittest.TestCase):
+    """The static half: what the page and the stylesheet declare.
+
+    Split from the render tests so a machine without node still checks that the
+    row exists and that its styling is neutral -- the two failures a restyle is
+    actually likely to cause.
+    """
+
+    def setUp(self) -> None:
+        _reset()
+        self.client = TestClient(app)
+
+    def test_the_visible_note_and_the_tooltip_say_the_same_thing(self) -> None:
+        """Two places carry the disclaimer; a restyle must not edit one of them."""
+        page = self.client.get("/").text
+        self.assertIn(INDEPENDENCE_TOOLTIP, page)
+        self.assertEqual(page.count(INDEPENDENCE_TOOLTIP), 2,
+                         "the tooltip and the visible note have drifted apart")
+
+    def test_the_page_carries_the_row_and_its_label(self) -> None:
+        page = self.client.get("/").text
+        self.assertIn('id="independence-row"', page)
+        self.assertIn("有效审计人数（基于谱系声明）", page)
+
+    def test_the_independence_styles_use_no_alarm_colour(self) -> None:
+        """A restyle is where "just make it stand out" quietly becomes a lie.
+
+        The rules are read out of ``style.css`` and checked for the alert
+        palette, so turning this row red fails a test instead of shipping.
+        """
+        css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+        start = css.index("independence (D5)")
+        end = css.index(".agents-list {", start)
+        block = css[start:end]
+        for token in ("--red", "#ff3b57", "--amber", "#ffb020", "--red-dim",
+                      "#8c1d2b", "alert", "danger", "warning"):
+            with self.subTest(token=token):
+                self.assertNotIn(token, block)
+        # And it does use the two neutral tones it claims to.
+        self.assertIn("var(--slate)", block)
+        self.assertIn("var(--text-faint)", block)
 
 
 class BindTests(unittest.TestCase):
