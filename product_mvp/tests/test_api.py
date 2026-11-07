@@ -130,6 +130,18 @@ class HttpTests(unittest.TestCase):
     def test_healthz(self) -> None:
         self.assertEqual(self.client.get("/healthz").json(), {"status": "ok"})
 
+    def test_head_works_where_get_does(self) -> None:
+        """``curl -I`` and uptime monitors use HEAD; a 405 there reads as an outage.
+
+        ``@app.get`` alone registers GET only, so both paths answered HEAD with
+        405 and ``Allow: GET``. RFC 9110 requires HEAD wherever GET is served.
+        """
+        for path in ("/", "/healthz"):
+            with self.subTest(path=path):
+                response = self.client.head(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.content, b"", "a HEAD reply must carry no body")
+
     # -- verify ----------------------------------------------------------
 
     def test_verify_false_completion(self) -> None:

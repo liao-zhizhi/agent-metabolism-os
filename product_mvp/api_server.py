@@ -40,7 +40,7 @@ from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, StrictBool
 
@@ -551,6 +551,16 @@ def dashboard() -> HTMLResponse:
     return HTMLResponse(html.replace("__ASSET_V__", _ASSET_VERSION))
 
 
+#: ``@app.get`` registers GET only, so ``HEAD /`` was a 405 with ``Allow: GET``.
+#: RFC 9110 says a server that answers GET must answer HEAD, and every uptime
+#: monitor and ``curl -I`` reaches for HEAD first -- a 405 there reads as "the
+#: demo is down" to exactly the people being shown it. The body of a HEAD reply
+#: is discarded by the client anyway, so this answers without building the page.
+@app.head("/", include_in_schema=False)
+def dashboard_head() -> Response:
+    return Response(status_code=200, media_type="text/html")
+
+
 @app.get("/favicon.svg", include_in_schema=False)
 def favicon() -> FileResponse:
     return FileResponse(STATIC / "favicon.svg", media_type="image/svg+xml")
@@ -559,6 +569,12 @@ def favicon() -> FileResponse:
 @app.get("/healthz", include_in_schema=False)
 def healthz() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.head("/healthz", include_in_schema=False)
+def healthz_head() -> Response:
+    """Same reason as ``dashboard_head``: platform health checks probe with HEAD."""
+    return Response(status_code=200)
 
 
 # ---------------------------------------------------------------------------
