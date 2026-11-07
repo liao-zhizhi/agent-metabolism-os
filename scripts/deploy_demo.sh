@@ -29,6 +29,19 @@ SSH="ssh -o BatchMode=yes -o ConnectTimeout=10"
 TAG="mcgs-$(date +%Y%m%d-%H%M%S)"
 DRY=0
 
+#: Writes allowed per client IP per window. 10 rather than 5: the console is a
+#: demo, and a visitor clicking the scenarios twice should not hit the wall.
+RATE_LIMIT="${CEL_DEPLOY_RATE_LIMIT:-10}"
+RATE_WINDOW="${CEL_DEPLOY_RATE_WINDOW:-60}"
+
+#: The origin is reached only through the Cloudflare tunnel (cloudflared runs
+#: --network host and dials 127.0.0.1:80), so the published port is bound to
+#: loopback. This, not an iptables rule, is what makes the origin unreachable
+#: from the internet: a rule can be forgotten on a rebuild, a bind cannot. It is
+#: also what makes CEL_TRUST_PROXY safe to turn on -- the only party that can
+#: reach the port is the tunnel, so X-Forwarded-For is written by a hop we own.
+PUBLISH="${CEL_DEPLOY_PUBLISH:-127.0.0.1:80:7860}"
+
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
 
 cd "$(dirname "$0")/.."
@@ -113,11 +126,17 @@ print('   image verified: falsify route + record_falsification')
   docker tag cel-dashboard:$TAG cel-dashboard:latest
 
   docker stop cel-app >/dev/null; docker rm cel-app >/dev/null
+  # -p $PUBLISH: loopback only. Nothing on the internet can reach the origin
+  # directly, which is what makes CEL_TRUST_PROXY=1 below sound: the only hop
+  # that can reach this port is the tunnel we control, so X-Forwarded-For was
+  # written by that hop and not by the caller.
   docker run -d --name cel-app --restart always \
-    -p 80:7860 -v /opt/cel_data:/data \
+    -p $PUBLISH -v /opt/cel_data:/data \
     -e CEL_API_KEY=\"\$KEY\" -e CEL_LEDGER_LOG=/data/ledger.jsonl \
+    -e CEL_RATE_LIMIT=$RATE_LIMIT -e CEL_RATE_WINDOW=$RATE_WINDOW \
+    -e CEL_TRUST_PROXY=1 \
     cel-dashboard:$TAG >/dev/null
-  echo \"   image cel-dashboard:$TAG\""
+  echo \"   image cel-dashboard:$TAG (listen $PUBLISH, ${RATE_LIMIT} writes/${RATE_WINDOW}s per IP)\""
 
 echo "== 5/6 health gate =="
 for i in $(seq 1 30); do
@@ -156,6 +175,24 @@ grep -q "commit \${shortHash" <<<"$JS" \
 grep -q "api/v1/falsify" <<<"$JS" \
   || { echo "   FATAL: served app.js has no falsification client" >&2; exit 1; }
 echo "   public bundle: $JSV labels commitments, and ships the reconciliation flow"
+
+# The origin must not be reachable except through the tunnel. Checking the
+# published binding, not a firewall rule: the rule can be absent while the bind
+# holds, and that is the case that matters.
+# `docker port` takes the CONTAINER port (7860), not the host port (80). Asking
+# for 80/tcp prints "no public port published" and looks like a failed bind.
+BIND=$($SSH "$HOST" "docker port cel-app 7860/tcp")
+[[ "$BIND" == 127.0.0.1:* ]] \
+  || { echo "   FATAL: origin port is published as $BIND, not loopback" >&2; exit 1; }
+echo "   origin binding: $BIND (loopback only; direct internet access refused)"
+
+# And the budget the process is actually using, not the one in this script.
+LIMIT=$(curl -s --max-time 20 "$URL/api/v1/stats" | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('rate_limit',{}).get('limit'))")
+[[ "$LIMIT" == "$RATE_LIMIT" ]] \
+  || { echo "   FATAL: live rate limit is $LIMIT, expected $RATE_LIMIT" >&2; exit 1; }
+echo "   live budget: $LIMIT writes per ${RATE_WINDOW}s per client IP"
 echo
 echo "deployed: $TAG"
 echo "rollback: docker tag cel-dashboard:rollback-* cel-dashboard:latest && restart"

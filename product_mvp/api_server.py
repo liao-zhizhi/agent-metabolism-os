@@ -251,15 +251,30 @@ def _client_ip(request: Request) -> str:
     is set, because that header is attacker-controlled: trusting it unasked
     turns the limiter into a no-op (send a new fake IP per request and the
     budget never fills) and, worse, lets anyone burn a specific victim's
-    budget. Behind a proxy the operator must say so; the header is then read
-    left-most, which is the originating client as the proxy recorded it.
+    budget. Behind a proxy the operator must say so.
+
+    When it is trusted, the **right-most** entry is used, not the left-most.
+    ``X-Forwarded-For`` is a list that each hop *appends* to, so everything left
+    of the last comma arrived from the client and is whatever they chose to
+    type: ``X-Forwarded-For: 1.2.3.4`` sent through Cloudflare arrives as
+    ``1.2.3.4, <real client>``. Reading the left-most entry would therefore let
+    anyone mint an unlimited budget by inventing an address per request --
+    through the very proxy this setting exists to support. The right-most entry
+    is the one the last hop (our proxy) wrote, and that hop is the only party
+    here that cannot lie to itself.
+
+    Caveat, stated because it is a real boundary: this assumes exactly one proxy
+    hop. With two chained proxies the right-most entry is the second proxy; list
+    both in the deployment instead of pretending otherwise.
     """
     if (os.environ.get(TRUST_PROXY_ENV) or "").strip():
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
-            first = forwarded.split(",")[0].strip()
-            if first:
-                return first
+            # rsplit, so a trailing comma or whitespace yields nothing rather
+            # than silently promoting the client's own value.
+            last = forwarded.rsplit(",", 1)[-1].strip()
+            if last:
+                return last
     client = request.client
     return client.host if client and client.host else "unknown"
 
@@ -303,17 +318,21 @@ def enforce_write_rate(request: Request) -> None:
     caller with the wrong key sees 429 rather than 403 once it is out of budget;
     that is the correct trade, and the 403 tests reset the budget before use.
     """
-    allowed, retry_after = WRITE_LIMITER.hit(_client_ip(request))
+    caller = _client_ip(request)
+    allowed, retry_after = WRITE_LIMITER.hit(caller)
     if allowed:
         return
     retry = max(1, int(retry_after + 0.999))
+    # Name the address in the 429 body. It is the only way an operator can tell
+    # "the limiter is working" from "everyone is behind one proxy and shares one
+    # budget", and it is not a secret: the caller already knows where it is.
     raise HTTPException(
         status_code=429,
         detail=(
-            "too many writes from this address: the limit is {} per {} seconds. "
+            "too many writes from {}: the limit is {} per {} seconds. "
             "Retry in {}s. Reads (/api/v1/stats, /api/v1/ledger) are not "
             "limited, so the console keeps rendering."
-            .format(WRITE_LIMITER.limit, int(WRITE_LIMITER.window), retry)
+            .format(caller, WRITE_LIMITER.limit, int(WRITE_LIMITER.window), retry)
         ),
         headers={"Retry-After": str(retry)},
     )

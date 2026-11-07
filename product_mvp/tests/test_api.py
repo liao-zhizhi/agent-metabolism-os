@@ -821,7 +821,12 @@ class RateLimitTests(unittest.TestCase):
 
     def test_a_trusted_proxy_header_is_honoured(self) -> None:
         """Behind a real proxy every request otherwise shares one address, and
-        one client would spend everyone's budget."""
+        one client would spend everyone's budget.
+
+        The **right-most** entry is the one our proxy appended; the left-most is
+        whatever the caller typed, so it must never be the identity. This test
+        sends both to pin down which one wins.
+        """
         self._spend()
         self.assertEqual(self._write(trace="x").status_code, 429)
         os.environ["CEL_TRUST_PROXY"] = "1"
@@ -831,8 +836,49 @@ class RateLimitTests(unittest.TestCase):
                 headers={"X-Forwarded-For": "198.51.100.7, 10.0.0.1"},
             )
             self.assertEqual(behind_proxy.status_code, 200)
+            # Spend the rest of 10.0.0.1's budget, each time with a different
+            # spoofed prefix. If the left-most entry were the identity, every one
+            # of these would look like a brand new client and none would be
+            # refused -- which is exactly how the limiter became a no-op.
+            for i in range(self.LIMIT - 1):
+                self.assertEqual(
+                    self._write(
+                        trace="proxied-more-{}".format(i),
+                        headers={"X-Forwarded-For": "198.51.100.{} , 10.0.0.1".format(i)},
+                    ).status_code,
+                    200,
+                )
+            again = self._write(
+                trace="proxied-over",
+                headers={"X-Forwarded-For": "198.51.100.99, 10.0.0.1"},
+            )
+            self.assertEqual(again.status_code, 429, again.text)
         finally:
             os.environ.pop("CEL_TRUST_PROXY", None)
+
+    def test_a_spoofed_prefix_through_a_trusted_proxy_does_not_refill_the_budget(
+        self,
+    ) -> None:
+        """The attack the old left-most read allowed: a fresh fake IP per request.
+
+        Through Cloudflare an ``X-Forwarded-For`` typed by the client arrives as
+        ``<typed>, <real client>``. Reading left-most made the typed part the
+        identity, so every request looked new and the limit never fired.
+        """
+        configure_auth("")
+        os.environ["CEL_TRUST_PROXY"] = "1"
+        try:
+            statuses = [
+                self._write(
+                    trace="spoof-{}".format(i),
+                    headers={"X-Forwarded-For": "203.0.113.{}, 10.0.0.1".format(i)},
+                ).status_code
+                for i in range(self.LIMIT + 1)
+            ]
+        finally:
+            os.environ.pop("CEL_TRUST_PROXY", None)
+        self.assertEqual(statuses[: self.LIMIT], [200] * self.LIMIT)
+        self.assertEqual(statuses[-1], 429, statuses)
 
     def test_an_unknown_key_still_spends_the_budget(self) -> None:
         """429 before 403: guessing the key is the cheapest attack here, so the
