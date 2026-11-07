@@ -323,7 +323,23 @@ def enforce_write_rate(request: Request) -> None:
     if allowed:
         return
     retry = max(1, int(retry_after + 0.999))
-    # Name the address in the 429 body. It is the only way an operator can tell
+    # Uvicorn's access line names the *peer*, which behind docker-proxy is
+    # always 172.17.0.1 -- so the one log an operator reads cannot answer "who".
+    # This line carries the address the budget was actually spent against, which
+    # is the resolved X-Forwarded-For entry on a trusted-proxy deploy.
+    #
+    # INFO, not WARNING: a client that keeps hammering gets one of these per
+    # request on top of uvicorn's own access line, and a limiter should not be
+    # able to amplify an attack into a disk-full incident. INFO still shows up
+    # in production (uvicorn owns the handler) and stays quiet under `unittest`,
+    # where no handler is configured.
+    _log_line(
+        "rate limit: refused {} (budget {} / {:g}s)".format(
+            caller, WRITE_LIMITER.limit, WRITE_LIMITER.window
+        ),
+        logging.INFO,
+    )
+    # Name the address in the 429 body too. It is the only way a client can tell
     # "the limiter is working" from "everyone is behind one proxy and shares one
     # budget", and it is not a secret: the caller already knows where it is.
     raise HTTPException(
