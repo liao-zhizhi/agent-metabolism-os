@@ -1152,18 +1152,40 @@ class AnonymousTrialTests(unittest.TestCase):
         self.assertEqual(after["remaining"], 0)
         self.assertGreater(after["retry_after"], 0)
 
-    def test_stats_install_block_matches_a_command_that_works(self) -> None:
-        """The CTA is data, and it points at a package that exists.
+    def test_the_served_page_and_stats_advertise_the_same_install_command(self) -> None:
+        """Pin the *agreement*, not the string.
 
-        ``pip install harness-audit-sidecar`` is the marketing name and it is
-        **not** on PyPI yet; a landing page whose hero command 404s is the exact
-        failure this project is about, so the published command is the VCS one
-        that resolves today.
+        The install command lives in three places -- the landing page's code
+        block, its explanatory note, and ``write_policy.install.pip`` -- and the
+        only thing that keeps them honest is that they are edited together. A
+        test that asserted today's literal would have to be rewritten on release
+        day, which is exactly when a rewrite is most likely to be done in a
+        hurry; a test that asserts they *match* passes before and after the
+        switch and breaks on the drift.
         """
         install = self.client.get("/api/v1/stats").json()["write_policy"]["install"]
-        self.assertIn("git+https://github.com/liao-zhizhi/harness-audit-sidecar", install["pip"])
+        page = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+
+        block = re.search(r'<code id="install-cmd">(.*?)</code>', page, re.S)
+        self.assertIsNotNone(block, "the landing page has no install-cmd block")
+        command = block.group(1).strip()
+
+        self.assertEqual(
+            command, install["pip"],
+            "the page and /api/v1/stats disagree about the install command",
+        )
+        self.assertIn("harness-audit-sidecar", command)
         self.assertEqual(install["mcp_server"], "harness-audit-server")
         self.assertIn("causal-evolution-paper", install["spec_repo"])
+
+        # Local consistency, no network: a page must not advertise a bare PyPI
+        # install while also saying the package is not on PyPI. That contradiction
+        # is the pre-release fallback left half-removed.
+        if "git+" not in command:
+            self.assertNotIn(
+                "尚未发布", page,
+                "the page advertises a bare pip install but still says 尚未发布",
+            )
 
 
 if __name__ == "__main__":
