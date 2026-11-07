@@ -26,6 +26,21 @@ by an expensive essay nobody can verify. Worth knowing that the weights in
 ``penalty.py`` decide how long the trap lasts, so a severity that keeps the
 system in ``CRITICAL`` for a hundred passes is also a decision to keep it
 shallow for a hundred passes.
+
+The first beat after waking is fast, by force
+--------------------------------------------
+A woken account is not the same machine as one that never slept, even at the same
+charge: it has no work in flight, and an expensive first beat spends the reserve
+that keeps it awake. With the shipped numbers -- wake at 40, slow beat 35, sleep
+floor 10 -- the slow beat is *affordable* and still must not run, because it lands
+the account on 5. That is the chatter a hysteresis band exists to prevent, so the
+scheduler refuses it here rather than reporting it afterwards.
+
+The fact comes from the account (``EnergyAccount.awaiting_first_beat``), the
+policy lives here, and the two are deliberately different causes with different
+reason codes: ``DEGRADED_TRUST`` is absorbing, ``DEGRADED_ENERGY`` needs a
+restore, and ``DEGRADED_WAKE`` expires on its own after one beat. Collapsing them
+would tell an operator to go fix something that fixes itself.
 """
 
 from __future__ import annotations
@@ -42,6 +57,7 @@ __all__ = [
     "ADAPTIVE_SURCHARGE",
     "DEGRADED_ENERGY",
     "DEGRADED_TRUST",
+    "DEGRADED_WAKE",
     "FAST",
     "FAST_QUALITY",
     "LLMResponse",
@@ -54,6 +70,7 @@ __all__ = [
     "TIER_INNATE",
     "TIERS",
     "DualBeatScheduler",
+    "WakeWindowError",
 ]
 
 FAST = "fast"
@@ -89,6 +106,14 @@ ADAPTIVE_SURCHARGE = 10.0
 DEGRADED_ENERGY = "insufficient_energy"
 DEGRADED_TRUST = "penalty_critical"
 
+#: Third cause, and the one that clears itself: the account had just climbed out
+#: of ``EXHAUSTED`` and had not yet paid for a beat. Distinct from the other two
+#: because the fix is *nothing* -- wait one beat -- and because it is the only
+#: degradation that expires without an operator doing anything. Keeping it
+#: separate is what lets an audit tell "degraded for a one-shot reason" from
+#: "degraded because the book is poor".
+DEGRADED_WAKE = "first_beat_after_wake"
+
 DEFAULT_BASE_COST = 7.0
 SLOW_COMPLEXITY_THRESHOLD = 0.7
 SLOW_ENERGY_MULTIPLIER = 5.0
@@ -98,6 +123,17 @@ SLOW_LATENCY_MULTIPLIER = 2.0
 # extra joules bought, and it is labelled as simulated wherever it is printed.
 FAST_QUALITY = 0.72
 SLOW_QUALITY = 0.94
+
+
+class WakeWindowError(Exception):
+    """A slow beat was demanded inside the first-beat window after waking.
+
+    Raised only in ``strict_first_beat`` mode. The default is to degrade and
+    record, because a scheduler that throws away a completed task to make a point
+    is worse than one that runs the cheap beat and says so. A caller that cannot
+    tolerate a fast answer -- a proof search, say -- asks for strict mode and gets
+    a failure instead of a quietly inferior result.
+    """
 
 
 @dataclass(frozen=True)
@@ -152,6 +188,7 @@ class DualBeatScheduler:
         slow_energy_multiplier: float = SLOW_ENERGY_MULTIPLIER,
         slow_latency_multiplier: float = SLOW_LATENCY_MULTIPLIER,
         penalty_ledger: Optional[PenaltyLedger] = None,
+        strict_first_beat: bool = False,
     ) -> None:
         if not isinstance(account, EnergyAccount):
             raise TypeError("account must be an EnergyAccount")
@@ -173,6 +210,7 @@ class DualBeatScheduler:
             slow_latency_multiplier, "slow_latency_multiplier"
         )
         self._penalty = penalty_ledger
+        self._strict_first_beat = bool(strict_first_beat)
 
     # -- parameters -------------------------------------------------------
 
@@ -231,6 +269,16 @@ class DualBeatScheduler:
         """
         return self.penalty_state != PENALTY_CRITICAL
 
+    @property
+    def strict_first_beat(self) -> bool:
+        """Whether a demanded slow beat after waking raises instead of degrading."""
+        return self._strict_first_beat
+
+    @property
+    def awaiting_first_beat(self) -> bool:
+        """D3.2 in one predicate: this account woke and has not yet paid a beat."""
+        return self._account.awaiting_first_beat
+
     # -- execution --------------------------------------------------------
 
     def execute(
@@ -283,12 +331,54 @@ class DualBeatScheduler:
         # account so that a system which is both poor and distrusted is told
         # the truth about which one is holding it back -- the charge is easy to
         # fix, and naming it wrongly would send the operator to the wrong lever.
+        #
+        # Order: trust, then the wake window, then the charge. Trust is
+        # absorbing, so it is reported first even when a transient condition is
+        # also present -- otherwise a woken-up bankrupt system would say
+        # "come back next beat" and the bankruptcy would never be named. The
+        # wake window sits in the middle because it is real but self-clearing,
+        # while a charge shortfall needs a restore.
         blocked_by = None
         if wants_slow:
             if not self.slow_thinking_allowed:
                 blocked_by = DEGRADED_TRUST
+            elif self._account.awaiting_first_beat:
+                blocked_by = DEGRADED_WAKE
             elif not self._account.can_afford(slow_price):
                 blocked_by = DEGRADED_ENERGY
+
+        if blocked_by == DEGRADED_WAKE and self._strict_first_beat:
+            # Nothing has been spent. A strict caller gets a failure rather than
+            # a cheap answer it did not ask for, and the account is untouched so
+            # the next call can still run fast.
+            raise WakeWindowError(
+                "refusing a slow beat on the first beat after waking: the "
+                "account left EXHAUSTED at {:.1f}% and has not paid for a beat "
+                "yet. The first beat must be fast (D3.2: a band narrower than "
+                "one slow cycle would wake, overspend, and re-sleep). Retry "
+                "with a task under the slow threshold, or wait one beat."
+                .format(self._account.ratio * 100.0)
+            )
+
+        # The band must fund the beat it admits. A wake that cannot pay for even
+        # the fast beat and stay above the sleep floor is not a wake, it is half
+        # of a chatter cycle: run it and the account is EXHAUSTED again on the
+        # very next cycle, having bought one answer with the charge it needed to
+        # keep running. Refused here rather than after the spend, so nothing is
+        # billed for a beat the band cannot hold.
+        if self._account.awaiting_first_beat and not self._account.first_beat_clears_band(fast_price):
+            raise EnergyExhausted(
+                "premature wake: {:.2f} of charge cannot fund a {:.2f} beat and "
+                "still clear the {}% sleep floor. A first beat must leave at "
+                "least {:.2f} behind; restore to at least {:.2f} first."
+                .format(
+                    self._account.current_energy,
+                    fast_price,
+                    self._account.wake_reserve / self._account.budget * 100.0,
+                    self._account.wake_reserve,
+                    fast_price + self._account.wake_reserve,
+                )
+            )
 
         degraded = False
         degraded_reason = None
@@ -297,14 +387,17 @@ class DualBeatScheduler:
             cost = slow_price
             self._account.consume(cost)
         else:
-            # Three ways to arrive here, and they mean different things:
+            # Four ways to arrive here, and they mean different things:
             #   wants_slow is False  -> the task did not deserve the slow beat,
             #                           or the account is conserving charge.
+            #   blocked_by TRUST     -> it deserved one and is not trusted with
+            #                           it. Also recorded, and also not a debt.
+            #   blocked_by WAKE      -> it deserved one on the first beat after
+            #                           waking. Recorded, and it expires on its
+            #                           own: the next beat may run slow.
             #   blocked_by ENERGY    -> it deserved one and could not pay, so
             #                           the scheduler degrades instead of
             #                           overdrawing. That is recorded.
-            #   blocked_by TRUST     -> it deserved one and is not trusted with
-            #                           it. Also recorded, and also not a debt.
             degraded = wants_slow
             degraded_reason = blocked_by
             cost = fast_price

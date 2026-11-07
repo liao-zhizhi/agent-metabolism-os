@@ -21,6 +21,26 @@ States
 The thresholds are *strict* (``ratio < threshold``), so an account sitting
 exactly on 30% is still in ``GROW``. That is deliberate: the boundary is a
 description of the charge, not a rounding rule, and a demo can show it.
+
+Waking is an event, not a state
+-------------------------------
+``state`` is derived from the charge and remembers nothing, which is right for a
+level but wrong for a *transition*. A cell that has just come out of dormancy is
+not the same machine as one that never went in, even when the two sit at the same
+ATP: the woken one has no work in flight, and paying for an expensive beat as its
+first act puts it straight back below the sleep floor.
+
+So the account keeps one bit of history -- ``wake_epoch``, bumped whenever the
+charge climbs out of ``EXHAUSTED`` -- and answers :attr:`awaiting_first_beat`
+until a positive-cost spend is actually recorded. The scheduler is the one that
+acts on it (see :class:`~agent_metabolism.scheduler.DualBeatScheduler`), but the
+fact belongs here, because this is the only object that sees every ``restore`` and
+every ``consume``. Deciding it anywhere else would mean inferring a transition
+from a level, and a level cannot tell you which side of the band you came from.
+
+A fresh account is *not* awaiting a first beat. It has never been dormant, and
+charging it the woken-up penalty would make every cold start pay for a dormancy it
+did not have.
 """
 
 from __future__ import annotations
@@ -139,6 +159,14 @@ class EnergyAccount:
         self._exhausted_threshold = exhausted
         self._conserve_threshold = conserve
         self._ledger: List[LedgerEntry] = []
+        #: How many times this account has climbed out of ``EXHAUSTED``. A count
+        #: rather than a bool so a later reader can tell "never dormant" from
+        #: "woke once and has been working since", which a flag cannot express.
+        self._wake_epoch = 0
+        #: Whether a positive-cost beat has been paid for since the last wake.
+        #: ``True`` at construction: a new account has not been dormant, so it is
+        #: not earning the first-beat restriction.
+        self._spent_since_wake = True
 
     # -- read-only view ---------------------------------------------------
 
@@ -168,6 +196,39 @@ class EnergyAccount:
     @property
     def ledger(self) -> Tuple[LedgerEntry, ...]:
         return tuple(self._ledger)
+
+    @property
+    def wake_epoch(self) -> int:
+        """How many times the charge has climbed out of ``EXHAUSTED``."""
+        return self._wake_epoch
+
+    @property
+    def awaiting_first_beat(self) -> bool:
+        """True once woken and until the first positive-cost beat is recorded.
+
+        This is the "just woke" flag, and it is one-way within a wake: only a
+        spend clears it, so a caller cannot clear it by asking twice. A refused
+        spend leaves it set, because nothing was paid for.
+        """
+        return self._wake_epoch > 0 and not self._spent_since_wake
+
+    @property
+    def wake_reserve(self) -> float:
+        """The charge a first beat after waking must leave behind.
+
+        The sleep floor itself, as an absolute amount. Paying the floor away is
+        the definition of chatter: the account wakes, buys one beat, and is
+        immediately below ``EXHAUSTED`` again -- which is the cycle
+        ``scheduler`` now refuses to enter.
+        """
+        return self._exhausted_threshold * self._budget
+
+    def first_beat_clears_band(self, cost: float) -> bool:
+        """Whether paying ``cost`` now would leave the charge above the floor."""
+        amount = _finite(cost, "cost")
+        if amount < 0.0:
+            raise ValueError("cost must not be negative, got {!r}".format(cost))
+        return self._energy - amount >= self.wake_reserve - _EPSILON
 
     @property
     def total_spent(self) -> float:
@@ -218,17 +279,29 @@ class EnergyAccount:
 
         before = self._energy
         self._energy = max(0.0, self._energy - amount)
+        self._spent_since_wake = True
         self._ledger.append(
             LedgerEntry(cost=amount, before=before, after=self._energy, state=self.state)
         )
         return self._energy
 
     def restore(self, amount: float) -> float:
-        """Add charge, capped at the budget. Returns the new charge."""
+        """Add charge, capped at the budget. Returns the new charge.
+
+        The only place a wake can be observed, because it is the only place the
+        charge goes up. A restore that does not lift the account out of
+        ``EXHAUSTED`` is not a wake -- it is a bigger account that is still
+        asleep, and treating it as a wake would spend the first-beat restriction
+        on a transition that has not happened.
+        """
         value = _finite(amount, "amount")
         if value < 0.0:
             raise ValueError("amount must not be negative, got {!r}".format(amount))
+        was_exhausted = self.state == EXHAUSTED
         self._energy = min(self._budget, self._energy + value)
+        if was_exhausted and self.state != EXHAUSTED:
+            self._wake_epoch += 1
+            self._spent_since_wake = False
         return self._energy
 
     # -- reporting --------------------------------------------------------
@@ -240,6 +313,8 @@ class EnergyAccount:
             "ratio": self.ratio,
             "state": self.state,
             "spent": self.total_spent,
+            "wake_epoch": self._wake_epoch,
+            "awaiting_first_beat": self.awaiting_first_beat,
         }
 
     def __repr__(self) -> str:

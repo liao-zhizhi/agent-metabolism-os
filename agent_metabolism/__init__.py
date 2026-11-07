@@ -178,6 +178,7 @@ from .scheduler import (
     ADAPTIVE_SURCHARGE,
     DEGRADED_ENERGY,
     DEGRADED_TRUST,
+    DEGRADED_WAKE,
     FAST,
     OXPHOS,
     SLOW,
@@ -187,6 +188,7 @@ from .scheduler import (
     TIERS,
     DualBeatScheduler,
     LLMResponse,
+    WakeWindowError,
 )
 
 __version__ = "1.0.10"
@@ -241,6 +243,7 @@ __all__ = [
     "DEFAULT_WEIGHTS",
     "DEGRADED_ENERGY",
     "DEGRADED_TRUST",
+    "DEGRADED_WAKE",
     "EMERGENCY",
     "EXHAUSTED",
     "FAST",
@@ -269,6 +272,7 @@ __all__ = [
     "DoubleEntryError",
     "DoubleEntryLedger",
     "DualBeatScheduler",
+    "WakeWindowError",
     "EnergyAccount",
     "EnergyError",
     "EnergyExhausted",
