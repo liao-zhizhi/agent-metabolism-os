@@ -330,7 +330,27 @@ class WitnessHashTests(unittest.TestCase):
         )
         self.assertEqual(out["verdict"], "PASS")
         self.assertEqual(out["penalty"], 0.0)
-        self.assertFalse(out["grounded"])
+        # Nothing was claimed, so nothing was committed. Note "grounded" is
+        # None here too: a silent failure is not *known* to be ungrounded.
+        self.assertFalse(out["commitment_recorded"])
+        self.assertIsNone(out["grounded"])
+
+    def test_grounded_is_never_true_even_for_a_real_digest(self) -> None:
+        """The server must not claim what it cannot see.
+
+        A supplied digest is a commitment: it lets someone holding the real file
+        falsify the claim later. It is not proof the file exists, because the
+        server cannot read the client's disk. Reporting ``grounded=True`` here
+        is what made an invented digest indistinguishable from an honest one.
+        """
+        out = self.gw.verify(
+            agent_id="a", intent="x", check=True, witness=True,
+            witness_hash=_H, trace_id=_trace(),
+        )
+        self.assertEqual(out["verdict"], "PASS")
+        self.assertTrue(out["commitment_recorded"])
+        self.assertIsNone(out["grounded"])
+        self.assertEqual(out["grounding"], "unverifiable_by_server")
 
     def test_a_replayed_trace_id_is_refused(self) -> None:
         trace = _trace()

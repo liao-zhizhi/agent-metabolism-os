@@ -382,6 +382,28 @@ body {
 .term-intent { color: var(--text-dim); }
 .term-tail { color: var(--text-faint); font-size: 11px; }
 
+/* Evidence tag: the line must show what backs the verdict, not just the verdict.
+   A digest is monospaced so a truncated hash still reads as a hash; a simulated
+   preset is deliberately a different colour so it cannot be mistaken for one. */
+.ev-tag {
+  flex: none;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.ev-hash {
+  color: var(--green);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px dashed rgba(43, 255, 136, 0.45);
+}
+.ev-sim {
+  color: var(--amber);
+  border: 1px dashed rgba(255, 176, 32, 0.55);
+}
+.ev-none { color: var(--text-faint); border: 1px dotted rgba(255, 255, 255, 0.18); }
+
 .term-line.is-fail { background: linear-gradient(90deg, rgba(255, 59, 87, 0.07), transparent 70%); }
 .term-line.is-pass { background: linear-gradient(90deg, rgba(43, 255, 136, 0.045), transparent 70%); }
 

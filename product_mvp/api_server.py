@@ -21,6 +21,7 @@ service in one sitting.
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import logging
 import os
@@ -296,10 +297,37 @@ class UnlockRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _asset_version() -> str:
+    """A short digest over the static assets, used to bust caches.
+
+    The console sits behind a CDN that caches ``/static/*`` for hours. A deploy
+    that replaces ``app.js`` without changing its URL therefore ships nothing
+    visible: the edge keeps serving the old file, and the operator sees a
+    dashboard that disagrees with the API it is talking to. That happened once
+    already, which is why the version is derived from the bytes instead of from
+    a hand-bumped constant -- forgetting to bump it is the failure mode.
+
+    Computed once per process: the files cannot change without a restart, since
+    they are baked into the image.
+    """
+    digest = hashlib.sha256()
+    for name in ("app.js", "style.css"):
+        path = STATIC / name
+        try:
+            digest.update(path.read_bytes())
+        except OSError:
+            digest.update(name.encode("utf-8"))
+    return digest.hexdigest()[:10]
+
+
+_ASSET_VERSION = _asset_version()
+
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def dashboard() -> HTMLResponse:
     """Serve the console. Read from disk so editing the HTML needs no restart."""
-    return HTMLResponse((TEMPLATES / "index.html").read_text(encoding="utf-8"))
+    html = (TEMPLATES / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(html.replace("__ASSET_V__", _ASSET_VERSION))
 
 
 @app.get("/favicon.svg", include_in_schema=False)

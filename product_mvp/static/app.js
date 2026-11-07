@@ -178,6 +178,40 @@ function paintAgents(agents) {
 
 /* -------------------------------------------------------------- live feed */
 
+/* Evidence, not decoration. A PASS used to be indistinguishable from a PASS
+ * that carried a digest, which was the console's own version of the bug the
+ * ledger just fixed: the screen showed a verdict without showing what backed
+ * it. Every line now says which of the three it is -- a recorded digest, an
+ * honest negative with nothing to hash, or a dashboard simulation.
+ *
+ * ``shortHash`` is the existing 10+4 truncation used for the chain head, reused
+ * so a digest looks the same everywhere on the page.
+ */
+function evidenceTag(entry) {
+  const artefact = String(entry.artefact || "");
+  const hash = String(entry.witness_hash || "");
+
+  // A simulated preset must never look like physical evidence. It says so on
+  // the line itself, so a screenshot cannot be cropped into a claim.
+  if (artefact.startsWith("simulated://")) {
+    return `<span class="ev-tag ev-sim" title="${artefact}">simulated://</span>`;
+  }
+  // The badge names what was recorded, not what was proven. An earlier version
+  // rendered a bare chain glyph, which made an invented digest and an honest
+  // one indistinguishable on screen -- the exact overclaim this whole exercise
+  // is about. "commit" is the claim the server can actually stand behind.
+  if (entry.verdict === "PASS" && entry.witness === true) {
+    return hash
+      ? `<span class="ev-tag ev-hash" title="commitment recorded: sha256:${hash} · trace ${entry.trace_id || "—"} — the server cannot verify the file exists">⛓ commit ${shortHash(hash)}</span>`
+      : `<span class="ev-tag ev-none">no digest</span>`;
+  }
+  if (entry.verdict === "PASS") {
+    // Accurate bad news: there is no artefact, so no digest is expected.
+    return `<span class="ev-tag ev-none" title="honest negative: nothing to hash">honest failure</span>`;
+  }
+  return "";
+}
+
 function renderEntry(entry, isNew) {
   const term = el("terminal");
   const line = document.createElement("div");
@@ -198,6 +232,7 @@ function renderEntry(entry, isNew) {
     <span class="seq">#${String(entry.seq).padStart(3, "0")}</span>
     <span class="t">${clockOf(entry.ts)}</span>
     <span class="v-tag v-${verdict.toLowerCase()}">${verdict}</span>
+    ${evidenceTag(entry)}
     <span class="term-agent">${entry.agent_id}</span>
     <span class="term-intent">${entry.intent}</span>
     ${detail}

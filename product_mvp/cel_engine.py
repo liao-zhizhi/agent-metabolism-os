@@ -37,8 +37,11 @@ Honest boundaries
   gate: it takes a physical artefact plus a digest before an *action* is
   allowed. This MVP needs a one-shot verdict over ``check``/``witness``, which is
   precisely the ``DoubleEntryLedger`` contract. When a caller supplies an
-  ``artefact`` path it is hashed with ``digest_file`` and recorded, so a
-  grounded pass is grounded in a real file and not a sentence.
+  ``artefact`` path it is hashed with ``digest_file`` and recorded. Note what
+  that does and does not buy: it binds the claim to a *specific digest*, so it
+  can be falsified later by anyone holding the real file. It does not prove the
+  file existed, because the server cannot read the client's disk. See
+  ``WitnessHashLimits``.
 * State is in memory. Restarting the process clears the books; ``CEL_LEDGER_LOG``
   optionally appends the chain to disk so a restart is auditable, but replaying
   it into live trust is out of scope for the MVP.
@@ -498,10 +501,15 @@ class CelGateway:
             "inflamed": state == CRITICAL,
             "penalty": receipt["penalty"],
             "charged_as": receipt["charged_as"],
-            # "grounded" now means exactly one thing: a digest was supplied and
-            # validated. It used to mean "the artefact string was non-empty",
-            # which is a statement about typing, not about evidence.
-            "grounded": bool(receipt.get("witness_hash")),
+            # "grounded" used to be set from "a digest was supplied", which
+            # reads as "the loop is closed". It is not: a liar who hashes a
+            # string that never touched a disk satisfies that test. The server
+            # cannot read the client's filesystem, so the honest answer to
+            # "was this grounded in reality" is "unknown" -- and null says so.
+            # See WitnessHashLimits and CAUSAL_HARDENING_REPORT.md §4.
+            "commitment_recorded": bool(receipt.get("witness_hash")),
+            "grounded": None,
+            "grounding": "unverifiable_by_server",
             "artefact": receipt["artefact"],
             "witness_hash": receipt.get("witness_hash", ""),
             "trace_id": receipt.get("trace_id", ""),
@@ -528,7 +536,9 @@ class CelGateway:
             "inflamed": self._state_of(sealed["agent"]) == CRITICAL,
             "penalty": 0.0,
             "charged_as": "",
-            "grounded": bool(sealed.get("witness_hash")),
+            "commitment_recorded": bool(sealed.get("witness_hash")),
+            "grounded": None,
+            "grounding": "unverifiable_by_server",
             "artefact": sealed["artefact"],
             "witness_hash": sealed.get("witness_hash", ""),
             "trace_id": sealed.get("trace_id", ""),

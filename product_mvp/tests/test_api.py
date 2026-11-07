@@ -10,6 +10,7 @@ on a bare interpreter.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -95,6 +96,23 @@ class HttpTests(unittest.TestCase):
         for path in ("/static/app.js", "/static/style.css", "/favicon.svg"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_asset_urls_are_versioned(self) -> None:
+        """The CDN caches /static/* for hours, so the URL must change on deploy.
+
+        This is a regression test for a real deploy: app.js was replaced but the
+        edge kept serving the old file for four hours, and the console showed a
+        verdict with no evidence tag while the API it polled already had the
+        field. A hand-bumped constant invites the same failure the next time
+        someone forgets, so the version is a digest over the bytes.
+        """
+        html = self.client.get("/").text
+        self.assertNotIn("__ASSET_V__", html, "template placeholder was not substituted")
+        self.assertRegex(html, r'/static/app\.js\?v=[0-9a-f]{10}')
+        self.assertRegex(html, r'/static/style\.css\?v=[0-9a-f]{10}')
+        # Same digest on both, or one asset can go stale alone.
+        versions = set(re.findall(r'\?v=([0-9a-f]{10})', html))
+        self.assertEqual(len(versions), 1, "assets disagree about the version")
 
     def test_healthz(self) -> None:
         self.assertEqual(self.client.get("/healthz").json(), {"status": "ok"})
