@@ -139,7 +139,12 @@ SRC="$(pwd)/product_mvp"
 FILES=(api_server.py cel_engine.py example_client.py
        Dockerfile .dockerignore
        static/app.js static/style.css templates/index.html
-       tests/test_api.py tests/test_engine.py)
+       tests/test_api.py tests/test_engine.py tests/render_probe.js)
+#: ``render_probe.js`` is in the list on purpose: ``test_api.py`` executes it, so
+#: shipping the test without the probe would leave a test directory that cannot
+#: run -- and it would fail rather than skip on any host that happens to have
+#: node. The same defect the probe exists to prevent (a check that reads as
+#: coverage and is structurally incapable of running), one directory away.
 
 echo "== 1/6 local test gate =="
 # Refuse to ship a tree that fails its own contract tests. A deploy is the worst

@@ -101,6 +101,13 @@ python3 -m unittest discover -s tests -v            # 引擎层，零第三方�
 .venv/bin/python -m unittest discover -s tests -v   # 含 HTTP 层（需 fastapi+httpx）
 ```
 
+**其中 7 个渲染测试需要 `node`**（`tests/render_probe.js` 把真实的 `static/app.js`
+载进 `vm` 执行 `independenceText()`，而不是对源码做字符串匹配——只 grep 源码会
+在死分支上通过）。没有 `node` 的机器上这 7 个会被 **skip 而非 fail**，用
+`-v` 会看到 `skipped='node is required to execute the renderer'`；其余测试照常
+覆盖模板与样式（`IndependencePresentationTests` 不依赖 node）。所以一个全绿的
+`-q` 结果也可能意味着这 7 个没跑，要看 skip 计数。
+
 ---
 
 ## 一·五、写接口的鉴权
