@@ -212,12 +212,12 @@
         <h3>安装 sidecar</h3>
         <button class="copy-btn" type="button" data-copy-target="install-cmd">复制</button>
       </div>
-      <pre class="codeblock"><code id="install-cmd">pip install "git+https://github.com/liao-zhizhi/harness-audit-sidecar.git"</code></pre>
+      <pre class="codeblock"><code id="install-cmd">pip install harness-audit-sidecar</code></pre>
       <p class="dev-note">
-        PyPI 上尚未发布，所以上面的命令走 git，今天就能装。
-        发布后命令会简化为 <code>pip install harness-audit-sidecar</code>。
-        装完应该有一个可执行文件：
+        已发布在 PyPI 上，装完应该有一个可执行文件：
         <code>harness-audit-server --help</code>。
+        也可以用 git 直接装当前开发版：
+        <code>pip install "git+https://github.com/liao-zhizhi/harness-audit-sidecar.git"</code>。
       </p>
     </div>
 

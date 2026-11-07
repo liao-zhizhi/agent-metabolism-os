@@ -1050,8 +1050,7 @@ def stats(request: Request) -> Dict[str, Any]:
             "can_unlock": True,
         },
         "install": {
-            "pip": 'pip install "git+https://github.com/liao-zhizhi/'
-                   'harness-audit-sidecar.git"',
+            "pip": "pip install harness-audit-sidecar",
             "mcp_server": "harness-audit-server",
             "repo": "https://github.com/liao-zhizhi/harness-audit-sidecar",
             "spec_repo": "https://github.com/liao-zhizhi/causal-evolution-paper",
