@@ -6,15 +6,17 @@
 
 | 项 | 值 |
 | --- | --- |
-| 版本 | v0.1（草案） |
-| 状态 | 推导完成，参考实现可执行，未进入发布包 |
+| 版本 | v0.2（草案） |
+| 状态 | 数学已证、参考实现可执行；仅 D1 离散记账、D2 的 R2 闩锁、D3.2 有代码强制，其中 D3.2 尚无真实流量（见 §0.1） |
 | 参考实现 | `agent_metabolism/dynamics.py`（1044 行，仅标准库） |
-| 测试 | `tests/test_dynamics.py`（47 项）+ `tests/test_wake_window.py`（22 项）+ 33 个 doctest |
+| 测试 | `tests/test_dynamics.py`（47 项）+ `tests/test_wake_window.py`（22 项）+ 36 个 doctest |
 | 数值 | `demo_dynamics.py` 运行产出，本文引用而不复述 |
 | 依赖层 | L1 `energy.py`、L2 `scheduler.py`、L3 `regime.py`、L7 `compartment.py`、`penalty.py`、`interface_engine.py` |
 | 论文锚点 | `metabolism_paper/main.tex`：`eq:penalty`、`eq:trust`、`eq:recover`、`eq:amortise`、`sec:ledger`、`sec:immunity` |
 
 > 本文的每一个数字都由 `demo_dynamics.py` 打印。若文档与脚本冲突，**文档错**。这是唯一能让白皮书不变成它所批判之物的方向。
+>
+> 同理：本文每一条"已实施"都必须能被一次 grep 证实。若某条法则只有测试通过而没有任何运行时调用点，它会被标成"数学已证，代码未强制"——因为一份把参考实现说成生产拦截的白皮书，正是它 §8 批评的那种假完成。
 
 ---
 
@@ -49,6 +51,47 @@ x=(E,\,T,\,W,\,H)\;=\;(\text{能荷},\ \text{信任},\ \text{独立见证},\ \te
 - **D4 遗传**：适应度对来源**乘法**，速度买不动出处。
 - **D5 独立**：克隆的法定人数等于一个见证。
 - **D6 传染**：溢出在 `R₀=1` 处发散；越过它，唯一有效的动作是切膜，不是更多验证。
+
+---
+
+## 0.1 实施状态：每一条法则究竟被强制到了哪一层
+
+这一节存在的原因是上一个版本把"参考实现 + 测试通过"写成了"已在代码中强制实施"。这两件事不是一回事，而它们的差别正好是本文的主题。
+
+判据只有一条，且可机械核查：**在生产代码里是否存在一个调用点**。测试、demo、audit 脚本都不算——它们证明公式会算，不证明系统会拦。
+
+| 法则 | 数学 | 参考实现 | 运行时强制 | 强制位置 / 证据 |
+| --- | --- | --- | --- | --- |
+| **D1** 供给 | ✅ | ✅ | ⚠️ **部分** | 离散更新在 `cel_engine` 运行时（`PenaltyLedger` 记账）；`derivative()` 无运行时调用点 |
+| **D2** 偿付 `min` | ✅ | ✅ | ❌ **未强制** | `net_assets()` 仅被 `tests/` 与 `demo_dynamics.py` 调用 |
+| **D2** R2 闩锁 | ✅ | ✅ | ✅ **已强制** | `cel_engine` 调 `record_falsification` → trust→0；`double_entry._closes_book` → `AgentLocked` 拒绝写入 |
+| **D3** 休眠/死亡判定 | ✅ | ✅ | ❌ **未强制** | `classify()` / `liquidate()` 无运行时调用点；`DORMANT/DEAD` 只存在于 `dynamics.py` |
+| **D3.2** 唤醒首拍 | ✅ | ✅ | ⚠️ **代码强制 / 零流量** | `EnergyAccount.awaiting_first_beat` + `DualBeatScheduler.execute`；`restore()` 无生产调用者 |
+| **D4** 适应度乘法 | ✅ | ✅ | ❌ **未强制** | `GenomeAudit` / `AdoptionGate` 无运行时调用点；`solidify()` 只在 `experiments/` |
+| **D5** 克隆虚报 | ✅ | ✅ | ❌ **未强制** | `effective_witnesses()` / `Ecosystem` 仅被测试与 demo 调用 |
+| **D6** 毒性溢出 | ✅ | ✅ | ❌ **未强制** | `spillover()` / `reproduction_number()` 无运行时调用点；L7 裂解只在 demo/audit |
+
+三条必须说清的事实：
+
+1. **已发布包根本不跑代谢层.** `harness-audit-sidecar` 的 `audit_sidecar/tools/membrane.py` 里明确写着 `this package never imports agent_metabolism`。所以 L1/L2 的能荷与拍调度不在 `demo.silicon-probe.com` 的请求路径上。
+2. **被服务的产品只跑其中两块.** `product_mvp/cel_engine.py` 运行时使用 `double_entry`（双式记账 + 账簿关闭）与 `penalty`（信任记分）。它**不**实例化 `EnergyAccount`、`DualBeatScheduler`、`LLMProxy`。
+3. **`restore()` 在修复前无任何生产调用者，修复后仍然没有.** D3.2 补上的是路径本身（事实 + 政策 + 拦截），不是把路径接进某条流量。`grep '\.restore('` 的全部命中是：`test_metabolism`、`test_wake_window`、`demo_dynamics`，以及 `experiments/` 里对一个无关 `env` 对象的调用。
+
+还有一条比逐符号检索更硬的判据：
+
+```bash
+grep -rn 'from agent_metabolism.dynamics\|import agent_metabolism.dynamics' --include=*.py .
+```
+
+命中只有 `demo_dynamics.py` 与 `tests/`。**`dynamics.py` 没有任何生产导入者。** 一个模块如果没人 import，它的函数就不可能在任何请求路径上被调用——这比"我查了每个符号"更难得地可证伪。
+
+因此全篇的状态词只有三种：
+
+- **✅ 已强制** —— 有生产调用点，且违反会被拒绝。
+- **⚠️ 部分 / 零流量** —— 两种情形共用此符号：(a) 有生产调用点但只覆盖一部分（如记账有、流方程无）；(b) 拦截代码存在且被测过，但今天没有任何生产流量会走到它。第二种最容易自我欺骗，所以必须显式写出"零流量"三个字。
+- **❌ 数学已证，代码未强制** —— 有实现、有测试、无调用点。
+
+（本节的每一条都可以用 `grep` 复核，命令见 §11。）
 
 ---
 
@@ -117,6 +160,8 @@ n_{\text{eff}}=\frac{n}{1+(n-1)\rho},\qquad \rho=1\Rightarrow n_{\text{eff}}=1
 
 ## 2. 本体与 D1：四个变量，一条平衡方程
 
+> **状态：⚠️ 部分强制.** 离散的 `P`/`T` 更新在 `cel_engine` 运行时真实发生（`PenaltyLedger`）；但 `derivative()` 这个连续形式**没有**运行时调用点——系统不积分它，只在测试里比对它与离散账本是否同解。
+
 ### 2.1 状态向量
 
 | 变量 | 含义 | 初值 | 代码锚点 |
@@ -166,6 +211,10 @@ n_{\text{eff}}=\frac{n}{1+(n-1)\rho},\qquad \rho=1\Rightarrow n_{\text{eff}}=1
 ---
 
 ## 3. D2：偿付力取 `min`，不取和
+
+> **状态：❌ 公式未强制 / ✅ R2 闩锁已强制.** 这两半必须分开读。
+> `net_assets()` 的调用点只有测试与 demo——**运行时从不用 `min` 折算偿付力**，`cel_engine` 直接报 `trust_score` 与 `penalty_state` 两个数。所以"零见证的满信任价值 0"今天是一个正确的公式，不是一条生效的约束。
+> 而它的 R2 那一半确实在拦人：`record_falsification` 把信任清零，`double_entry._closes_book` 因 `INVALID` 或连续两次 `FAIL` 关闭账簿，此后写入抛 `AgentLocked`。这条有生产调用点，是本文少数真正**在跑**的法则。
 
 ### 3.1 定义
 
@@ -223,6 +272,8 @@ A_{BS}-N=cW+T-\min(T,cW)=\max(T,\,cW)
 
 ## 4. D3：死锁边界 R1 —— 休眠不是死亡
 
+> **状态：❌ 判定未强制 / ⚠️ D3.2 已实施待流量.** `classify()` 与 `liquidate()` 无运行时调用点——今天没有任何进程会宣布一个智能体 `DORMANT` 或 `DEAD`，`DORMANT`/`DEAD` 这两个词在 `dynamics.py` 之外不存在。D3.2 的唤醒守卫是本节唯一有代码强制的部分，见 §4.3。
+
 ### 4.1 定义（R1 是图论命题，不是阈值）
 
 设 `𝒜` 为全部可通行动作，`cost(a) ≤ E`、`permit(a,T) ∈ {0,1}`。**R1 边界**定义为
@@ -278,9 +329,16 @@ e_{\text{out}}\ \ge\ e_{\text{in}}+\frac{c_{\max}}{B}
 
 这就是一条从带宽推出来的**调度器义务**：`energy.py` 的 `0.10/0.30` 支持 fast 唤醒，不支持 slow。要么把 `e_out` 抬到 0.45，要么在唤醒后的第一拍强制 `FAST`。
 
-#### ✅ 已在代码中强制实施
+#### ⚠️ 已实施，运行时路径已补全，待真实流量验证
 
 选择的是第二条：**不改阈值，改行为**。抬 `e_out` 到 0.45 会让一个健康账户在 30%–45% 区间被迫休眠，代价远大于收益；而"首拍必须快"只在唤醒那一拍生效，之后立刻解除。
+
+"补全路径"的准确含义，以及它**不**包含什么：
+
+- 补上了什么：唤醒这个**事实**有了记录处（`wake_epoch` / `awaiting_first_beat`），拦截这个**政策**有了执行点（`execute` 里的 `blocked_by = DEGRADED_WAKE`），两者都有测试钉住。
+- 没有补上什么：**没有任何生产流量会走到它**。`restore()` 今天的全部调用点是两个测试文件加一个 demo 脚本；`DualBeatScheduler` 的全部实例化点在 `demo.py`、`final_audit.py`、`final_ecosystem_audit.py` 与 `demo_dynamics.py`。没有服务、没有 cron、没有请求路径在跑这条循环。
+
+所以这里的状态是"路径通了，但路上还没有车"。把它标成 ✅ 会让读者以为一个正在运行的守护进程会在唤醒时拒绝慢拍——那个进程不存在。这条法则目前是**可执行的规范**，不是**运行中的约束**。要变成后者，需要一个真实的"耗尽→休眠→回充→唤醒"驱动：目前 `EnergyAccount` 只有 `restore()` 这一个回收入口，而没有调度它的东西。
 
 实施分两层，因为事实与政策不能同居一处：
 
@@ -337,6 +395,10 @@ e_{\text{out}}\ \ge\ e_{\text{in}}+\frac{c_{\max}}{B}
 ---
 
 ## 5. D4：遗传审计 —— 适应度是乘法
+
+> **状态：❌ 数学已证，代码未强制.**
+> `GenomeAudit`、`AdoptionGate`、`audit_policy` 的调用点只有 `tests/test_dynamics.py` 与 `demo_dynamics.py`。生产路径上**没有任何地方**对固化单元计算适应度或施加采纳门槛：`FractalEvolver.solidify()` 本身只在 `experiments/solidification_experiment.py` 被调用，`cel_engine` 不碰它。
+> 也就是说：一个伪造见证的变异体今天不会被任何运行中的系统拒绝——它只会被一个没人调用的函数打 0 分。要变成强制，需要一个真实的固化入口（`solidify` 后面挂 `GenomeAudit.fitness`，非 `PASS` 则拒绝写 `SOLIDIFIED`），以及一个跨代保留的 `AdoptionGate` 状态。这两样都还没有。
 
 ### 5.1 基因组
 
@@ -441,6 +503,10 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 
 ## 6. D5：独立性与同源共谋
 
+> **状态：❌ 数学已证，代码未强制.**
+> `effective_witnesses()` 与 `Ecosystem` 只被 `tests/test_dynamics.py` 与 `demo_dynamics.py` 调用。运行时**没有**任何地方把法定人数折算成 `n_eff` 再喂给偿付力：`cel_engine` 的生态视图按 `agent` 逐个列账，从不减去相关性折扣。
+> 后果要说准：今天的 6 个克隆在报表里仍然显示为 6 个独立代理。D5 提供了正确算法的实现，但没有任何一处把它接在真实的多智能体账本上。这是本文里最容易造成"看起来已经有了"的一条，因为它有一个带数字的表；表是 `demo_dynamics.py` 算的，不是系统算的。
+
 ### 6.1 定义与两个极限
 
 \[
@@ -488,6 +554,10 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 ---
 
 ## 7. D6：炎症与毒性溢出（Task 3 后半）
+
+> **状态：❌ 数学已证，代码未强制.**
+> `spillover()`、`reproduction_number()`、`removal_for_containment()` 的调用点只有测试与 demo。运行时**不计算 `R₀`**，因此也谈不上"按 `R₀≥1` 切换成隔离"。
+> 容易混淆的近邻：L7 `CompartmentManager` 的裂解机制确实存在且自带阈值（连续 3 次异常，`DEFAULT_ANOMALY_THRESHOLD`），但它的全部实例化点在 `demo.py`、`integration_demo.py`、`final_audit.py`——同样没有服务在跑它。而且裂解阈值是**一个固定计数**，不是从 `R₀` 推出来的；D6 的贡献正是说明"为什么 3 次"只能算经验值，而"`β⟨k⟩/γ < 1`"才是判据。两者不可互相顶替。
 
 ### 7.1 制备
 
@@ -545,6 +615,14 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 
 最关键的一句：**假完成在报表里表现为"净额为零的往返"，在动力学里表现为"净资产的一次不可逆负跳变"。** 前者需要有人去翻原始凭证才能发现；后者在下一个周期就是负的，且没有任何后续干净运行能把它补回来。
 
+**限定（必须读）.** 上表说的是**动力学口径能表达什么**，不是**当前部署已经在做什么**。按 §0.1：
+
+- `T→0` 闩死这一行是**真的在跑**的（`cel_engine` → `PenaltyLedger.record_falsification` → `double_entry` 关账）。
+- `H ↑`、`N` 立即下降这一行**没有**强制：`net_assets()` 无运行时调用点，`H` 在服务里不被计算。
+- `n_eff=1`、`R₀` 可算这一行同样未强制：两者只在 `demo_dynamics.py` 里算。
+
+所以严格讲：D2 的 R2 半边今天就在防假完成；D1 的负债流、D5 的去重、D6 的传染判据今天只是**已被证明的记账法**。它们的价值是"当有人把它接上去时，不需要再发明一套理论"，而不是"已经在拦"。把这句话省掉，本文就变成了它自己 §1.1 里那种被摊销过的成功声明。
+
 ---
 
 ## 9. 可反驳性：什么观测会推翻这些法则
@@ -573,19 +651,20 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 4. **分支过程假设均质混合.** `R₀=β⟨k⟩/γ` 是平均场式。真实膜图有度分布与局部聚集，`R₀` 需要换成谱半径 `ρ(M)`（下一代矩阵的主特征值）。这是已知的推广，未在本文实现。
 5. **反驳者可能不诚实.** `record_falsification` 是一个反向的不可验证声明。`cel_engine.py` 的 `FalsificationLimits` 已承认这一点，并用"可归因"（observer id + 证据入账，假指控本身留痕）而不是"可验证"来应对。本法则继承该局限。
 6. **未处理：休眠期的见证贬值.** 休眠期间 `W` 仍按 `δ_w` 衰减，但 `H` 的修复也停了。两者对 `N` 的净效应未分析。这是一个已知的空白。
+7. **最大的局限是 §0.1：六条法则里只有一条半在跑.** D2 的 R2 闩锁与 D3.2 的唤醒守卫有代码强制；`N` 的 `min` 折算、`classify` 的生死判定、`F` 的乘法、`n_eff` 的去重、`R₀` 的传染判据，目前都只在测试与 demo 中被调用。本文的价值因此是**一份可执行的规范**，而不是**一份运行报告**。这个区别如果被抹掉，本文就从"防止假完成"变成了"一个假完成"。
 
 ---
 
 ## 11. 映射表
 
-| 法则 | 参考实现 | 关键常数（来源） | 测试 |
-| --- | --- | --- | --- |
-| D1 供给 | `dynamics.derivative`（`dynamics.py:286`） | `TRUST_RECOVERY`、`TRUST_DROP_PER_PENALTY`、`PENALTY_BASE`（`penalty.py`） | `TheFourFlows`（5 项） |
-| D2 偿付 | `net_assets`(166)、`solvency_margin`(200)、`required_independence`(220) | `COLLATERAL_PER_WITNESS=MAX_TRUST` | `SolvencyIsNotAddition`（6 项） |
-| D3 死锁 | `classify`(350)、`min_exit_ratio`(401)、`DormancyController`(437)、`liquidate`(554)；**执行**在 `scheduler.execute` | `EXHAUSTED_THRESHOLD`、`CONSERVE_THRESHOLD`、`DEFAULT_BASE_COST` | `DormancyIsNotDeath`（10 项）、`test_wake_window`（22 项） |
-| D4 遗传 | `GenomeAudit`(626)、`adoption_horizon`(689)、`AdoptionGate`(730)、`audit_policy`(780) | `VERIFY_COST=1.0`、`SOLIDIFIED_COST=0.01` | `FitnessIsAProduct`、`AdoptionHasAHysteresisBand`（12 项） |
-| D5 独立 | `effective_witnesses`(851)、`Ecosystem`(906) | — | `AQuorumOfClonesIsOneWitness`（6 项） |
-| D6 传染 | `reproduction_number`(959)、`spillover`(986)、`removal_for_containment` | `LYSIS_THRESHOLD`（`compartment.py`） | `SpilloverIsBoundedUpToCriticality`（5 项） |
+| 法则 | 参考实现 | 关键常数（来源） | 测试 | 运行时 |
+| --- | --- | --- | --- | --- |
+| D1 供给 | `dynamics.derivative`（`dynamics.py:286`） | `TRUST_RECOVERY`、`TRUST_DROP_PER_PENALTY`、`PENALTY_BASE`（`penalty.py`） | `TheFourFlows`（5 项） | ⚠️ 离散部分在跑 |
+| D2 偿付 | `net_assets`(166)、`solvency_margin`(200)、`required_independence`(220) | `COLLATERAL_PER_WITNESS=MAX_TRUST` | `SolvencyIsNotAddition`（6 项） | ❌ 公式未强制 / ✅ R2 闩锁 |
+| D3 死锁 | `classify`(350)、`min_exit_ratio`(401)、`DormancyController`(437)、`liquidate`(554)；**执行**在 `scheduler.execute` | `EXHAUSTED_THRESHOLD`、`CONSERVE_THRESHOLD`、`DEFAULT_BASE_COST` | `DormancyIsNotDeath`（10 项）、`test_wake_window`（22 项） | ❌ 判定未强制 / ⚠️ D3.2 无流量 |
+| D4 遗传 | `GenomeAudit`(626)、`adoption_horizon`(689)、`AdoptionGate`(730)、`audit_policy`(780) | `VERIFY_COST=1.0`、`SOLIDIFIED_COST=0.01` | `FitnessIsAProduct`、`AdoptionHasAHysteresisBand`（12 项） | ❌ 未强制 |
+| D5 独立 | `effective_witnesses`(851)、`Ecosystem`(906) | — | `AQuorumOfClonesIsOneWitness`（6 项） | ❌ 未强制 |
+| D6 传染 | `reproduction_number`(959)、`spillover`(986)、`removal_for_containment` | `LYSIS_THRESHOLD`（`compartment.py`） | `SpilloverIsBoundedUpToCriticality`（5 项） | ❌ 未强制 |
 
 复现全部数字：
 
@@ -593,6 +672,27 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 python demo_dynamics.py
 python -m unittest tests.test_dynamics tests.test_wake_window -q
 ```
+
+复核 §0.1 的每一条状态（"数学已证，代码未强制"必须能被这条命令证实）：
+
+```bash
+# 只应在 dynamics.py / tests / demo 中出现，不应有生产文件
+for s in GenomeAudit effective_witnesses spillover reproduction_number \
+         AdoptionGate audit_policy classify liquidate net_assets; do
+  printf '%-24s ' "$s"
+  grep -rl "$s" --include=*.py . | grep -v __pycache__ | grep -v '/\.venv/' \
+    | grep -v '/build/' | grep -v '^./tests/' | tr '\n' ' '; echo
+done
+
+# restore() 的生产调用者：应当为空
+grep -rn '\.restore(' --include=*.py . | grep -v '/\.venv/' | grep -v '/build/' \
+  | grep -v '^./tests/' | grep -v 'demo_dynamics.py' | grep -v experiments/
+
+# 已发布包是否依赖代谢层：应当为空
+grep -rn 'agent_metabolism' agent-harness-audit-sidecar 2>/dev/null || true
+```
+
+最后一条在 `agent-harness-audit` 仓库中执行，命中 `audit_sidecar/tools/membrane.py` 的一行注释 "this package never imports `agent_metabolism`"——注释本身即是证据。
 
 ---
 
