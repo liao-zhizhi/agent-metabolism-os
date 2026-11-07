@@ -299,6 +299,7 @@ def _six_agents(client, tokens: str) -> None:
         assert client.post("/api/v1/lineage", json=body).status_code == 200
 
 
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
 class IndependenceApiTests(unittest.TestCase):
     """D5 must be in the *response*, not just in the engine.
 
@@ -374,6 +375,7 @@ INDEPENDENCE_TOOLTIP = (
 HAVE_NODE = shutil.which("node") is not None
 
 
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
 @unittest.skipUnless(HAVE_NODE, "node is required to execute the renderer")
 class IndependenceRenderTests(unittest.TestCase):
     """The D5 line on the dashboard, rendered -- not pattern-matched.
@@ -474,6 +476,7 @@ class IndependenceRenderTests(unittest.TestCase):
         self.assertEqual(view["tooltip"], INDEPENDENCE_TOOLTIP)
 
 
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
 class IndependencePresentationTests(unittest.TestCase):
     """The static half: what the page and the stylesheet declare.
 
@@ -517,6 +520,7 @@ class IndependencePresentationTests(unittest.TestCase):
         self.assertIn("var(--text-faint)", block)
 
 
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
 class BindTests(unittest.TestCase):
     """The port a host injects wins over the default, and a bad value is fatal."""
 
