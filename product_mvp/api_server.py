@@ -774,6 +774,24 @@ class UnlockRequest(BaseModel):
     reason: str = ""
 
 
+class LineageRequest(BaseModel):
+    """Which lineage an agent says it descends from.
+
+    ``tokens`` are opaque labels the client chooses -- a model id, a prompt
+    template name, a shared context hash. The server does not know what they
+    mean and deliberately does not try: it only measures overlap, and overlap is
+    computable from strings it cannot interpret.
+
+    See ``CelGateway.declare_lineage`` for why this is a *declaration* and not
+    evidence, and why an undeclared agent is reported as ``n_effective: null``
+    instead of being counted at par.
+    """
+
+    agent_id: Optional[str] = None
+    agent: Optional[str] = None
+    tokens: List[str]
+
+
 class FalsifyRequest(BaseModel):
     """An observer's report that a booked commitment was false.
 
@@ -1064,6 +1082,64 @@ def stats(request: Request) -> Dict[str, Any]:
         data["write_policy"]["anonymous"]["remaining"] = remaining
         data["write_policy"]["anonymous"]["retry_after"] = int(retry + 0.999)
     return data
+
+
+@app.post("/api/v1/lineage", dependencies=WRITE_ACCESS)
+def lineage(body: LineageRequest) -> JSONResponse:
+    """Declare which lineage an agent descends from, for the D5 quorum count.
+
+    Without this endpoint ``n_effective`` would be permanently ``null``: the
+    ledger records intents, artefacts and digests, and none of those name a
+    model, a prompt or a shared context, so correlation is **not inferable from
+    what is already stored**. A statistic that can never be non-null reads as
+    coverage while being structurally incapable of running -- the same defect as
+    the old ``os.path.isfile`` check that resolved against the server's own disk,
+    and it is removed here for the same reason rather than left in place.
+
+    What the declaration is worth: it is a claim by the party being measured, so
+    ``n_effective`` is an **upper bound** on independence. Lying can only inflate
+    it (shared lineage lowers the count, distinct lineage raises it), which is
+    why the field says ``bound: "upper"`` instead of presenting itself as a
+    measurement. It is still worth reporting: the alternative is the headcount,
+    which is the same upper bound with nothing bounding it.
+
+    Keyed, like ``/verify``. An anonymous trial book is disposable and its
+    declarations with it, so accepting them anonymously would produce a quorum
+    number for a fleet that does not persist.
+
+    Attribution gap, stated rather than implied: the declaration is recorded
+    against the ``agent_id`` in the body, **not** against the key that sent it,
+    so any keyed caller can declare lineage on another agent's behalf -- and
+    declaring a rival's fleet as clones makes its ``n_effective`` drop. This is
+    survivable only because the number is display-only today; the moment it gates
+    anything, the declaration needs to be attributable (per-agent credentials, or
+    a countersignature) before it can be trusted at all.
+
+    Re-declaring replaces the previous tokens. Nothing is sealed onto the chain:
+    a chain entry is a commitment the system can check later, and there is
+    nothing to check a self-description against.
+    """
+    agent_id = (body.agent_id or body.agent or "").strip()
+    try:
+        result = GATEWAY.declare_lineage(agent_id, body.tokens)
+    except VerifyError as error:
+        return JSONResponse(
+            status_code=error.status_code,
+            content={"declared": False, "detail": error.message, "agent_id": agent_id},
+        )
+    stats = GATEWAY.stats()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "declared": True,
+            "agent_id": result["agent_id"],
+            "tokens": result["tokens"],
+            "sealed": False,
+            "n_raw": stats["n_raw"],
+            "n_effective": stats["n_effective"],
+            "independence": stats["independence"],
+        },
+    )
 
 
 @app.get("/api/v1/ledger")

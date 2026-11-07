@@ -218,6 +218,132 @@ class StatsTests(unittest.TestCase):
         self.assertEqual(stats["inflamed_agents"], 0)
 
 
+class IndependenceTests(unittest.TestCase):
+    """D5 in the ecosystem view: headcount is not a quorum.
+
+    The law: ``n_eff = n / (1 + (n-1)rho)``. Six agents sharing a prompt, a model
+    and a context are one witness repeated, and a dashboard that shows ``6``
+    without saying so is the six-fold overstatement this is meant to name.
+
+    The load-bearing decision under test is the ``null``: the ledger records
+    intents, artefacts and digests, and **none of those name a lineage**, so
+    correlation cannot be inferred from stored data. An undeclared fleet
+    therefore gets ``n_effective: None`` rather than the flattering headcount.
+    """
+
+    @staticmethod
+    def _populate(gw: CelGateway, count: int, tokens) -> None:
+        """Book one verified pass per agent, and optionally declare its lineage."""
+        for i in range(count):
+            name = "agent-%d" % i
+            gw.verify(
+                agent_id=name, intent="check the module", check=True, witness=True,
+                witness_hash=_H, trace_id=_trace(),
+            )
+            if tokens is not None:
+                declared = tokens(i)
+                if declared is not None:
+                    gw.declare_lineage(name, declared)
+
+    def test_six_clones_are_one_witness(self) -> None:
+        gw = CelGateway()
+        self._populate(gw, 6, lambda i: ["prompt:summarise-v1"])
+        stats = gw.stats()
+        self.assertEqual(stats["n_raw"], 6)
+        self.assertEqual(stats["n_effective"], 1.0)
+        self.assertEqual(stats["independence"]["rho"], 1.0)
+        self.assertEqual(stats["independence"]["status"], "declared")
+        # The overstatement factor, which is the number worth being angry about.
+        self.assertEqual(stats["n_raw"] / stats["n_effective"], 6.0)
+
+    def test_six_independent_agents_are_worth_six(self) -> None:
+        gw = CelGateway()
+        self._populate(gw, 6, lambda i: ["prompt:variant-%d" % i])
+        stats = gw.stats()
+        self.assertEqual(stats["n_raw"], 6)
+        self.assertEqual(stats["n_effective"], 6.0)
+        self.assertEqual(stats["independence"]["rho"], 0.0)
+
+    def test_an_undeclared_fleet_gets_null_not_the_headcount(self) -> None:
+        gw = CelGateway()
+        self._populate(gw, 6, None)
+        stats = gw.stats()
+        self.assertEqual(stats["n_raw"], 6)
+        self.assertIsNone(
+            stats["n_effective"],
+            "an agent count is a fact; an effective count needs correlation, and "
+            "filling in 6 here is exactly the overstatement D5 exists to name",
+        )
+        self.assertEqual(stats["independence"]["status"], "uncalibrated")
+        self.assertIn("uncalibrated", stats["independence"]["reason"])
+
+    def test_a_partly_declared_fleet_gets_no_number_either(self) -> None:
+        # Averaging a measured overlap with an assumed one is precise about the
+        # wrong thing, so the mixed case answers null rather than a guess.
+        gw = CelGateway()
+        self._populate(gw, 4, lambda i: ["prompt:shared"] if i < 3 else None)
+        stats = gw.stats()
+        self.assertEqual(stats["n_raw"], 4)
+        self.assertIsNone(stats["n_effective"])
+        self.assertEqual(stats["independence"]["status"], "partial")
+        self.assertIn("agent-3", stats["independence"]["reason"])
+
+    def test_partial_overlap_lands_between_the_limits(self) -> None:
+        gw = CelGateway()
+        self._populate(gw, 2, lambda i: ["model:a", "context:shared"] if i == 0
+                       else ["model:b", "context:shared"])
+        stats = gw.stats()
+        # Jaccard = 1 shared of 3 union -> rho = 1/3, n_eff = 1 / (1 + 1/3) = 1.5
+        self.assertAlmostEqual(stats["independence"]["rho"], 1 / 3, places=6)
+        self.assertEqual(stats["n_effective"], 1.5)
+
+    def test_a_single_agent_is_its_own_effective_count(self) -> None:
+        # n/(1+(n-1)rho) is n at n = 1 for every rho: arithmetic, not estimation.
+        gw = CelGateway()
+        self._populate(gw, 1, lambda i: ["prompt:x"])
+        stats = gw.stats()
+        self.assertEqual(stats["n_raw"], 1)
+        self.assertEqual(stats["n_effective"], 1.0)
+        self.assertEqual(stats["independence"]["status"], "trivial")
+
+    def test_the_bound_is_labelled_upper(self) -> None:
+        """Lying can only inflate the number, so it must not be called measured."""
+        gw = CelGateway()
+        self._populate(gw, 3, lambda i: ["prompt:%d" % i])
+        independence = gw.stats()["independence"]
+        self.assertEqual(independence["bound"], "upper")
+        self.assertEqual(independence["source"], "declared-lineage")
+        self.assertIn("not measured", independence["reason"])
+
+    def test_an_empty_declaration_is_refused(self) -> None:
+        gw = CelGateway()
+        with self.assertRaises(VerifyError):
+            gw.declare_lineage("agent-0", [])
+        with self.assertRaises(VerifyError):
+            gw.declare_lineage("agent-0", ["  "])
+        with self.assertRaises(VerifyError):
+            gw.declare_lineage("", ["prompt:x"])
+        with self.assertRaises(VerifyError):
+            # A bare string is not a token list; {"a","b","c"} would otherwise
+            # be read as three tokens from one character per token.
+            gw.declare_lineage("agent-0", "prompt:x")
+
+    def test_redeclaring_replaces_the_previous_claim(self) -> None:
+        gw = CelGateway()
+        self._populate(gw, 2, lambda i: ["prompt:%d" % i])
+        self.assertEqual(gw.stats()["n_effective"], 2.0)
+        gw.declare_lineage("agent-0", ["prompt:1"])   # now both are the same
+        self.assertEqual(gw.stats()["n_effective"], 1.0)
+
+    def test_declaring_does_not_write_to_the_chain(self) -> None:
+        """A self-description is not a witnessed fact, so it stays off the chain."""
+        gw = CelGateway()
+        self._populate(gw, 2, None)
+        before = gw.stats()["total_entries"]
+        gw.declare_lineage("agent-0", ["prompt:x"])
+        self.assertEqual(gw.stats()["total_entries"], before)
+
+
 class ChainTests(unittest.TestCase):
     def setUp(self) -> None:
         self.gw = CelGateway(fail_limit=3)

@@ -68,13 +68,13 @@ x=(E,\,T,\,W,\,H)\;=\;(\text{能荷},\ \text{信任},\ \text{独立见证},\ \te
 | **D3** 休眠/死亡判定 | ✅ | ✅ | ❌ **未强制** | `classify()` / `liquidate()` 无运行时调用点；`DORMANT/DEAD` 只存在于 `dynamics.py` |
 | **D3.2** 唤醒首拍 | ✅ | ✅ | ⚠️ **代码强制 / 零流量** | `EnergyAccount.awaiting_first_beat` + `DualBeatScheduler.execute`；`restore()` 无生产调用者 |
 | **D4** 适应度乘法 | ✅ | ✅ | ❌ **未强制** | `GenomeAudit` / `AdoptionGate` 无运行时调用点；`solidify()` 只在 `experiments/` |
-| **D5** 克隆虚报 | ✅ | ✅ | ❌ **未强制** | `effective_witnesses()` / `Ecosystem` 仅被测试与 demo 调用 |
+| **D5** 克隆虚报 | ✅ | ✅ | ⚠️ **已接入响应 / 非拦截** | `cel_engine.stats()` 计算 `n_effective`（`GET /api/v1/stats` 返回 `n_raw` / `n_effective`），ρ 由**声明谱系**的成对 Jaccard 估计；无人被拒绝 |
 | **D6** 毒性溢出 | ✅ | ✅ | ❌ **未强制** | `spillover()` / `reproduction_number()` 无运行时调用点；L7 裂解只在 demo/audit |
 
 三条必须说清的事实：
 
 1. **已发布包根本不跑代谢层.** `harness-audit-sidecar` 的 `audit_sidecar/tools/membrane.py` 里明确写着 `this package never imports agent_metabolism`。所以 L1/L2 的能荷与拍调度不在 `demo.silicon-probe.com` 的请求路径上。
-2. **被服务的产品只跑其中两块.** `product_mvp/cel_engine.py` 运行时使用 `double_entry`（双式记账 + 账簿关闭）与 `penalty`（信任记分）。它**不**实例化 `EnergyAccount`、`DualBeatScheduler`、`LLMProxy`。
+2. **被服务的产品只跑其中三块.** `product_mvp/cel_engine.py` 运行时使用 `double_entry`（双式记账 + 账簿关闭）、`penalty`（信任记分），以及 `dynamics` 里的**两个函数**（`effective_witnesses`、`lineage_correlation`，用于 D5 的生态视图统计）。它**不**实例化 `EnergyAccount`、`DualBeatScheduler`、`LLMProxy`，也不调用 `derivative()` / `net_assets()` / `classify()`。
 3. **`restore()` 在修复前无任何生产调用者，修复后仍然没有.** D3.2 补上的是路径本身（事实 + 政策 + 拦截），不是把路径接进某条流量。`grep '\.restore('` 的全部命中是：`test_metabolism`、`test_wake_window`、`demo_dynamics`，以及 `experiments/` 里对一个无关 `env` 对象的调用。
 
 还有一条比逐符号检索更硬的判据：
@@ -83,12 +83,12 @@ x=(E,\,T,\,W,\,H)\;=\;(\text{能荷},\ \text{信任},\ \text{独立见证},\ \te
 grep -rn 'from agent_metabolism.dynamics\|import agent_metabolism.dynamics' --include=*.py .
 ```
 
-命中只有 `demo_dynamics.py` 与 `tests/`。**`dynamics.py` 没有任何生产导入者。** 一个模块如果没人 import，它的函数就不可能在任何请求路径上被调用——这比"我查了每个符号"更难得地可证伪。
+命中为 `demo_dynamics.py`、`tests/`，以及 `product_mvp/cel_engine.py` 的一行 import。**`dynamics.py` 在生产侧只有一个导入者，且只取走两个函数**（D5 的 `effective_witnesses` / `lineage_correlation`）。D1/D2/D3/D4/D6 的参考实现仍无任何请求路径调用它们。一个模块如果没人 import，它的函数就不可能在任何请求路径上被调用——这比"我查了每个符号"更难得地可证伪；反过来，**导入了不等于用上了**，所以逐条证据写的是"哪个函数、在哪个调用点"，不是"哪个文件 import 过"。
 
 因此全篇的状态词只有三种：
 
 - **✅ 已强制** —— 有生产调用点，且违反会被拒绝。
-- **⚠️ 部分 / 零流量** —— 两种情形共用此符号：(a) 有生产调用点但只覆盖一部分（如记账有、流方程无）；(b) 拦截代码存在且被测过，但今天没有任何生产流量会走到它。第二种最容易自我欺骗，所以必须显式写出"零流量"三个字。
+- **⚠️ 部分 / 零流量 / 已接入响应** —— 三种情形共用此符号：(a) 有生产调用点但只覆盖一部分（如记账有、流方程无）；(b) 拦截代码存在且被测过，但今天没有任何生产流量会走到它；**(c) 数字已经进入 API 响应，但只用于显示，不构成任何拒绝**。第二种最容易自我欺骗，所以必须显式写出"零流量"三个字；第三种最容易把"仪表盘上有个数"当成"这件事被管住了"，所以必须显式写出"非拦截"。
 - **❌ 数学已证，代码未强制** —— 有实现、有测试、无调用点。
 
 （本节的每一条都可以用 `grep` 复核，命令见 §11。）
@@ -149,6 +149,8 @@ n_{\text{eff}}=\frac{n}{1+(n-1)\rho},\qquad \rho=1\Rightarrow n_{\text{eff}}=1
 **实测**：6 个克隆 `ρ=1.00`，`n_eff=1.00`，高估 `6.0×`；两个谱系各 3 个、组内 `ρ=0.25`、组间 `0`，`n_eff=4.00`，高估 `1.50×`。
 
 会计在这里会给出 6 和 6。
+
+产品路径（`cel_engine.stats()`）现在把这两个数并排返回：`n_raw` 与 `n_effective`。它不阻止任何请求，所以它是**报告**，不是**准入**——区别见 §6 的状态块。
 
 ### 1.4 可清偿性：吸收态
 
@@ -503,9 +505,16 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 
 ## 6. D5：独立性与同源共谋
 
-> **状态：❌ 数学已证，代码未强制.**
-> `effective_witnesses()` 与 `Ecosystem` 只被 `tests/test_dynamics.py` 与 `demo_dynamics.py` 调用。运行时**没有**任何地方把法定人数折算成 `n_eff` 再喂给偿付力：`cel_engine` 的生态视图按 `agent` 逐个列账，从不减去相关性折扣。
-> 后果要说准：今天的 6 个克隆在报表里仍然显示为 6 个独立代理。D5 提供了正确算法的实现，但没有任何一处把它接在真实的多智能体账本上。这是本文里最容易造成"看起来已经有了"的一条，因为它有一个带数字的表；表是 `demo_dynamics.py` 算的，不是系统算的。
+> **状态：⚠️ 已接入响应，非拦截.**
+> `product_mvp/cel_engine.py` 的生态视图（`CelGateway.stats()`）现在计算并返回 `n_raw` / `n_effective`，并由 `GET /api/v1/stats` 暴露给仪表盘；`ρ` 通过**声明谱系**的成对 Jaccard 估计，算术来自 `dynamics.effective_witnesses()` / `lineage_correlation()`（import，不重抄）。
+> 三者必须分开说，否则这一行会变成新的自我欺骗：
+> 1. **数字进了响应** —— 是。`n_effective` 是 API 字段，不再是只在 demo 里算出来的表。
+> 2. **`ρ` 是估计，且是自报的** —— 声明通道 `POST /api/v1/lineage` 的填写者**不一定是被计数的那个 agent**：声明记在请求体里的 `agent_id` 上，不记在发送它的凭证上，因此任何持钥匙的调用方都能替别人声明，把竞争对手的集群说成同源即可压低其 `n_eff`。加上激励是单向的（共享谱系**降低** `n_eff`，独立谱系**提高**它），这个数字只能是独立性的**上界**，响应里用 `bound: "upper"` 标出，不叫它测量值。今天这样能成立，只因为它**不参与任何判定**；一旦它开始当闸门用，声明必须先能归因（每 agent 独立凭证，或第三方背书）。
+> 3. **没有拒绝** —— 它只用于显示。没有任何请求因为 `n_eff` 过低而被拒，所以按 §0.1 的判据它**不是 ✅**：✅ 的定义是"违反会被拒绝"，而这里没有任何东西会因为相关性高而被挡住。
+>
+> 一个必要的默认：**未声明谱系的 agent 不按 1 计入**，整个生态视图返回 `n_effective: null` 且 `status: "uncalibrated"`。沉默不给分，否则"什么都不说"就是通往最高法定人数的最省事路径。混合声明（部分有、部分无）同样返回 `null`（`status: "partial"`）：把一个实测重叠和一个假设重叠平均，得到的是一个对错误对象精确的数字。
+>
+> 仍然没做到的事：`n_eff` 没有回喂 D2 的 `W`（第 4 步），所以偿付力计算里用的还是头数。D5 现在负责**报告**虚报，不负责**阻止**它。
 
 ### 6.1 定义与两个极限
 
@@ -549,7 +558,11 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 
 第 3 条是本法则唯一"宁可错杀"的地方，理由不对称：把独立当成相关只浪费算力，把相关当成独立则直接放大偿付力，而偿付力是放行声明的凭据。
 
+**产品路径与 `Ecosystem` 的一处有意分歧**，读代码时必须知道：`Ecosystem` 对无记录关系的两者默认 `ρ=1`（保守，把独立错当相关）；`cel_engine` 的产品路径不能这么做，因为它面对的是真实客户的名册——把没声明谱系的 agent 一律当成"与所有其他人都完全相关"，会在客户第一次接入时就把 `n_eff` 压成 1，那是一个更糟的谎言（只是方向相反）。所以产品路径选择 `n_effective: null` + `status: "uncalibrated"`。两者共同点是：**都不在无信息时给出一个好看的数字。**
+
 **实测**：6 个克隆 `ρ=1.00/eff=1.00/虚报 6.0×`；两个谱系各 3、组内 `ρ=0.25`、组间 0 ⇒ 平均 `ρ=0.10`、`eff=4.00`、虚报 `1.50×`，与 `1+(6−1)(0.10)=1.5` 逐位吻合。
+
+**产品侧实测**（`product_mvp/tests/test_api.py::IndependenceApiTests`，走 HTTP 而非直接调函数）：6 个声明同一 token 的 agent ⇒ `n_raw=6, n_effective=1.0, ρ=1.0`；6 个各声明不同 token ⇒ `n_raw=6, n_effective=6.0, ρ=0.0`；3 个不声明 ⇒ `n_raw=3, n_effective=null, status="uncalibrated"`。第一条即 `6.0×` 虚报，且它是被**接口**算出来的，不再是 `demo_dynamics.py` 里的表。
 
 ---
 
@@ -646,12 +659,12 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 ## 10. 局限（诚实边界）
 
 1. **参数是政策，不是测量.** `δ_w=0.02`、`δ_r=0.25`、`c=100`、`β`、`⟨k⟩` 都是可替换的。与 `energy.py`、`penalty.py` 的自我声明一致。本法则的形状不依赖具体取值（`min`、吸收态、乘积、调和式、`1/(1−R₀)` 都是结构），但**数值结论**依赖。
-2. **`ρ` 是代理量.** 用谱系 Jaccard 估相关，真相关需要观测失败模式——而失败模式只能在失败之后观测。这是一个结构性循环，本文没有解决它，只是把它显式化了，并选择了保守默认 `ρ=1`。
+2. **`ρ` 是代理量，且（在产品路径上）由被测者自报.** 用谱系 Jaccard 估相关，真相关需要观测失败模式——而失败模式只能在失败之后观测。这是一个结构性循环，本文没有解决它，只是把它显式化了。两种默认都不会给出好看的数字：`dynamics.Ecosystem` 选保守默认 `ρ=1`（宁可把独立当相关），产品路径选 `null`（宁可不给数）。另有方向性缺陷需记明：声明由被计数方填写，而说谎只会**高估**独立性，所以产品路径的 `n_effective` 是上界，不是测量值。
 3. **`Φ` 是二值闸门.** `φ_min=0.50` 时 `φ=0.50` 完全放行。安全性完全落在阈值的取值上，而阈值是政策。若要连续化，需要把 `φ` 直接乘进 `Gain`，但那会让"刚好卡线"的伪造体拿到部分分数——**两种坏处必须选一个**，本文选了二值（宁可少放行）。
 4. **分支过程假设均质混合.** `R₀=β⟨k⟩/γ` 是平均场式。真实膜图有度分布与局部聚集，`R₀` 需要换成谱半径 `ρ(M)`（下一代矩阵的主特征值）。这是已知的推广，未在本文实现。
 5. **反驳者可能不诚实.** `record_falsification` 是一个反向的不可验证声明。`cel_engine.py` 的 `FalsificationLimits` 已承认这一点，并用"可归因"（observer id + 证据入账，假指控本身留痕）而不是"可验证"来应对。本法则继承该局限。
 6. **未处理：休眠期的见证贬值.** 休眠期间 `W` 仍按 `δ_w` 衰减，但 `H` 的修复也停了。两者对 `N` 的净效应未分析。这是一个已知的空白。
-7. **最大的局限是 §0.1：六条法则里只有一条半在跑.** D2 的 R2 闩锁与 D3.2 的唤醒守卫有代码强制；`N` 的 `min` 折算、`classify` 的生死判定、`F` 的乘法、`n_eff` 的去重、`R₀` 的传染判据，目前都只在测试与 demo 中被调用。本文的价值因此是**一份可执行的规范**，而不是**一份运行报告**。这个区别如果被抹掉，本文就从"防止假完成"变成了"一个假完成"。
+7. **最大的局限是 §0.1：六条法则里只有两条在跑，第三条只在报告.** D2 的 R2 闩锁与 D3.2 的唤醒守卫有代码强制；D5 的 `n_eff` 进了 API 响应但只用于显示，不拒绝任何东西；`N` 的 `min` 折算、`classify` 的生死判定、`F` 的乘法、`R₀` 的传染判据，仍然只在测试与 demo 中被调用。本文的价值因此是**一份可执行的规范**，而不是**一份运行报告**。这个区别如果被抹掉，本文就从"防止假完成"变成了"一个假完成"。
 
 ---
 
@@ -663,7 +676,7 @@ p^*=\min\!\Bigl(1,\ \frac{qK}{2\kappa}\Bigr)
 | D2 偿付 | `net_assets`(166)、`solvency_margin`(200)、`required_independence`(220) | `COLLATERAL_PER_WITNESS=MAX_TRUST` | `SolvencyIsNotAddition`（6 项） | ❌ 公式未强制 / ✅ R2 闩锁 |
 | D3 死锁 | `classify`(350)、`min_exit_ratio`(401)、`DormancyController`(437)、`liquidate`(554)；**执行**在 `scheduler.execute` | `EXHAUSTED_THRESHOLD`、`CONSERVE_THRESHOLD`、`DEFAULT_BASE_COST` | `DormancyIsNotDeath`（10 项）、`test_wake_window`（22 项） | ❌ 判定未强制 / ⚠️ D3.2 无流量 |
 | D4 遗传 | `GenomeAudit`(626)、`adoption_horizon`(689)、`AdoptionGate`(730)、`audit_policy`(780) | `VERIFY_COST=1.0`、`SOLIDIFIED_COST=0.01` | `FitnessIsAProduct`、`AdoptionHasAHysteresisBand`（12 项） | ❌ 未强制 |
-| D5 独立 | `effective_witnesses`(851)、`Ecosystem`(906) | — | `AQuorumOfClonesIsOneWitness`（6 项） | ❌ 未强制 |
+| D5 独立 | `effective_witnesses`(851)、`lineage_correlation`(884)、`Ecosystem`(906) | — | `AQuorumOfClonesIsOneWitness`（6 项）、`IndependenceTests` / `IndependenceApiTests`（16 项） | ⚠️ 已接入响应（`cel_engine.stats()`），非拦截 |
 | D6 传染 | `reproduction_number`(959)、`spillover`(986)、`removal_for_containment` | `LYSIS_THRESHOLD`（`compartment.py`） | `SpilloverIsBoundedUpToCriticality`（5 项） | ❌ 未强制 |
 
 复现全部数字：
@@ -677,12 +690,19 @@ python -m unittest tests.test_dynamics tests.test_wake_window -q
 
 ```bash
 # 只应在 dynamics.py / tests / demo 中出现，不应有生产文件
+# 例外：effective_witnesses / lineage_correlation 由 product_mvp/cel_engine.py
+# 导入（D5 生态视图）——这条例外本身也要能被下面这条命令核出来。
 for s in GenomeAudit effective_witnesses spillover reproduction_number \
          AdoptionGate audit_policy classify liquidate net_assets; do
   printf '%-24s ' "$s"
   grep -rl "$s" --include=*.py . | grep -v __pycache__ | grep -v '/\.venv/' \
     | grep -v '/build/' | grep -v '^./tests/' | tr '\n' ' '; echo
 done
+
+# D5 的生产调用点：应当命中 cel_engine 的 import 块、两处调用，
+# 以及一处指代同名函数的 docstring（不是调用，别把它算成覆盖）
+grep -rn 'effective_witnesses\|lineage_correlation' --include=*.py product_mvp/ \
+  | grep -v '/tests/'
 
 # restore() 的生产调用者：应当为空
 grep -rn '\.restore(' --include=*.py . | grep -v '/\.venv/' | grep -v '/build/' \

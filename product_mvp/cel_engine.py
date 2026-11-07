@@ -57,7 +57,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 # The core library is not an installed package: the service is deliberately
 # runnable from a bare checkout with no build step. Two layouts are supported,
@@ -117,6 +117,10 @@ from agent_metabolism.penalty import (  # noqa: E402
     MAX_TRUST,
     WARNING,
     PenaltyLedger,
+)
+from agent_metabolism.dynamics import (  # noqa: E402
+    effective_witnesses,
+    lineage_correlation,
 )
 
 #: Refusals are not verdicts -- nothing was judged -- but they belong in the
@@ -293,6 +297,12 @@ class CelGateway:
         #: entry to derive them from -- and an operator still needs to see that
         #: someone tried. In-memory only: not tamper-evident, and labelled so.
         self._rejections: List[Dict[str, Any]] = []
+        #: ``agent`` -> the lineage tokens that agent declared. **Declared, not
+        #: measured**, and the direction of the incentive is why the label
+        #: matters: shared lineage lowers ``n_effective`` while distinct lineage
+        #: raises it, so only the flattering claim is tempting. See
+        #: :meth:`declare_lineage` for what this can and cannot support.
+        self._lineage: Dict[str, Tuple[str, ...]] = {}
 
         self._books = DoubleEntryLedger(
             penalty_factory=self._ledger_for, fail_limit=fail_limit
@@ -790,6 +800,159 @@ class CelGateway:
                 "chain_hash": sealed["hash"],
             }
 
+    def declare_lineage(self, agent_id: str, tokens: Sequence[str]) -> Dict[str, Any]:
+        """Record which lineage an agent says it descends from.
+
+        Why this exists at all: D5 says six clones are one witness, and the only
+        way to know that six agents are clones is to be told what they were built
+        from. Nothing else in an entry -- ``intent``, ``artefact``,
+        ``witness_hash`` -- names a model, a prompt or a context, so the
+        correlation **cannot be inferred from what the ledger already holds**.
+        Rather than invent a number, the gateway asks, and answers ``null`` until
+        it has been told.
+
+        What this declaration is worth, stated plainly: **it is a claim by
+        whoever submits it, and it is not evidence.** Two things follow, and
+        both are load-bearing:
+
+        * The incentive is one-directional. Shared lineage *lowers*
+          ``n_effective``; distinct lineage *raises* it. So an agent that wants a
+          bigger quorum has every reason to declare a token nobody shares.
+          Therefore ``n_effective`` is an **upper bound** on independence, never
+          a measurement of it -- which is still worth having, because the
+          alternative (counting agents) is the same upper bound with no bound at
+          all.
+        * Silence must not pay. An undeclared agent produces ``n_effective: null``
+          rather than a contribution of 1, so a fleet cannot reach the flattering
+          number by saying nothing.
+
+        Not sealed onto the chain, deliberately: a chain entry is a commitment
+        the system can later check, and there is nothing here to check against.
+        Putting it on the chain would make an unverifiable self-description look
+        like a witnessed fact -- the exact confusion ``WitnessHashLimits``
+        warns about.
+
+        Re-declaring replaces the previous tokens; the latest claim is the one
+        the statistic uses, and a history of claims would imply an audit trail
+        this does not have.
+
+        Raises:
+            VerifyError: empty agent id, empty token list, or a blank token.
+        """
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise VerifyError("agent_id must be a non-empty string")
+        if isinstance(tokens, str) or not isinstance(tokens, Sequence):
+            raise VerifyError(
+                "tokens must be a list of lineage tokens, got {!r}. A bare "
+                "string would be read one character at a time, and None is an "
+                "absence of information rather than a claim of independence."
+                .format(type(tokens).__name__)
+            )
+        cleaned: List[str] = []
+        for token in tokens:
+            if not isinstance(token, str) or not token.strip():
+                raise VerifyError("each lineage token must be a non-empty string")
+            cleaned.append(token.strip())
+        if not cleaned:
+            raise VerifyError(
+                "a lineage declaration needs at least one token; an empty one is "
+                "not a claim of independence, it is an absence of information"
+            )
+        unique = tuple(sorted(set(cleaned)))
+        with self._lock:
+            self._lineage[agent_id.strip()] = unique
+        return {"agent_id": agent_id.strip(), "tokens": list(unique)}
+
+    def witness_independence(self, agents: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+        """``n_eff = n / (1 + (n-1)rho)`` over the agents in the ecosystem view.
+
+        ``rho`` is the mean pairwise Jaccard overlap of the declared lineage
+        tokens, which is the same proxy :func:`lineage_correlation` implements --
+        the arithmetic is imported rather than restated, so this cannot drift from
+        the law it is supposed to be applying.
+
+        Four statuses, and the ``null`` ones are the point:
+
+        * ``declared`` -- every agent in scope declared a lineage, so ``rho`` can
+          be computed. Note the word: declared, because nothing here measured it.
+        * ``uncalibrated`` -- nobody declared. No number.
+        * ``partial`` -- only some declared. Still no number: averaging a measured
+          overlap with an assumed one produces a figure that is precise about the
+          wrong thing, and a null is at least honest.
+        * ``trivial`` -- fewer than two agents, where ``n/(1+(n-1)rho)`` is ``n``
+          for every ``rho``. Arithmetic rather than estimation, so a number is
+          reported. ``empty`` covers the no-agents case for the same reason.
+        """
+        with self._lock:
+            if agents is None:
+                names = sorted({e.get("agent", "") for e in self._entries if e.get("agent")})
+            else:
+                names = sorted({str(n).strip() for n in agents if str(n).strip()})
+            n_raw = len(names)
+
+            if n_raw == 0:
+                return {
+                    "n_raw": 0,
+                    "n_effective": 0.0,
+                    "status": "empty",
+                    "rho": None,
+                    "reason": "no agents in scope",
+                    "source": "declared-lineage",
+                    "declared": 0,
+                }
+
+            declared = [n for n in names if n in self._lineage]
+            if n_raw < 2:
+                return {
+                    "n_raw": n_raw,
+                    "n_effective": float(n_raw),
+                    "status": "trivial",
+                    "rho": None,
+                    "reason": "a single witness is its own effective count",
+                    "source": "declared-lineage",
+                    "declared": len(declared),
+                }
+
+            if len(declared) < n_raw:
+                missing = [n for n in names if n not in self._lineage]
+                return {
+                    "n_raw": n_raw,
+                    "n_effective": None,
+                    "status": "uncalibrated" if not declared else "partial",
+                    "rho": None,
+                    "reason": (
+                        "correlation uncalibrated: no lineage declared for any agent; "
+                        "declare it with POST /api/v1/lineage"
+                        if not declared
+                        else "correlation uncalibrated: {} of {} agents have no "
+                             "declared lineage ({})".format(
+                                 len(missing), n_raw, ", ".join(missing[:5])
+                             )
+                    ),
+                    "source": "declared-lineage",
+                    "declared": len(declared),
+                }
+
+            overlaps: List[float] = []
+            for i, a in enumerate(names):
+                for b in names[i + 1:]:
+                    set_a = set(self._lineage[a])
+                    set_b = set(self._lineage[b])
+                    union = set_a | set_b
+                    rho_pair = lineage_correlation(len(set_a & set_b), len(union))
+                    overlaps.append(rho_pair)
+            rho = sum(overlaps) / len(overlaps)
+            return {
+                "n_raw": n_raw,
+                "n_effective": round(effective_witnesses(n_raw, rho), 4),
+                "status": "declared",
+                "rho": round(rho, 6),
+                "reason": "computed from declared lineage, not measured from failures",
+                "source": "declared-lineage",
+                "declared": len(declared),
+                "bound": "upper",
+            }
+
     def stats(self) -> Dict[str, Any]:
         """What the dashboard's top row shows. Every number is derived, not kept."""
         with self._lock:
@@ -856,6 +1019,14 @@ class CelGateway:
                 if _STATE_ORDER[state] > _STATE_ORDER[worst]:
                     worst = state
 
+            # D5 on the dashboard. ``n_raw`` is the headcount and
+            # ``n_effective`` is what that headcount is worth once declared
+            # lineage is accounted for; the two are shown side by side because
+            # the gap between them is the finding. ``None`` is a real answer
+            # here -- see ``witness_independence`` for why an uncalibrated fleet
+            # gets no number rather than the flattering one.
+            independence = self.witness_independence(agents)
+
             return {
                 "intercepted_false_completions": intercepted,
                 "blocked_unwitnessed": unwitnessed,
@@ -878,6 +1049,19 @@ class CelGateway:
                 "inflamed_agents": inflamed,
                 "locked_agents": locked,
                 "agents_total": len(agents),
+                #: D5. The headcount, and what it is worth once lineage is
+                #: accounted for. ``agents_total`` is kept as the older name for
+                #: the same count; ``n_raw`` is spelled to pair with the line
+                #: below it, because a reader who sees one number will assume
+                #: they are the same thing.
+                "n_raw": independence["n_raw"],
+                #: ``None`` = not calibrated, and that is not a bug. An agent
+                #: count is a fact; an *effective* count needs to know how
+                #: correlated the agents are, and the ledger cannot tell. Filling
+                #: in the headcount here would be the six-fold overstatement D5
+                #: exists to name.
+                "n_effective": independence["n_effective"],
+                "independence": independence,
                 "health_state": worst,
                 "total_entries": len(self._entries),
                 "verdicts": {

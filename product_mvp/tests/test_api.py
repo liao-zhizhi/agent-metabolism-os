@@ -280,6 +280,78 @@ class HttpTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class IndependenceApiTests(unittest.TestCase):
+    """D5 must be in the *response*, not just in the engine.
+
+    A statistic the endpoint does not return is a statistic nobody can act on,
+    so these tests go through the wire format rather than calling ``stats()``.
+    """
+
+    def setUp(self) -> None:
+        _reset()
+        self.client = TestClient(app)
+
+    def _six(self, tokens) -> None:
+        for i in range(6):
+            name = "agent-%d" % i
+            self.client.post("/api/v1/verify", json=grounded(agent_id=name))
+            body = {"agent_id": name, "tokens": [tokens.format(i)]}
+            self.assertEqual(
+                self.client.post("/api/v1/lineage", json=body).status_code, 200
+            )
+
+    def test_stats_exposes_both_counts(self) -> None:
+        self._six("prompt:shared")
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertEqual(stats["n_raw"], 6)
+        self.assertEqual(stats["n_effective"], 1.0)
+        self.assertEqual(stats["independence"]["status"], "declared")
+
+    def test_six_independent_agents_are_worth_six(self) -> None:
+        self._six("prompt:v{0}")
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertEqual(stats["n_raw"], 6)
+        self.assertEqual(stats["n_effective"], 6.0)
+
+    def test_the_fields_exist_before_anyone_declares_anything(self) -> None:
+        """The field must be present and null, not missing: a missing key and a
+        null read the same to a human and differently to a client."""
+        for i in range(3):
+            self.client.post("/api/v1/verify", json=grounded(agent_id="g%d" % i))
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertIn("n_raw", stats)
+        self.assertIn("n_effective", stats)
+        self.assertEqual(stats["n_raw"], 3)
+        self.assertIsNone(stats["n_effective"])
+        self.assertEqual(stats["independence"]["status"], "uncalibrated")
+
+    def test_lineage_endpoint_reports_the_new_counts(self) -> None:
+        for i in range(2):
+            self.client.post("/api/v1/verify", json=grounded(agent_id="d%d" % i))
+        first = self.client.post(
+            "/api/v1/lineage", json={"agent_id": "d0", "tokens": ["p"]}
+        )
+        self.assertIsNone(first.json()["n_effective"])  # d1 still silent
+        second = self.client.post(
+            "/api/v1/lineage", json={"agent_id": "d1", "tokens": ["p"]}
+        )
+        self.assertEqual(second.json()["n_effective"], 1.0)
+
+    def test_an_empty_declaration_is_a_400(self) -> None:
+        self.client.post("/api/v1/verify", json=grounded(agent_id="e0"))
+        for tokens in ([], ["   "]):
+            with self.subTest(tokens=tokens):
+                response = self.client.post(
+                    "/api/v1/lineage", json={"agent_id": "e0", "tokens": tokens}
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(response.json()["declared"])
+
+    def test_an_empty_agent_id_is_refused(self) -> None:
+        response = self.client.post("/api/v1/lineage", json={"tokens": ["p"]})
+        self.assertEqual(response.status_code, 400)
+
+
 class BindTests(unittest.TestCase):
     """The port a host injects wins over the default, and a bad value is fatal."""
 
