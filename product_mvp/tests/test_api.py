@@ -49,6 +49,31 @@ def configure_auth(key: str) -> None:
     api_server.configure_auth()
 
 
+#: A syntactically valid digest for tests that only care about the *shape* of a
+#: grounded pass. It is deliberately the digest of a string nobody hashed a file
+#: to produce: this layer validates form, and pretending otherwise in a fixture
+#: would hide the boundary that ``WitnessHashLimits`` documents.
+TEST_HASH = "sha256:" + "a" * 64
+
+_trace_counter = [0]
+
+
+def grounded(trace: str = "", **overrides) -> dict:
+    """A success claim that satisfies the digest requirement."""
+    if not trace:
+        _trace_counter[0] += 1
+        trace = "trace-{}".format(_trace_counter[0])
+    body = {
+        "intent": "x",
+        "check": True,
+        "witness": True,
+        "witness_hash": TEST_HASH,
+        "trace_id": trace,
+    }
+    body.update(overrides)
+    return body
+
+
 @unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
 class HttpTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -96,15 +121,14 @@ class HttpTests(unittest.TestCase):
 
     def test_verify_accepts_the_core_vocabulary_agent_key(self) -> None:
         response = self.client.post(
-            "/api/v1/verify",
-            json={"agent": "legacy_agent", "intent": "x", "check": True, "witness": True},
+            "/api/v1/verify", json=grounded(agent="legacy_agent")
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["agent_id"], "legacy_agent")
 
     def test_verify_rejects_missing_agent(self) -> None:
         response = self.client.post(
-            "/api/v1/verify", json={"intent": "x", "check": True, "witness": True}
+            "/api/v1/verify", json=grounded()
         )
         self.assertEqual(response.status_code, 400)
 
@@ -142,7 +166,7 @@ class HttpTests(unittest.TestCase):
         )
         self.client.post(
             "/api/v1/verify",
-            json={"agent_id": "b", "intent": "y", "check": True, "witness": True},
+            json=grounded(agent_id="b", intent="y"),
         )
         stats = self.client.get("/api/v1/stats").json()
 
@@ -158,7 +182,7 @@ class HttpTests(unittest.TestCase):
         for i in range(4):
             self.client.post(
                 "/api/v1/verify",
-                json={"agent_id": "a", "intent": f"t{i}", "check": True, "witness": True},
+                json=grounded(agent_id="a", intent=f"t{i}"),
             )
         ledger = self.client.get("/api/v1/ledger?limit=3").json()
 
@@ -171,7 +195,7 @@ class HttpTests(unittest.TestCase):
     def test_ledger_verify_endpoint(self) -> None:
         self.client.post(
             "/api/v1/verify",
-            json={"agent_id": "a", "intent": "x", "check": True, "witness": True},
+            json=grounded(agent_id="a"),
         )
         body = self.client.get("/api/v1/ledger/verify").json()
         self.assertTrue(body["chain_ok"])
@@ -200,7 +224,7 @@ class HttpTests(unittest.TestCase):
     def test_unlock_of_an_unlocked_agent_is_a_conflict(self) -> None:
         self.client.post(
             "/api/v1/verify",
-            json={"agent_id": "ok_agent", "intent": "x", "check": True, "witness": True},
+            json=grounded(agent_id="ok_agent"),
         )
         response = self.client.post("/api/v1/agents/ok_agent/unlock", json={})
         self.assertEqual(response.status_code, 409)

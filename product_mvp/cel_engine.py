@@ -49,6 +49,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -117,8 +118,44 @@ from agent_metabolism.penalty import (  # noqa: E402
 
 #: Refusals are not verdicts -- nothing was judged -- but they belong in the
 #: audit log all the same, and the UI needs a word for them.
+#: Refusals are not verdicts -- nothing was judged -- but they belong in the
+#: audit log all the same, and the UI needs a word for them.
 REFUSED = "REFUSED"
 
+
+class WitnessHashLimits:
+    """What a client-supplied digest does and does not prove. Read before quoting.
+
+    **What this gateway now enforces** (all mechanical, all testable):
+
+    * A success claim must carry a well-formed SHA-256. A parse failure, a null,
+      or free text is refused before anything is booked.
+    * A success claim must carry a ``trace_id``, and an id already used is a
+      replay. One physical action therefore cannot be booked twice.
+    * The digest is stored next to the claim in the hash-chained entry, so the
+      commitment is fixed at submission time and cannot be quietly restated
+      later.
+
+    **What it does not enforce:** that the digest describes anything that
+    happened. The server cannot see the client's disk, so a client that types a
+    digest of a string it invented passes every check above. This is not a bug
+    awaiting a patch; it is the boundary of a remote-witness protocol.
+
+    The honest framing is *commitment, not verification*. Before this change the
+    ledger held an unfalsifiable boolean; now it holds a falsifiable commitment.
+    A third party who later obtains the real artefact can check whether the
+    recorded digest matches, and a mismatch is proof of a lie. That is a real
+    gain in accountability and **not** a gain in presupposed truth.
+
+    Closing the remaining gap needs a witness the client does not control:
+    instrument-level audit trails signed at source (ALCOA+ / 21 CFR 11.10(e)),
+    a hardware-rooted attestation, or an independent notary. Until one of those
+    is wired in, a ``PASS`` here means "a well-formed commitment was made", not
+    "the work was done".
+    """
+
+
+_WitnessHashLimits = WitnessHashLimits
 #: Worst-wins ordering for the headline health state.
 _STATE_ORDER = {HEALTHY: 0, WARNING: 1, CRITICAL: 2}
 
@@ -130,6 +167,51 @@ class VerifyError(Exception):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+
+
+class UnwitnessedClaim(VerifyError):
+    """A success claim arrived with no digest for the cloud to hold onto.
+
+    Raised instead of booking an ``INVALID`` row, because a submission that
+    never became a legal claim is not a judgement about an agent -- it is a
+    malformed request. The distinction is load-bearing:
+
+    * an **honest** agent whose experiment failed submits ``witness=false`` and
+      is booked (and, by policy, not punished);
+    * an agent that claims success without evidence gets **rejected**, and the
+      ledger does not move.
+
+    Booking the second as INVALID would put a permanent mark on an agent for a
+    client bug, and the previous design round already showed where punishing
+    ambiguity leads: agents stop submitting anything.
+    """
+
+    def __init__(self, message: str, status_code: int = 422) -> None:
+        super().__init__(message, status_code)
+
+
+#: A witness digest is a SHA-256, bare or scheme-prefixed. Anything else is a
+#: sentence wearing a hash's clothes.
+_SHA256_BARE = re.compile(r"^[0-9a-fA-F]{64}$")
+_SHA256_PREFIXED = re.compile(r"^sha256:([0-9a-fA-F]{64})$")
+
+
+def normalise_witness_hash(value: Any) -> Optional[str]:
+    """The bare lowercase digest, or ``None`` when ``value`` is not one.
+
+    Returns ``None`` for every non-digest, including the empty string and a
+    plausible-looking short hex. A validator that accepts "close enough" is how
+    a hex field becomes free text again.
+    """
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    prefixed = _SHA256_PREFIXED.match(text)
+    if prefixed:
+        return prefixed.group(1).lower()
+    if _SHA256_BARE.match(text):
+        return text.lower()
+    return None
 
 
 def _canonical(payload: Dict[str, Any]) -> bytes:
@@ -167,6 +249,17 @@ class CelGateway:
         # hash is one nobody checks.
         self._chain_head = "0" * 64
         self._seq = 0
+        #: ``trace_id`` -> agent that first used it. A claim is a commitment:
+        #: the same id submitted twice is either a retry (nothing new happened)
+        #: or a replay of someone else's real digest. Both are refused, because
+        #: a ledger where one physical action can be booked twice measures the
+        #: number of requests, not the number of things that occurred.
+        self._trace_ids: Dict[str, str] = {}
+        #: Submissions refused before they became entries. Kept separately
+        #: because they are **not** on the chain -- by construction there is no
+        #: entry to derive them from -- and an operator still needs to see that
+        #: someone tried. In-memory only: not tamper-evident, and labelled so.
+        self._rejections: List[Dict[str, Any]] = []
 
         self._books = DoubleEntryLedger(
             penalty_factory=self._ledger_for, fail_limit=fail_limit
@@ -196,6 +289,26 @@ class CelGateway:
         if ledger is None:
             return None
         return round(float(ledger.trust_score), 2)
+
+    def _note_rejection(
+        self, agent_id: str, trace_id: Optional[str], reason: str
+    ) -> None:
+        """Record a refused submission without booking it.
+
+        Not on the chain: there is no entry, so there is nothing to chain. It is
+        still recorded, because an audit wall that silently drops attempts is a
+        wall nobody can review. The cost of that honesty is stated in ``stats``:
+        this counter is kept, not derived, and is therefore not tamper-evident.
+        """
+        with self._lock:
+            self._rejections.append(
+                {
+                    "ts": time.time(),
+                    "agent": agent_id.strip() if isinstance(agent_id, str) else "",
+                    "trace_id": trace_id if isinstance(trace_id, str) else "",
+                    "reason": reason,
+                }
+            )
 
     # -- the chain ---------------------------------------------------------
 
@@ -246,12 +359,26 @@ class CelGateway:
         witness: Optional[bool],
         artefact: str = "",
         cost: float = 0.0,
+        witness_hash: Optional[str] = None,
+        trace_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Book one entry. Never raises for a *judged* result -- a FAIL is a
         successful audit, not an API error.
 
+        A success claim must arrive with a digest. ``witness=True`` and no
+        ``witness_hash`` is refused (:class:`UnwitnessedClaim`), and
+        ``witness=True`` with a duplicate ``trace_id`` is refused as a replay.
+        Both leave the ledger untouched.
+
+        What the digest buys, stated plainly so nobody over-reads it: the cloud
+        records a *commitment* it can check later against the real artefact,
+        and cannot be replayed. It does **not** verify provenance -- the server
+        has no access to the client's disk, so a client that invents a digest is
+        booked as a pass. See ``WitnessHashLimits`` below.
+
         Raises:
-            VerifyError: the submission is malformed.
+            UnwitnessedClaim: success claimed, no usable digest.
+            VerifyError: the submission is malformed, or the trace_id is a replay.
             AgentLocked: the agent's book is closed. The refusal is still sealed
                 onto the chain, because "someone tried again" is evidence.
         """
@@ -266,16 +393,44 @@ class CelGateway:
                 "witness must be true, false, or null (null = nothing was inspected)"
             )
 
-        # A supplied path is hashed here rather than taken on trust: a witness
-        # whose stated hash is wrong is not a witness that was checked.
-        recorded_artefact = artefact if isinstance(artefact, str) else ""
-        if recorded_artefact and os.path.isfile(recorded_artefact):
-            try:
-                recorded_artefact = "{}#{}".format(
-                    recorded_artefact, digest_file(recorded_artefact)
+        # -- the witness digest ------------------------------------------------
+        # A supplied digest is parsed, never taken on trust. Note what is *not*
+        # here any more: the old code called os.path.isfile(artefact), which
+        # resolves on the server's own disk. For a remote client that path can
+        # never exist, so the hash branch never fired and every entry looked
+        # exactly like an ungrounded one -- a check that reads as coverage and
+        # is structurally incapable of ever running. It is gone rather than
+        # fixed: the server has no standing to read a client's filesystem.
+        digest = normalise_witness_hash(witness_hash)
+        if witness_hash not in (None, "") and digest is None:
+            raise VerifyError(
+                "witness_hash must be 64 hex characters or 'sha256:<64 hex>', "
+                "got {!r}".format(witness_hash),
+                422,
+            )
+
+        trace = trace_id.strip() if isinstance(trace_id, str) else ""
+        if witness is True:
+            if digest is None:
+                self._note_rejection(
+                    agent_id, trace_id, "success claimed without a witness digest"
                 )
-            except OSError:
-                recorded_artefact = "{}#unreadable".format(recorded_artefact)
+                raise UnwitnessedClaim(
+                    "witness=true requires witness_hash: a success claim with no "
+                    "digest is not evidence the cloud can hold you to"
+                )
+            if not trace:
+                self._note_rejection(
+                    agent_id, trace_id, "success claimed without a trace_id"
+                )
+                raise UnwitnessedClaim(
+                    "witness=true requires trace_id: without it the same digest "
+                    "can be replayed and one action is booked as many"
+                )
+
+        # ``artefact`` is the client's pointer, recorded as given. It is not a
+        # path the server will open -- see the note above.
+        recorded_artefact = artefact if isinstance(artefact, str) else ""
 
         tx = Transaction(
             agent=agent_id.strip(),
@@ -287,6 +442,15 @@ class CelGateway:
         )
 
         with self._lock:
+            if witness is True and trace in self._trace_ids:
+                self._note_rejection(
+                    agent_id, trace_id, "duplicate trace_id (replay)"
+                )
+                raise VerifyError(
+                    "trace_id {!r} was already booked by {!r}; a claim cannot be "
+                    "replayed".format(trace, self._trace_ids[trace]),
+                    409,
+                )
             try:
                 receipt = self._books.record_transaction(tx)
             except AgentLocked as locked:
@@ -298,6 +462,8 @@ class CelGateway:
                         "witness": witness,
                         "verdict": REFUSED,
                         "artefact": recorded_artefact,
+                        "witness_hash": digest or "",
+                        "trace_id": trace,
                         "cost": float(cost),
                         "trust_after": self._trust_of(agent_id.strip()),
                         "penalty": 0.0,
@@ -310,7 +476,14 @@ class CelGateway:
             except DoubleEntryError as error:
                 raise VerifyError(str(error), status_code=422) from None
 
+            # Carried on the receipt rather than added to the core ``Transaction``:
+            # the digest is this gateway's contract with the client, and the
+            # library that composes verdicts has no opinion about it.
+            receipt["witness_hash"] = digest or ""
+            receipt["trace_id"] = trace
             sealed = self._append(receipt)
+            if trace:
+                self._trace_ids[trace] = agent_id.strip()
 
         state = self._state_of(agent_id.strip())
         verdict = receipt["verdict"]
@@ -325,8 +498,13 @@ class CelGateway:
             "inflamed": state == CRITICAL,
             "penalty": receipt["penalty"],
             "charged_as": receipt["charged_as"],
-            "grounded": bool(receipt["artefact"]),
+            # "grounded" now means exactly one thing: a digest was supplied and
+            # validated. It used to mean "the artefact string was non-empty",
+            # which is a statement about typing, not about evidence.
+            "grounded": bool(receipt.get("witness_hash")),
             "artefact": receipt["artefact"],
+            "witness_hash": receipt.get("witness_hash", ""),
+            "trace_id": receipt.get("trace_id", ""),
             "locked": self._books.is_locked(receipt["agent"]),
             "lock_reason": self._books.lock_reason(receipt["agent"]),
             "seq": sealed["seq"],
@@ -350,8 +528,10 @@ class CelGateway:
             "inflamed": self._state_of(sealed["agent"]) == CRITICAL,
             "penalty": 0.0,
             "charged_as": "",
-            "grounded": bool(sealed["artefact"]),
+            "grounded": bool(sealed.get("witness_hash")),
             "artefact": sealed["artefact"],
+            "witness_hash": sealed.get("witness_hash", ""),
+            "trace_id": sealed.get("trace_id", ""),
             "locked": True,
             "lock_reason": sealed["reason"],
             "seq": sealed["seq"],
@@ -376,6 +556,8 @@ class CelGateway:
                     "witness": True,
                     "verdict": "UNLOCK",
                     "artefact": "",
+                    "witness_hash": "",
+                    "trace_id": "",
                     "cost": 0.0,
                     "trust_after": self._trust_of(agent_id.strip()),
                     "penalty": 0.0,
@@ -456,6 +638,13 @@ class CelGateway:
             return {
                 "intercepted_false_completions": intercepted,
                 "blocked_unwitnessed": unwitnessed,
+                #: Success claims refused at the door for lacking a digest, or
+                #: for replaying one. These never became entries, so this is the
+                #: one number below that is *kept* rather than derived, and it
+                #: is not covered by the hash chain. Read it as a smoke alarm,
+                #: not as evidence: an attacker who can restart the process can
+                #: clear it, and no verdict was ever recorded against them.
+                "rejected_unwitnessed": len(self._rejections),
                 "refused_attempts": refused,
                 "verified_passes": passed,
                 "avg_trust_score": avg_trust,
@@ -512,6 +701,8 @@ def _public(entry: Dict[str, Any]) -> Dict[str, Any]:
         "penalty": entry["penalty"],
         "charged_as": entry["charged_as"],
         "artefact": entry["artefact"],
+        "witness_hash": entry.get("witness_hash", ""),
+        "trace_id": entry.get("trace_id", ""),
         "book_locked": entry["book_locked"],
         "reason": entry.get("reason", ""),
         "hash": entry["hash"],

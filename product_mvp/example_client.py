@@ -107,11 +107,22 @@ def show_rejected_write() -> None:
 # 2. the four verdicts, so a reader can see the whole rule in one place
 # ---------------------------------------------------------------------------
 
+def new_trace_id() -> str:
+    """A fresh id per scenario: the cloud refuses a replayed trace as a replay."""
+    return "example-" + uuid.uuid4().hex
+
+
 SCENARIOS = [
     (
+        # A success claim must carry a digest; the cloud validates its form and
+        # records it as a commitment. This one is a constant over a marker
+        # string, so the entry is honest about being an example rather than
+        # pretending a button press was a sealed vial.
         "verified work",
         {"agent_id": "robot_arm_01", "intent": "seal the sample vial",
-         "check": True, "witness": True, "artefact": "demo://vial/42"},
+         "check": True, "witness": True, "artefact": "demo://vial/42",
+         "witness_hash": "sha256:47ea49ca591c30488beedcdadbef0231dc497ed059ff8cff1b94a3c99ea4d1ef",
+         "trace_id": new_trace_id()},
        "PASS",
     ),
     (
@@ -129,7 +140,9 @@ SCENARIOS = [
     (
         "under-claim",
         {"agent_id": "nav_stack_02", "intent": "report battery swap",
-         "check": False, "witness": True},
+         "check": False, "witness": True, "artefact": "demo://battery/02",
+         "witness_hash": "sha256:47ea49ca591c30488beedcdadbef0231dc497ed059ff8cff1b94a3c99ea4d1ef",
+         "trace_id": new_trace_id()},
        "FAIL",
     ),
     (

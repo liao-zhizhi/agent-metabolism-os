@@ -265,6 +265,18 @@ async function tick() {
 
 /* ----------------------------------------------------------------- submit */
 
+/* The two presets that claim a landed effect need a digest and a trace id:
+ * a success claim without one is refused with 422 by design (see
+ * cel_engine.WitnessHashLimits). These are **simulations**, so the digest is a
+ * constant over the literal string "cel-dashboard-simulation" and the artefact
+ * is a `simulated://` pointer. That keeps the demo working without dressing a
+ * button press up as a real grounding: the ledger entry itself says simulated.
+ */
+const SIM_HASH = "sha256:d19733cb344a38d43297e4071f12561ba0f76371b2fcd48e8c6493ec03646039";
+const newTrace = () =>
+  (crypto.randomUUID ? "sim-" + crypto.randomUUID()
+                     : "sim-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+
 const SCENARIOS = {
   // The headline demo: the agent says it succeeded, the evidence says it did not.
   false_completion: {
@@ -284,7 +296,9 @@ const SCENARIOS = {
     intent: "seal the sample vial",
     check: true,
     witness: true,
-    artefact: "demo://vial/42",
+    artefact: "simulated://vial/42",
+    witness_hash: SIM_HASH,
+    trace_id: newTrace(),
   },
   unwitnessed: {
     agent_id: "nav_stack_02",
@@ -297,6 +311,9 @@ const SCENARIOS = {
     intent: "report battery swap",
     check: false,
     witness: true,
+    artefact: "simulated://battery/02",
+    witness_hash: SIM_HASH,
+    trace_id: newTrace(),
   },
 };
 

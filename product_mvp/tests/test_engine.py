@@ -21,7 +21,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from cel_engine import REFUSED, CelGateway, VerifyError, _Refused  # noqa: E402
+from cel_engine import (  # noqa: E402
+    REFUSED,
+    CelGateway,
+    UnwitnessedClaim,
+    VerifyError,
+    _Refused,
+)
+
+#: Shape-valid digest for calls that exercise the verdict, not the digest.
+#: This layer validates form; it never opens a file, and a fixture that implied
+#: otherwise would paper over the boundary ``WitnessHashLimits`` documents.
+_H = "sha256:" + "b" * 64
+
+_TRACE = [0]
+
+
+def _trace() -> str:
+    _TRACE[0] += 1
+    return "engine-trace-{}".format(_TRACE[0])
 
 
 class LayoutTests(unittest.TestCase):
@@ -73,7 +91,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_verified_work_is_a_pass(self) -> None:
         out = self.gw.verify(
-            agent_id="robot_arm_01", intent="seal vial", check=True, witness=True
+            agent_id="robot_arm_01", intent="seal vial", check=True, witness=True, witness_hash=_H, trace_id=_trace()
         )
         self.assertEqual(out["verdict"], "PASS")
         self.assertEqual(out["trust_score"], 100.0)
@@ -103,7 +121,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_under_claim_is_a_fail_but_cheaper(self) -> None:
         out = self.gw.verify(
-            agent_id="nav_stack_02", intent="battery swap", check=False, witness=True
+            agent_id="nav_stack_02", intent="battery swap", check=False, witness=True, witness_hash=_H, trace_id=_trace()
         )
         self.assertEqual(out["verdict"], "FAIL")
         self.assertEqual(out["charged_as"], "FALSE_REPORT")
@@ -125,7 +143,7 @@ class VerdictTests(unittest.TestCase):
 
     def test_rejects_empty_intent(self) -> None:
         with self.assertRaises(VerifyError):
-            self.gw.verify(agent_id="a", intent="   ", check=True, witness=True)
+            self.gw.verify(agent_id="a", intent="   ", check=True, witness=True, witness_hash=_H, trace_id=_trace())
 
 
 class QuarantineTests(unittest.TestCase):
@@ -159,12 +177,12 @@ class QuarantineTests(unittest.TestCase):
     def test_a_pass_resets_the_streak(self) -> None:
         self.gw.verify(agent_id="a", intent="x", check=True, witness=False)
         self.gw.verify(agent_id="a", intent="y", check=True, witness=False)
-        self.gw.verify(agent_id="a", intent="z", check=True, witness=True)  # honest pass
+        self.gw.verify(agent_id="a", intent="z", check=True, witness=True, witness_hash=_H, trace_id=_trace())  # honest pass
         out = self.gw.verify(agent_id="a", intent="w", check=True, witness=False)
         self.assertFalse(out["locked"])
 
     def test_unlock_requires_a_locked_book(self) -> None:
-        self.gw.verify(agent_id="a", intent="x", check=True, witness=True)
+        self.gw.verify(agent_id="a", intent="x", check=True, witness=True, witness_hash=_H, trace_id=_trace())
         with self.assertRaises(VerifyError):
             self.gw.unlock("a")
 
@@ -172,7 +190,7 @@ class QuarantineTests(unittest.TestCase):
         for _ in range(3):
             self.gw.verify(agent_id="a", intent="x", check=True, witness=False)
         self.gw.unlock("a", "operator reviewed the log")
-        out = self.gw.verify(agent_id="a", intent="y", check=True, witness=True)
+        out = self.gw.verify(agent_id="a", intent="y", check=True, witness=True, witness_hash=_H, trace_id=_trace())
         self.assertEqual(out["verdict"], "PASS")
         self.assertFalse(out["locked"])
 
@@ -181,7 +199,7 @@ class StatsTests(unittest.TestCase):
     def test_stats_are_derived_from_entries(self) -> None:
         gw = CelGateway(fail_limit=3)
         gw.verify(agent_id="a", intent="x", check=True, witness=False)
-        gw.verify(agent_id="b", intent="y", check=True, witness=True)
+        gw.verify(agent_id="b", intent="y", check=True, witness=True, witness_hash=_H, trace_id=_trace())
 
         stats = gw.stats()
         self.assertEqual(stats["intercepted_false_completions"], 1)
@@ -240,26 +258,126 @@ class ChainTests(unittest.TestCase):
         with self.assertRaises(_Refused):
             gw.verify(agent_id="a", intent="x", check=True, witness=False)
         gw.unlock("a")
-        gw.verify(agent_id="a", intent="y", check=True, witness=True)
+        gw.verify(agent_id="a", intent="y", check=True, witness=True, witness_hash=_H, trace_id=_trace())
 
         seqs = [e["seq"] for e in gw.ledger(limit=20)["entries"]]
         self.assertEqual(seqs, list(range(1, len(seqs) + 1)))
         self.assertTrue(gw.verify_chain())
 
 
-class ArtefactTests(unittest.TestCase):
-    def test_a_real_file_is_hashed_into_the_entry(self) -> None:
-        gw = CelGateway()
-        target = Path(__file__)  # any readable file will do
-        out = gw.verify(
-            agent_id="a",
-            intent="verify a file",
-            check=True,
-            witness=True,
-            artefact=str(target),
+class WitnessHashTests(unittest.TestCase):
+    """The door: a success claim must carry a digest the cloud can hold onto.
+
+    The old behaviour hashed ``artefact`` with ``os.path.isfile`` on the
+    *server's* disk. For a remote client that path can never exist, so the
+    branch never fired -- a check that read as coverage and could not run. These
+    tests pin the replacement, including the case that is deliberately allowed.
+    """
+
+    def setUp(self) -> None:
+        self.gw = CelGateway(fail_limit=3)
+
+    def test_a_pass_needs_a_digest(self) -> None:
+        with self.assertRaises(UnwitnessedClaim):
+            self.gw.verify(agent_id="a", intent="x", check=True, witness=True)
+        # Refused at the door: no entry, no trust spent.
+        self.assertEqual(self.gw.ledger()["total_entries"], 0)
+
+    def test_a_pass_needs_a_trace_id(self) -> None:
+        with self.assertRaises(UnwitnessedClaim):
+            self.gw.verify(
+                agent_id="a", intent="x", check=True, witness=True, witness_hash=_H
+            )
+        self.assertEqual(self.gw.ledger()["total_entries"], 0)
+
+    def test_free_text_is_not_a_digest(self) -> None:
+        for bogus in ("yes", "sha256:", "a" * 63, "a" * 65, "z" * 64, "", "0x" + "a" * 64):
+            with self.subTest(bogus=bogus):
+                with self.assertRaises(VerifyError) as caught:
+                    self.gw.verify(
+                        agent_id="a",
+                        intent="x",
+                        check=True,
+                        witness=True,
+                        witness_hash=bogus,
+                        trace_id=_trace(),
+                    )
+                self.assertEqual(caught.exception.status_code, 422)
+
+    def test_bare_hex_and_prefixed_form_are_both_accepted(self) -> None:
+        bare = "c" * 64
+        out = self.gw.verify(
+            agent_id="a", intent="x", check=True, witness=True,
+            witness_hash=bare, trace_id=_trace(),
         )
-        self.assertIn("sha256:", out["artefact"])
-        self.assertTrue(out["grounded"])
+        self.assertEqual(out["verdict"], "PASS")
+        self.assertEqual(out["witness_hash"], bare)
+
+        prefixed = self.gw.verify(
+            agent_id="a", intent="y", check=True, witness=True,
+            witness_hash="sha256:" + "d" * 64, trace_id=_trace(),
+        )
+        self.assertEqual(prefixed["witness_hash"], "d" * 64)
+
+    def test_an_honest_failure_needs_no_digest(self) -> None:
+        """A negative result has nothing to hash.
+
+        Requiring one here would make the only affordable strategy "never report
+        a failure", which is the failure mode the whole design round removed.
+        """
+        out = self.gw.verify(
+            agent_id="a", intent="assay failed", check=False, witness=False
+        )
+        self.assertEqual(out["verdict"], "PASS")
+        self.assertEqual(out["penalty"], 0.0)
+        self.assertFalse(out["grounded"])
+
+    def test_a_replayed_trace_id_is_refused(self) -> None:
+        trace = _trace()
+        self.gw.verify(
+            agent_id="a", intent="x", check=True, witness=True,
+            witness_hash=_H, trace_id=trace,
+        )
+        with self.assertRaises(VerifyError) as caught:
+            self.gw.verify(
+                agent_id="a", intent="x again", check=True, witness=True,
+                witness_hash=_H, trace_id=trace,
+            )
+        self.assertEqual(caught.exception.status_code, 409)
+        # The replay booked nothing: one action, one entry.
+        self.assertEqual(self.gw.ledger()["total_entries"], 1)
+
+    def test_the_digest_reaches_the_chain(self) -> None:
+        trace = _trace()
+        self.gw.verify(
+            agent_id="a", intent="x", check=True, witness=True,
+            witness_hash=_H, trace_id=trace,
+        )
+        entry = self.gw.ledger()["entries"][-1]
+        self.assertEqual(entry["witness_hash"], _H.replace("sha256:", ""))
+        self.assertEqual(entry["trace_id"], trace)
+        self.assertTrue(self.gw.verify_chain())
+
+    def test_the_server_never_reads_the_client_path(self) -> None:
+        """``artefact`` is a pointer, recorded verbatim, and never opened.
+
+        A path that exists on this machine proves nothing about a remote client,
+        so opening it would only manufacture confidence.
+        """
+        out = self.gw.verify(
+            agent_id="a", intent="x", check=True, witness=True,
+            witness_hash=_H, trace_id=_trace(), artefact=str(Path(__file__)),
+        )
+        self.assertEqual(out["artefact"], str(Path(__file__)))
+        self.assertNotIn("#", out["artefact"])
+
+    def test_refusals_are_counted_but_not_chained(self) -> None:
+        for _ in range(3):
+            with self.assertRaises(UnwitnessedClaim):
+                self.gw.verify(agent_id="a", intent="x", check=True, witness=True)
+        stats = self.gw.stats()
+        self.assertEqual(stats["rejected_unwitnessed"], 3)
+        self.assertEqual(stats["total_entries"], 0)
 
 
 if __name__ == "__main__":

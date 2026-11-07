@@ -271,9 +271,19 @@ class VerifyRequest(BaseModel):
     #: ``None`` (or omitting the field) means "nothing was inspected", which is
     #: INVALID -- not a failure, and never a pass.
     witness: Optional[StrictBool] = None
-    #: Optional pointer to physical evidence. A real file path is sha256-hashed
-    #: before being stored, so the entry is grounded in bytes, not a claim.
+    #: Pointer to the evidence, e.g. ``hello.txt``. Stored as given: the server
+    #: does **not** open it, because a remote client's path cannot exist here.
     artefact: str = ""
+    #: SHA-256 of the witnessed effect, bare or ``sha256:<hex>``. Required when
+    #: ``witness`` is true: a success claim with no digest is refused (422) and
+    #: the ledger does not move. Optional for an honest failure, because a
+    #: negative result has no artefact to hash and punishing it for that would
+    #: teach agents to stop reporting failures.
+    witness_hash: Optional[str] = None
+    #: Client-chosen unique id for this action. Required when ``witness`` is
+    #: true; a repeat is refused as a replay, so one action cannot be booked
+    #: twice. See ``cel_engine.WitnessHashLimits`` for what the digest proves.
+    trace_id: Optional[str] = None
     cost: float = 0.0
 
 
@@ -317,6 +327,12 @@ def verify(body: VerifyRequest) -> JSONResponse:
     A FAIL is a **successful audit**, not an API error: it returns 200 with
     ``verdict: "FAIL"``. Only a closed book returns 423, because nothing was
     judged.
+
+    A success claim without a usable digest -- or one that replays an already
+    used ``trace_id`` -- returns 422 or 409 with ``verdict: "INVALID"`` and
+    ``ledger_written: false``. Nothing is booked: a malformed submission is not
+    a judgement about an agent, and putting a permanent INVALID row on the chain
+    for a client bug would punish the wrong party.
     """
     agent_id = (body.agent_id or body.agent or "").strip()
     try:
@@ -327,11 +343,26 @@ def verify(body: VerifyRequest) -> JSONResponse:
             witness=body.witness,
             artefact=body.artefact,
             cost=body.cost,
+            witness_hash=body.witness_hash,
+            trace_id=body.trace_id,
         )
     except _Refused as refused:
         return JSONResponse(status_code=423, content=GATEWAY.settle_refusal(refused))
     except VerifyError as error:
-        raise HTTPException(status_code=error.status_code, detail=error.message) from None
+        # Refused at the door. The body names the ledger state explicitly so a
+        # client cannot read "no error object" as "probably recorded".
+        return JSONResponse(
+            status_code=error.status_code,
+            content={
+                "verdict": "INVALID",
+                "detail": error.message,
+                "ledger_written": False,
+                "agent_id": agent_id,
+                "trace_id": body.trace_id or "",
+                "witness": body.witness,
+                "witness_hash": body.witness_hash or "",
+            },
+        )
     return JSONResponse(status_code=200, content=result)
 
 
