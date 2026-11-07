@@ -50,7 +50,87 @@ ANON_WINDOW="${CEL_DEPLOY_ANON_WINDOW:-300}"
 #: reach the port is the tunnel, so X-Forwarded-For is written by a hop we own.
 PUBLISH="${CEL_DEPLOY_PUBLISH:-127.0.0.1:80:7860}"
 
-[[ "${1:-}" == "--dry-run" ]] && DRY=1
+#: The distribution name as the landing page must spell it.
+PKG="harness-audit-sidecar"
+#: The two commands. `git+` is what works before the first upload; `bare` is
+#: what the page should advertise once PyPI has the name.
+CMD_BARE="pip install ${PKG}"
+CMD_GIT="pip install \"git+https://github.com/liao-zhizhi/${PKG}.git\""
+
+if [[ "${1:-}" == "--dry-run" ]]; then DRY=1; fi
+if [[ "${1:-}" == "--selftest" ]]; then SELFTEST=1; else SELFTEST=0; fi
+
+#: Assert the served landing page's install command matches what the index
+#: actually holds. ``$1`` is ``published`` or ``missing``; ``$2`` is the HTML.
+#:
+#: This exists because the hero CTA is a claim about the outside world, and it
+#: goes stale in the direction that hurts: the page keeps saying "not on PyPI
+#: yet" after the release lands, or keeps advertising ``pip install
+#: harness-audit-sidecar`` while that name still 404s. Both are the same defect
+#: as a wrong verdict -- a claim the evidence does not support.
+#:
+#: It is a function rather than an inline ``if`` so that ``--selftest`` can drive
+#: it through fixtures. A gate nobody ran is a gate that passes everything.
+#:
+#: Exit codes: 0 ok; 1 published but page does not advertise the bare command;
+#: 2 published but the page still denies it; 3 not published and the page does
+#: not offer the git+ command.
+check_install_claim() {
+  local mode="$1" html="$2"
+  case "$mode" in
+    published)
+      grep -qF "$CMD_BARE" <<<"$html" || return 1
+      # `if`, not `grep && return`: under `set -e` a failing left-hand side of
+      # `&&` terminates the whole script, which would turn "the page is correct"
+      # into an abort halfway through the fixture run.
+      if grep -q "尚未发布" <<<"$html"; then return 2; fi
+      ;;
+    missing)
+      # The git+ line is a *superset* string ("pip install \"git+..."), so this
+      # cannot be satisfied by a page that only mentions the bare name in prose.
+      grep -qF "$CMD_GIT" <<<"$html" || return 3
+      ;;
+    *) return 4 ;;
+  esac
+  return 0
+}
+
+selftest_install_claim() {
+  local fails=0
+  expect() {
+    local want="$1" desc="$2"; shift 2
+    # `if ...; then; else` rather than `func; got=$?`: under `set -e` a bare
+    # call that exits non-zero kills the harness, so the first fixture that
+    # *should* fail would end the run and prove nothing about the rest.
+    local got=0
+    if check_install_claim "$@" >/dev/null 2>&1; then got=0; else got=$?; fi
+    if [[ "$got" == "$want" ]]; then
+      echo "   ok   $desc (exit $got)"
+    else
+      echo "   FAIL $desc: wanted exit $want, got $got" >&2
+      fails=$((fails + 1))
+    fi
+  }
+  echo "== install-claim gate: selftest =="
+  expect 0 "published + bare command advertised" published \
+    "<code>${CMD_BARE}</code>"
+  expect 2 "published + page still says 尚未发布" published \
+    "<code>${CMD_BARE}</code> 发布后命令会简化为 ${CMD_BARE}，PyPI 上尚未发布"
+  expect 1 "published + page advertises nothing" published \
+    "<code>${CMD_GIT}</code>"
+  expect 0 "not published + git+ command" missing "<code>${CMD_GIT}</code>"
+  expect 3 "not published + only a prose mention" missing \
+    "发布后命令会简化为 ${CMD_BARE}"
+  expect 3 "not published + empty page" missing ""
+  [[ $fails -eq 0 ]] || { echo "selftest FAILED ($fails)" >&2; exit 1; }
+  echo "   all install-claim fixtures behave"
+}
+
+if [[ $SELFTEST -eq 1 ]]; then
+  selftest_install_claim
+  exit 0
+fi
+
 
 cd "$(dirname "$0")/.."
 SRC="$(pwd)/product_mvp"
@@ -186,17 +266,22 @@ echo "   public page: hero copy, install command, MCP config, repo links present
 # direction that hurts: the page keeps saying "not on PyPI yet" after a release,
 # or keeps advertising `pip install harness-audit-sidecar` while that name still
 # 404s. Both are the same bug as a wrong verdict -- a claim the evidence does not
-# support -- so the deploy checks the claim against PyPI instead of trusting the
-# person who last edited the HTML.
-if curl -sf --max-time 10 https://pypi.org/pypi/harness-audit-sidecar/json >/dev/null; then
-  grep -q "尚未发布" <<<"$HTML" \
-    && { echo "   FATAL: package is on PyPI but the page still says 尚未发布" >&2; exit 1; }
-  echo "   install claim: package is on PyPI, page does not deny it"
+# support -- so the deploy asks PyPI which world it is in and refuses a page that
+# describes the other one. (`--selftest` drives this same function through
+# fixtures.)
+if curl -sf --max-time 10 "https://pypi.org/pypi/$PKG/json" >/dev/null; then
+  CLAIM_MODE=published
 else
-  grep -qF 'pip install "git+https://github.com/liao-zhizhi/harness-audit-sidecar' <<<"$HTML" \
-    || { echo "   FATAL: package is not on PyPI but the page does not offer the git+ command" >&2; exit 1; }
-  echo "   install claim: package is not on PyPI, page offers the command that works"
+  CLAIM_MODE=missing
 fi
+check_install_claim "$CLAIM_MODE" "$HTML" && CLAIM_RC=0 || CLAIM_RC=$?
+case "$CLAIM_RC" in
+  0) echo "   install claim: $PKG is ${CLAIM_MODE} on PyPI, page agrees" ;;
+  1) echo "   FATAL: $PKG is on PyPI but the page does not offer '$CMD_BARE'" >&2; exit 1 ;;
+  2) echo "   FATAL: $PKG is on PyPI but the page still says 尚未发布" >&2; exit 1 ;;
+  3) echo "   FATAL: $PKG is not on PyPI but the page does not offer the git+ command" >&2; exit 1 ;;
+  *) echo "   FATAL: unknown install-claim mode '$CLAIM_MODE'" >&2; exit 1 ;;
+esac
 JSV=$(grep -oE '/static/app\.js\?v=[0-9a-f]{10}' <<<"$HTML")
 JS=$(curl -s --max-time 20 "$URL$JSV")
 # Check for the wording, not just for the feature. A bundle that still renders a
