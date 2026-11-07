@@ -123,6 +123,28 @@ python api_server.py
 大屏上的 key 由人工粘贴进控制台的输入框，存在 `sessionStorage`（关掉标签页就没了），
 不会写进 HTML —— 所以"查看源代码"看不到任何 key。
 
+### 写接口的限流
+
+密钥只决定"谁能写"，不决定"能写多少次"：拿到 key 的人（或没有 key 时的任何人）
+仍然可以把 `/api/v1/verify` 当压力接口打。所以三个写接口
+（`/verify`、`/falsify`、`/agents/{id}/unlock`）按 **客户端 IP** 加了一个滑动窗口预算：
+
+- 默认 **5 次 / 60 秒 / IP**，第 6 次返回 **429 Too Many Requests**，
+  并带 `Retry-After` 头（秒）；
+- 被拒的请求**不记账**：429 表示"这件事没发生"，不是"发生并被罚"；
+- 读接口（`/stats`、`/ledger`、`/ledger/verify`、`/`）**完全不受限**——大屏每 2 秒轮询一次，
+  限流会把监控页变成空白页；
+- 限流在**鉴权之前**执行：爆破 `X-API-Key` 是这里最便宜的攻击，预算必须在
+  那次 HMAC 比较之前就花掉。代价是错的 key 用尽预算后会看到 429 而不是 403；
+- 预算按 IP 算，而 `X-Forwarded-For` 是客户端可伪造的，**默认忽略**它；
+  真正在反向代理后面时设 `CEL_TRUST_PROXY=1`（取最左侧地址），否则所有请求共享
+  代理那一个 IP，一个人就能花光所有人的预算。
+
+调整：`CEL_RATE_LIMIT=20 CEL_RATE_WINDOW=60`（`CEL_RATE_LIMIT=0` 关闭限流，
+启动日志会打 `rate limit: DISABLED` 警告——它只该出现在压测或单调用方场景）。
+`/api/v1/stats` 会报出 `rate_limit: {limit, window_seconds, scope}`，
+让大屏能解释 429 是策略而不是故障。
+
 公网部署（持久化磁盘、`/data`、平台环境变量、验收清单）见 **[DEPLOYMENT.md](DEPLOYMENT.md)**。
 
 本目录可以直接作为 **Hugging Face Space** 发布：文件顶部的 YAML 就是 Space 配置
@@ -248,6 +270,9 @@ product_mvp/
 | `CEL_PORT` / `CEL_HOST` | — | 本服务自己的旋钮，本地或 compose 用；优先级高于 `PORT`/`HOST` |
 | `CEL_CORE_PATH` | 自动探测 | 核心库路径。不设时按 `../agent-metabolism-os` → `..` 顺序找 `agent_metabolism/double_entry.py`；**镜像里写死 `/app`**，自建镜像时必须自己给 |
 | `CEL_FAIL_LIMIT` | `3` | 连续几次 `FAIL` 隔离一个 Agent（核心最小值 2） |
+| `CEL_RATE_LIMIT` | `5` | 每个客户端 IP 在窗口内允许的**写**请求次数（三个写接口共享此预算）；`0` 关闭 |
+| `CEL_RATE_WINDOW` | `60` | 限流窗口，秒（滑动窗口，不是固定桶） |
+| `CEL_TRUST_PROXY` | 空 | 设成任意非空值才信任 `X-Forwarded-For` 的最左地址。**只在确实有反向代理时设**——否则任何人都能伪造它绕过限流 |
 | `CEL_LEDGER_LOG` | 空 | 把链追加到文件。必须落在**可写且持久**的路径：容器里写 `/data/...` 且挂卷；Vercel 只有 `/tmp` 可写，**重启即丢** |
 
 ### 按平台

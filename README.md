@@ -413,7 +413,9 @@ service and a dashboard, so the two-sided rule can be watched instead of read:
 Read endpoints (`/api/v1/stats`, `/api/v1/ledger`, `/api/v1/ledger/verify`) are anonymous, so the
 whole chain can be inspected and re-verified without a credential. Writing charges trust against an
 agent id and therefore requires a demo key; open an issue with your use case to request one. No key
-is published in this repository or any other.
+is published in this repository or any other — the dashboard asks for it at runtime and keeps it in
+`sessionStorage`, never in the HTML. Writes are also rate-limited per client IP (5 per minute by
+default, `429` with `Retry-After` when exceeded); reads are never limited.
 
 Or run it locally:
 

@@ -8,6 +8,12 @@ Three endpoints, the whole product:
 
 Plus ``GET /`` which serves the dashboard, and ``GET /healthz``.
 
+Two gates stand in front of the write path, in this order: a per-client-IP
+sliding-window budget (``CEL_RATE_LIMIT`` writes per ``CEL_RATE_WINDOW``
+seconds, ``429`` with ``Retry-After`` when spent) and the shared
+``X-API-Key`` (``403``). Reads are anonymous and never rate-limited: the
+dashboard polls them every two seconds.
+
 Run::
 
     uvicorn api_server:app --reload --port 8000     # from product_mvp/
@@ -25,11 +31,14 @@ import hashlib
 import hmac
 import logging
 import os
+import threading
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -133,13 +142,186 @@ def require_api_key(
         )
 
 
-WRITE_ACCESS = [Depends(require_api_key)]
-
-
 def configure_auth() -> ApiKeyAuth:
     """Re-read the key from the environment. Used by tests; safe to call twice."""
     AUTH.reload()
     return AUTH
+
+
+# ---------------------------------------------------------------------------
+# rate limiting (write path only)
+# ---------------------------------------------------------------------------
+#: The write budget, per client IP, per window. These are the two knobs a
+#: deployment may want to change; everything else here is fixed policy.
+RATE_LIMIT_ENV = "CEL_RATE_LIMIT"
+RATE_WINDOW_ENV = "CEL_RATE_WINDOW"
+#: Set to a non-empty value when the process sits behind a reverse proxy that
+#: appends ``X-Forwarded-For``. Off by default on purpose -- see ``_client_ip``.
+TRUST_PROXY_ENV = "CEL_TRUST_PROXY"
+
+DEFAULT_RATE_LIMIT = 5
+DEFAULT_RATE_WINDOW = 60.0
+
+#: Stop the per-key dictionary from growing without bound on a public instance.
+RATE_SWEEP_AT = 4096
+
+
+def _env_number(name: str, default: float, cast) -> float:
+    """Read a non-negative number, refusing to start on nonsense.
+
+    A typo'd ``CEL_RATE_LIMIT=abc`` must not silently become "no limit": the
+    whole point of the knob is that the operator believes it is on. Failing at
+    boot is the only outcome that cannot be mistaken for protection.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = cast(raw)
+    except ValueError:
+        raise SystemExit("{} must be a number, got {!r}".format(name, raw)) from None
+    if value < 0:
+        raise SystemExit("{} must not be negative, got {!r}".format(name, raw))
+    return value
+
+
+class RateLimiter:
+    """A sliding-window request counter keyed by client IP.
+
+    Sliding window, not a fixed bucket, because a fixed bucket lets a caller
+    spend the whole budget at the end of one window and again at the start of
+    the next -- ``2 * limit`` writes in a few milliseconds, which is exactly the
+    burst the limit exists to stop.
+
+    ``limit=0`` disables the check (the documented escape hatch for a load test
+    or a single trusted caller); it is off by *configuration*, never by
+    accident, because a limiter that fails open on a malformed setting is worse
+    than no limiter at all.
+
+    Every write is one entry in a deque of monotonic timestamps. Monotonic
+    rather than wall-clock, so an NTP step cannot hand out a fresh budget.
+    """
+
+    def __init__(self, limit: int = DEFAULT_RATE_LIMIT,
+                 window: float = DEFAULT_RATE_WINDOW,
+                 clock=None) -> None:
+        self.limit = limit
+        self.window = window
+        # Injectable so the window can be tested without sleeping for a minute.
+        self._clock = clock or time.monotonic
+        self._hits: Dict[str, Deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def reset(self) -> None:
+        """Drop every recorded hit. Tests call this; nothing else should."""
+        with self._lock:
+            self._hits.clear()
+
+    def hit(self, key: str) -> Tuple[bool, float]:
+        """Book one attempt. Returns ``(allowed, retry_after_seconds)``.
+
+        The attempt is booked only when it is allowed, so a client that keeps
+        hammering does not extend its own ban by doing so -- the window empties
+        on schedule and the next allowed request is predictable.
+        """
+        if self.limit <= 0:
+            return True, 0.0
+        now = self._clock()
+        cutoff = now - self.window
+        with self._lock:
+            bucket = self._hits.get(key)
+            if bucket is None:
+                bucket = self._hits[key] = deque()
+            while bucket and bucket[0] <= cutoff:
+                bucket.popleft()
+            if len(bucket) >= self.limit:
+                return False, max(bucket[0] + self.window - now, 0.0)
+            bucket.append(now)
+            if len(self._hits) > RATE_SWEEP_AT:
+                for stale in [k for k, v in self._hits.items() if not v]:
+                    del self._hits[stale]
+            return True, 0.0
+
+
+def _client_ip(request: Request) -> str:
+    """The identity the budget is spent against.
+
+    ``request.client.host`` by default, which is the only value the server can
+    see for itself. ``X-Forwarded-For`` is *ignored* unless ``CEL_TRUST_PROXY``
+    is set, because that header is attacker-controlled: trusting it unasked
+    turns the limiter into a no-op (send a new fake IP per request and the
+    budget never fills) and, worse, lets anyone burn a specific victim's
+    budget. Behind a proxy the operator must say so; the header is then read
+    left-most, which is the originating client as the proxy recorded it.
+    """
+    if (os.environ.get(TRUST_PROXY_ENV) or "").strip():
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            first = forwarded.split(",")[0].strip()
+            if first:
+                return first
+    client = request.client
+    return client.host if client and client.host else "unknown"
+
+
+def _rate_knobs() -> Tuple[int, float]:
+    """``(limit, window)`` from the environment, refusing inconsistent pairs.
+
+    A window of zero with a non-zero limit would mean "the budget is always
+    empty", i.e. no limit at all, while the boot log claims one is on. The only
+    supported way to turn this off is ``CEL_RATE_LIMIT=0``.
+    """
+    limit = int(_env_number(RATE_LIMIT_ENV, DEFAULT_RATE_LIMIT, int))
+    window = _env_number(RATE_WINDOW_ENV, DEFAULT_RATE_WINDOW, float)
+    if limit > 0 and window <= 0:
+        raise SystemExit(
+            "{}={} needs {} > 0; use {}={} to disable the limit"
+            .format(RATE_LIMIT_ENV, limit, RATE_WINDOW_ENV, RATE_LIMIT_ENV, 0)
+        )
+    return limit, window
+
+
+_initial_limit, _initial_window = _rate_knobs()
+
+WRITE_LIMITER = RateLimiter(limit=_initial_limit, window=_initial_window)
+
+
+def configure_rate_limit() -> RateLimiter:
+    """Re-read both knobs and clear the counters. Used by tests."""
+    WRITE_LIMITER.limit, WRITE_LIMITER.window = _rate_knobs()
+    WRITE_LIMITER.reset()
+    return WRITE_LIMITER
+
+
+def enforce_write_rate(request: Request) -> None:
+    """FastAPI dependency: spend one unit of the caller's write budget.
+
+    Runs **before** the key check on purpose. Brute-forcing ``X-API-Key`` is the
+    cheapest attack on this service -- every guess costs the attacker one
+    request and costs the server one HMAC comparison -- so the budget has to be
+    spent before the comparison, not after it. The visible consequence is that a
+    caller with the wrong key sees 429 rather than 403 once it is out of budget;
+    that is the correct trade, and the 403 tests reset the budget before use.
+    """
+    allowed, retry_after = WRITE_LIMITER.hit(_client_ip(request))
+    if allowed:
+        return
+    retry = max(1, int(retry_after + 0.999))
+    raise HTTPException(
+        status_code=429,
+        detail=(
+            "too many writes from this address: the limit is {} per {} seconds. "
+            "Retry in {}s. Reads (/api/v1/stats, /api/v1/ledger) are not "
+            "limited, so the console keeps rendering."
+            .format(WRITE_LIMITER.limit, int(WRITE_LIMITER.window), retry)
+        ),
+        headers={"Retry-After": str(retry)},
+    )
+
+
+#: Every endpoint that **writes** to the ledger. Rate limit first (it is the
+#: cheap check and it gates key guessing), then the key itself.
+WRITE_ACCESS = [Depends(enforce_write_rate), Depends(require_api_key)]
 
 
 def _log_line(message: str, level: int) -> None:
@@ -177,6 +359,25 @@ def _announce_auth() -> None:
             "auth: DISABLED -- {} is not set. Anyone who can reach this port can "
             "charge an agent's trust. Fine for a local demo; set {} before "
             "exposing this instance.".format(API_KEY_ENV, API_KEY_ENV),
+            logging.WARNING,
+        )
+    if WRITE_LIMITER.limit > 0:
+        _log_line(
+            "rate limit: writes are capped at {} per {:g}s per client IP "
+            "(proxy header {})".format(
+                WRITE_LIMITER.limit,
+                WRITE_LIMITER.window,
+                "TRUSTED via " + TRUST_PROXY_ENV
+                if (os.environ.get(TRUST_PROXY_ENV) or "").strip()
+                else "not trusted; X-Forwarded-For ignored",
+            ),
+            logging.INFO,
+        )
+    else:
+        _log_line(
+            "rate limit: DISABLED via {}={}. Only acceptable for a load test or "
+            "a single trusted caller.".format(RATE_LIMIT_ENV,
+                                              os.environ.get(RATE_LIMIT_ENV)),
             logging.WARNING,
         )
 
@@ -471,10 +672,17 @@ def stats() -> Dict[str, Any]:
     needs it. It exposes counts and trust scores, never key material.
 
     ``auth_enabled`` is included so a client can tell an unprotected instance
-    from a protected one instead of assuming.
+    from a protected one instead of assuming. ``rate_limit`` reports the write
+    budget for the same reason: a console that cannot see the ceiling shows a
+    429 as a mystery rather than as policy.
     """
     data = GATEWAY.stats()
     data["auth_enabled"] = AUTH.enabled
+    data["rate_limit"] = {
+        "limit": WRITE_LIMITER.limit,
+        "window_seconds": WRITE_LIMITER.window,
+        "scope": "writes only, per client IP",
+    }
     return data
 
 

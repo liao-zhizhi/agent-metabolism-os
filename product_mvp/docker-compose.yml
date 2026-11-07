@@ -29,6 +29,10 @@ services:
       #   CEL_API_KEY=$(python -c 'import secrets;print(secrets.token_urlsafe(32))') docker compose up
       # Unset means the gate is OFF -- the dashboard will say so in red.
       CEL_API_KEY: "${CEL_API_KEY:-}"
+      # Writes allowed per client IP per sliding window; the 6th is a 429.
+      # 0 disables it. Reads are never limited.
+      CEL_RATE_LIMIT: "${CEL_RATE_LIMIT:-5}"
+      CEL_RATE_WINDOW: "${CEL_RATE_WINDOW:-60}"
     volumes:
       - cel-ledger:/data
     restart: unless-stopped

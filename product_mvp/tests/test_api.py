@@ -36,9 +36,22 @@ def _reset() -> None:
     ``configure_auth()`` re-reads ``CEL_API_KEY`` into the module-level holder,
     so the two auth states can be exercised without reloading the module (which
     would build a second gateway and quietly detach the routes from it).
+
+    The write budget is reset too, and deliberately set out of the way: these
+    tests are about the ledger and the key, and a shared 5-per-minute budget
+    would make them fail by arithmetic rather than by behaviour (one test books
+    seven entries). ``RateLimitTests`` below puts the shipping default back and
+    tests the limiter itself.
     """
     GATEWAY.__init__(fail_limit=GATEWAY.fail_limit, ledger_log=None)
     configure_auth("")
+    os.environ["CEL_RATE_LIMIT"] = str(UNLIMITED_FOR_TESTS)
+    api_server.configure_rate_limit()
+    os.environ.pop("CEL_RATE_LIMIT", None)
+
+
+#: Large enough that no behavioural test can spend it by accident.
+UNLIMITED_FOR_TESTS = 10_000
 
 
 def configure_auth(key: str) -> None:
@@ -700,6 +713,207 @@ class FalsificationTests(unittest.TestCase):
         self.assertEqual(stats["avg_trust_score"], 0.0)
         agent = [a for a in stats["agents"] if a["agent_id"] == "honest"][0]
         self.assertEqual(agent["falsified"], 1)
+
+
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class RateLimitTests(unittest.TestCase):
+    """The write budget: ``CEL_RATE_LIMIT`` writes per IP per window.
+
+    The point of these tests is not that a counter counts. It is that the
+    limiter cannot be sidestepped with a header, that it never applies to the
+    reads the console polls, and that a rejected request books nothing -- a 429
+    that still wrote a ledger row would be a request that was refused and
+    charged at once.
+    """
+
+    LIMIT = 5
+
+    def setUp(self) -> None:
+        GATEWAY.__init__(fail_limit=GATEWAY.fail_limit, ledger_log=None)
+        configure_auth("")
+        os.environ["CEL_RATE_LIMIT"] = str(self.LIMIT)
+        os.environ["CEL_RATE_WINDOW"] = "60"
+        os.environ.pop("CEL_TRUST_PROXY", None)
+        api_server.configure_rate_limit()
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        for name in ("CEL_RATE_LIMIT", "CEL_RATE_WINDOW", "CEL_TRUST_PROXY"):
+            os.environ.pop(name, None)
+        api_server.configure_rate_limit()
+
+    # -- helpers ---------------------------------------------------------
+
+    def _write(self, client=None, trace: str = "", headers=None, **overrides):
+        client = client or self.client
+        overrides.setdefault("agent_id", "rate_limited_agent")
+        return client.post(
+            "/api/v1/verify",
+            json=grounded(trace=trace, **overrides),
+            headers=headers or {},
+        )
+
+    def _spend(self, client=None, n: int = None) -> None:
+        for i in range(self.LIMIT if n is None else n):
+            self.assertEqual(self._write(client, trace="budget-{}".format(i)).status_code, 200)
+
+    # -- the limit ------------------------------------------------------
+
+    def test_the_sixth_write_in_a_window_is_429(self) -> None:
+        self._spend()
+        response = self._write(trace="over-budget")
+        self.assertEqual(response.status_code, 429)
+        body = response.json()
+        self.assertIn("5 per 60 seconds", body["detail"])
+        retry = response.headers.get("Retry-After")
+        self.assertIsNotNone(retry, "429 without Retry-After is a dead end for a client")
+        self.assertTrue(1 <= int(retry) <= 60, retry)
+
+    def test_a_refused_write_books_nothing(self) -> None:
+        """A 429 must be a request that did not happen, not a charged one."""
+        self._spend()
+        before = self.client.get("/api/v1/stats").json()["total_entries"]
+        self.assertEqual(self._write(trace="over-budget").status_code, 429)
+        after = self.client.get("/api/v1/stats").json()["total_entries"]
+        self.assertEqual(before, after)
+        traces = [e.get("trace_id") for e in self.client.get("/api/v1/ledger").json()["entries"]]
+        self.assertNotIn("over-budget", traces)
+
+    def test_reads_are_never_limited(self) -> None:
+        """The dashboard polls /stats every 2s; limiting that would blank it."""
+        self._spend()
+        self.assertEqual(self._write(trace="over-budget").status_code, 429)
+        for path in ("/api/v1/stats", "/api/v1/ledger", "/api/v1/ledger/verify", "/", "/healthz"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
+    def test_the_budget_is_per_client_address(self) -> None:
+        first = TestClient(app, client=("10.0.0.1", 50000))
+        second = TestClient(app, client=("10.0.0.2", 50000))
+        self._spend(first)
+        self.assertEqual(self._write(first, trace="a").status_code, 429)
+        self.assertEqual(self._write(second, trace="b").status_code, 200)
+
+    # -- cannot be sidestepped ------------------------------------------
+
+    def test_a_spoofed_forwarded_for_header_does_not_buy_a_budget(self) -> None:
+        """``X-Forwarded-For`` is attacker-controlled; trusting it unasked is
+        the whole limiter in one header. Off by default, so a fresh fake IP per
+        request must still be refused."""
+        self._spend()
+        response = self._write(
+            trace="spoof",
+            headers={"X-Forwarded-For": "203.0.113.9"},
+        )
+        self.assertEqual(response.status_code, 429)
+
+    def test_a_trusted_proxy_header_is_honoured(self) -> None:
+        """Behind a real proxy every request otherwise shares one address, and
+        one client would spend everyone's budget."""
+        self._spend()
+        self.assertEqual(self._write(trace="x").status_code, 429)
+        os.environ["CEL_TRUST_PROXY"] = "1"
+        try:
+            behind_proxy = self._write(
+                trace="proxied",
+                headers={"X-Forwarded-For": "198.51.100.7, 10.0.0.1"},
+            )
+            self.assertEqual(behind_proxy.status_code, 200)
+        finally:
+            os.environ.pop("CEL_TRUST_PROXY", None)
+
+    def test_an_unknown_key_still_spends_the_budget(self) -> None:
+        """429 before 403: guessing the key is the cheapest attack here, so the
+        budget must be spent before the comparison it protects."""
+        configure_auth("the-real-key")
+        try:
+            statuses = [
+                self.client.post(
+                    "/api/v1/verify",
+                    json=grounded(trace="guess-{}".format(i)),
+                    headers={"X-API-Key": "guess-{}".format(i)},
+                ).status_code
+                for i in range(self.LIMIT + 1)
+            ]
+        finally:
+            configure_auth("")
+        self.assertEqual(statuses[: self.LIMIT], [403] * self.LIMIT)
+        self.assertEqual(statuses[-1], 429, statuses)
+
+    # -- configuration ---------------------------------------------------
+
+    def test_zero_disables_the_limiter(self) -> None:
+        """The documented escape hatch for a load test -- by configuration, and
+        announced at boot rather than silent."""
+        os.environ["CEL_RATE_LIMIT"] = "0"
+        api_server.configure_rate_limit()
+        for i in range(self.LIMIT * 3):
+            self.assertEqual(self._write(trace="free-{}".format(i)).status_code, 200)
+
+    def test_a_malformed_limit_refuses_to_start(self) -> None:
+        """A typo must not silently mean "no limit": that is the failure that
+        looks like protection."""
+        os.environ["CEL_RATE_LIMIT"] = "five"
+        with self.assertRaises(SystemExit):
+            api_server.configure_rate_limit()
+
+    def test_a_zero_window_refuses_to_start(self) -> None:
+        """limit>0 with window=0 is "no limit" wearing a limit's log line."""
+        os.environ["CEL_RATE_WINDOW"] = "0"
+        with self.assertRaises(SystemExit):
+            api_server.configure_rate_limit()
+
+    def test_stats_reports_the_budget(self) -> None:
+        reported = self.client.get("/api/v1/stats").json()["rate_limit"]
+        self.assertEqual(reported["limit"], self.LIMIT)
+        self.assertEqual(reported["window_seconds"], 60.0)
+        self.assertIn("writes only", reported["scope"])
+
+
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class RateLimiterWindowTests(unittest.TestCase):
+    """The sliding window itself, on a fake clock (no sleeping in the suite).
+
+    A fixed bucket would let a caller spend the budget at the end of one window
+    and again at the start of the next; the sliding window is what stops that,
+    so the boundary behaviour is worth pinning down.
+    """
+
+    def setUp(self) -> None:
+        from api_server import RateLimiter
+
+        self.now = 1000.0
+        self.limiter = RateLimiter(limit=3, window=60.0, clock=lambda: self.now)
+
+    def test_the_window_slides_rather_than_resetting(self) -> None:
+        for _ in range(3):
+            self.assertTrue(self.limiter.hit("ip")[0])
+        allowed, retry = self.limiter.hit("ip")
+        self.assertFalse(allowed)
+        self.assertAlmostEqual(retry, 60.0, places=3)
+
+        self.now += 30.0
+        self.assertFalse(self.limiter.hit("ip")[0], "half a window is not a window")
+
+        self.now += 30.5  # the first three hits have now aged out
+        self.assertTrue(self.limiter.hit("ip")[0])
+
+    def test_a_refused_hit_does_not_extend_the_ban(self) -> None:
+        for _ in range(3):
+            self.limiter.hit("ip")
+        self.now += 50.0
+        self.assertFalse(self.limiter.hit("ip")[0])
+        self.now += 10.5  # 60.5s after the first hit, 10.5s after the refused one
+        self.assertTrue(
+            self.limiter.hit("ip")[0],
+            "the ban must expire on the original schedule, not the last attempt",
+        )
+
+    def test_keys_are_independent(self) -> None:
+        for _ in range(3):
+            self.limiter.hit("a")
+        self.assertFalse(self.limiter.hit("a")[0])
+        self.assertTrue(self.limiter.hit("b")[0])
 
 
 if __name__ == "__main__":

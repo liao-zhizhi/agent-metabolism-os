@@ -78,6 +78,19 @@ function writeHeaders() {
   return headers;
 }
 
+/* A 429 is neither a bad key nor a bad request: it is the server's write
+ * budget, and clicking again immediately only spends more of it. Say when the
+ * budget comes back instead of repeating the generic "rejected" toast. */
+function rateLimitToast(res) {
+  const retry = res.headers.get("Retry-After");
+  toast(
+    "⏳ 写入过于频繁（服务器按 IP 限流）" +
+      (retry ? `，请 ${retry} 秒后再试` : "，请稍后再试") +
+      "。读取不受影响。",
+    "warn"
+  );
+}
+
 async function getJSON(url) {
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -435,6 +448,10 @@ async function submitFalsify() {
     });
     const data = await res.json();
 
+    if (res.status === 429) {
+      fail("429：写入过于频繁，请稍后再试");
+      return;
+    }
     if (res.status === 403) {
       authEnabled = true;
       keyRejected = true;
@@ -567,6 +584,10 @@ async function submit(payload, button) {
     });
     const data = await res.json();
 
+    if (res.status === 429) {
+      rateLimitToast(res);
+      return;
+    }
     if (res.status === 403) {
       // A 403 is direct evidence that this instance enforces a key -- stronger
       // than the stats poll, which may simply have failed to load. Trust it, and
@@ -643,6 +664,10 @@ async function unlock(agentId) {
       body: JSON.stringify({ reason: "operator release from dashboard" }),
     });
     const data = await res.json();
+    if (res.status === 429) {
+      toast("⏳ 解锁过于频繁（服务器按 IP 限流），请稍后再试", "warn");
+      return;
+    }
     if (res.status === 403) {
       authEnabled = true;
       keyRejected = true;

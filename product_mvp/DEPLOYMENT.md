@@ -29,6 +29,27 @@ CEL_LEDGER_LOG=/data/ledger.jsonl         # optional; only meaningful with persi
 CEL_FAIL_LIMIT=3                          # optional; consecutive FAILs before quarantine
 ```
 
+Three more, all optional, all about abuse rather than identity:
+
+```bash
+CEL_RATE_LIMIT=5                          # writes per client IP per window; 0 disables
+CEL_RATE_WINDOW=60                        # window length in seconds (sliding)
+CEL_TRUST_PROXY=1                         # ONLY behind a reverse proxy you control
+```
+
+The key answers "who may write"; the budget answers "how often". Without it a
+single caller holding the key (or any caller, on an instance where the key is
+unset) can use `/api/v1/verify` as a load generator, and every one of those
+requests appends to the ledger. The limit is per client IP and covers the three
+write endpoints; reads — which the dashboard polls every 2s — are never limited.
+Over budget is `429` with `Retry-After`, and the refused request books nothing.
+
+`CEL_TRUST_PROXY` is off by default because `X-Forwarded-For` is
+attacker-controlled: trusting it unasked lets a caller mint a new fake IP per
+request and never fill the budget. Set it only when this process really is
+behind a proxy (Spaces, Render, Fly, nginx) — otherwise every request appears to
+come from the proxy, and one visitor can spend everyone's budget.
+
 Generate a key rather than inventing one:
 
 ```bash
@@ -164,6 +185,11 @@ in either. Secrets are exposed to the running container as environment variables
 which is exactly what `api_server.py` reads.
 
 Optional **Variable** (not sensitive): `CEL_FAIL_LIMIT = 3`.
+
+On a Space the process is behind Hugging Face's proxy, so if the write budget
+should be per visitor rather than per proxy, add **Variable**
+`CEL_TRUST_PROXY = 1` (see §0). Leaving it unset is safe — it just makes the
+budget global to the Space instead of per caller.
 
 Changing a secret restarts the Space — expected, and it costs the in-memory
 ledger (see §5).
