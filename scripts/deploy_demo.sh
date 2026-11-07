@@ -181,6 +181,22 @@ for marker in "Audit your own agents locally" "Zero data leaves your machine" \
     || { echo "   FATAL: served landing page is missing: $marker" >&2; exit 1; }
 done
 echo "   public page: hero copy, install command, MCP config, repo links present"
+
+# The hero CTA is a promise about the outside world, and it can go stale in the
+# direction that hurts: the page keeps saying "not on PyPI yet" after a release,
+# or keeps advertising `pip install harness-audit-sidecar` while that name still
+# 404s. Both are the same bug as a wrong verdict -- a claim the evidence does not
+# support -- so the deploy checks the claim against PyPI instead of trusting the
+# person who last edited the HTML.
+if curl -sf --max-time 10 https://pypi.org/pypi/harness-audit-sidecar/json >/dev/null; then
+  grep -q "尚未发布" <<<"$HTML" \
+    && { echo "   FATAL: package is on PyPI but the page still says 尚未发布" >&2; exit 1; }
+  echo "   install claim: package is on PyPI, page does not deny it"
+else
+  grep -qF 'pip install "git+https://github.com/liao-zhizhi/harness-audit-sidecar' <<<"$HTML" \
+    || { echo "   FATAL: package is not on PyPI but the page does not offer the git+ command" >&2; exit 1; }
+  echo "   install claim: package is not on PyPI, page offers the command that works"
+fi
 JSV=$(grep -oE '/static/app\.js\?v=[0-9a-f]{10}' <<<"$HTML")
 JS=$(curl -s --max-time 20 "$URL$JSV")
 # Check for the wording, not just for the feature. A bundle that still renders a
