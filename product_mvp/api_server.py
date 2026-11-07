@@ -292,6 +292,26 @@ class UnlockRequest(BaseModel):
     reason: str = ""
 
 
+class FalsifyRequest(BaseModel):
+    """An observer's report that a booked commitment was false.
+
+    Deliberately minimal: the server cannot go and look, so everything it can
+    record is what the observer says. ``evidence`` is required rather than
+    optional -- see the endpoint docstring for why an empty one is rejected.
+    """
+
+    trace_id: str
+    #: ``file_not_found`` or ``hash_mismatch``. An enum rather than free text so
+    #: the ledger can be counted by reason later, and so a typo is a 422 instead
+    #: of a silently different finding.
+    reason: str
+    #: What was checked and what was seen, in the observer's words. This is the
+    #: only material a later reviewer has.
+    evidence: str = ""
+    #: The digest actually computed from the artefact, for ``hash_mismatch``.
+    observed_hash: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # pages
 # ---------------------------------------------------------------------------
@@ -389,6 +409,54 @@ def verify(body: VerifyRequest) -> JSONResponse:
                 "trace_id": body.trace_id or "",
                 "witness": body.witness,
                 "witness_hash": body.witness_hash or "",
+            },
+        )
+    return JSONResponse(status_code=200, content=result)
+
+
+@app.post("/api/v1/falsify", dependencies=WRITE_ACCESS)
+def falsify(body: FalsifyRequest) -> JSONResponse:
+    """Overturn a booked PASS after checking the physical artefact.
+
+    The server could not check the artefact when the claim arrived -- it cannot
+    reach a client's disk -- so the claim was booked as a *commitment*. This
+    endpoint is the other half of that bargain, and the reason a commitment is
+    worth recording at all: an observer who later looks can report what they
+    found, and the agent's trust goes to zero.
+
+    Requires the same key as ``/verify``. Not because it writes (it does, an
+    appended ``REFUTED`` entry), but because it *destroys* trust: an anonymous
+    falsify endpoint would be a one-request way to ruin any agent, which is a
+    worse hole than the lie it corrects. "Any observer can refute" therefore
+    means "any observer holding the audit key".
+
+    What this endpoint does not establish: that the refuter is truthful. A
+    falsification is a claim in the opposite direction, made with no more
+    ability to inspect than the original. It is *attributable* though -- the
+    evidence string is sealed on the chain -- so a false accusation is itself on
+    the record and can be rebutted.
+
+    The original PASS is never rewritten; a ``REFUTED`` entry is appended that
+    points back at it (``refutes_seq`` / ``refutes_hash``). Rewriting the
+    original would change its body, and the body is covered by its chain hash --
+    so "correcting" the record in place would make ``verify_chain()`` fail and
+    erase the very thing being audited: that the system said PASS.
+    """
+    try:
+        result = GATEWAY.falsify(
+            trace_id=body.trace_id,
+            reason=body.reason,
+            evidence=body.evidence,
+            observed_hash=body.observed_hash,
+        )
+    except VerifyError as error:
+        return JSONResponse(
+            status_code=error.status_code,
+            content={
+                "verdict": "INVALID",
+                "detail": error.message,
+                "ledger_written": False,
+                "trace_id": body.trace_id,
             },
         )
     return JSONResponse(status_code=200, content=result)

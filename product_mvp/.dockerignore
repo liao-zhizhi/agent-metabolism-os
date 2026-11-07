@@ -11,3 +11,7 @@ tests
 assets
 *.md
 docker-compose.yml
+
+# The core snapshot is a build-time input, not part of the app tree. Keep the
+# docs out of the image; the package itself must come through when present.
+core_snapshot/**/*.md

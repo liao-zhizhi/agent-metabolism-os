@@ -54,6 +54,7 @@ __all__ = [
     "PENALTY_BASE",
     "PenaltyError",
     "PenaltyLedger",
+    "REFUTATION_PENALTY",
     "TRUST_DROP_PER_PENALTY",
     "TRUST_RECOVERY",
     "UnknownViolationType",
@@ -103,6 +104,11 @@ WARNING_TRUST = 80.0
 # a guessed price. An unknown type must state its own weight: silently charging
 # a default is how a novel failure gets under-reported.
 DEFAULT_WEIGHTS: Dict[str, float] = {
+    # The heaviest charge in the table, and deliberately so. Every other weight
+    # prices an *error*; this one prices proof that a recorded commitment was
+    # false. It is only reachable after the fact, by an external observer who
+    # checked the physical artefact -- see ``PenaltyLedger.record_falsification``.
+    "FALSIFIED_COMMITMENT": 10.0,
     "FALSE_COMPLETION": 5.0,
     "ISOLATION_BREACH": 4.0,
     "UNAUTHORIZED_ACTION": 4.0,
@@ -111,6 +117,10 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
     "PROTOCOL_VIOLATION": 1.5,
     "STALE_SUBSTRATE": 1.0,
 }
+
+#: A refutation is not priced in the same currency as a mistake: it takes the
+#: fine straight past ``CRITICAL_PENALTY`` regardless of what was already owed.
+REFUTATION_PENALTY = 100.0
 
 
 class PenaltyError(ValueError):
@@ -194,6 +204,10 @@ class PenaltyLedger:
         self._penalty = 0.0
         self._violations: List[Violation] = []
         self._successes = 0
+        #: Commitments refuted by a later physical check. Not a violation count
+        #: like the ones above: at least one of these means the record itself
+        #: was false, so trust cannot be earned back automatically.
+        self._falsifications = 0
 
     # -- read-only view ---------------------------------------------------
 
@@ -229,6 +243,21 @@ class PenaltyLedger:
     @property
     def success_count(self) -> int:
         return self._successes
+
+    @property
+    def falsifications(self) -> int:
+        """How many recorded commitments were refuted by a later check."""
+        return self._falsifications
+
+    @property
+    def is_falsified(self) -> bool:
+        """True once any commitment from this book was refuted.
+
+        Read as a one-way latch, not a score: it never clears, because the fact
+        it represents -- "this record contained something false" -- does not
+        stop being true when the agent behaves well afterwards.
+        """
+        return self._falsifications > 0
 
     def get_state(self) -> str:
         """``HEALTHY`` / ``WARNING`` / ``CRITICAL`` for the current position."""
@@ -281,6 +310,41 @@ class PenaltyLedger:
         self._violations.append(record)
         return record
 
+    def record_falsification(self, reason: str = "") -> Violation:
+        """Refute a previously recorded commitment. There is no partial version.
+
+        Called when someone outside the system checked the physical artefact
+        and found it absent, or found a different digest. Unlike
+        :meth:`record_violation`, this is not a priced mistake: it is proof that
+        the record was false, so trust goes to zero outright and the fine jumps
+        past ``CRITICAL_PENALTY``. Deducting a fraction would make the cost of
+        lying depend on how much trust the liar had banked, which is backwards.
+
+        The asymmetry is the whole point (R2): claiming success is a single
+        cheap request, and this is the one path that can undo it -- late, but
+        catastrophically.
+
+        Args:
+            reason: free text from the refuting observer, kept for the record.
+        """
+        weight = DEFAULT_WEIGHTS["FALSIFIED_COMMITMENT"]
+        penalty = max(weight * self._base, REFUTATION_PENALTY)
+        before = self._trust
+        self._falsifications += 1
+        self._penalty += penalty
+        self._trust = 0.0
+        record = Violation(
+            seq=len(self._violations) + 1,
+            violation_type="FALSIFIED_COMMITMENT",
+            weight=weight,
+            penalty=penalty,
+            trust_before=before,
+            trust_after=0.0,
+            state_after=self.get_state(),
+        )
+        self._violations.append(record)
+        return record
+
     # -- recovery ---------------------------------------------------------
 
     def record_success(self) -> float:
@@ -291,8 +355,16 @@ class PenaltyLedger:
         the two effects are unequal: trust moves by a fixed step while the fine
         decays by a fraction, so a large fine keeps hurting after trust has
         started to recover.
+
+        A refuted book earns nothing. Every other path back is a fraction of the
+        way; this one is closed on purpose, because "do fifty clean runs after
+        being caught lying" is precisely the redemption arc the asymmetry (R2)
+        exists to deny. The success still counts -- the work happened -- it just
+        does not buy trust.
         """
         self._successes += 1
+        if self._falsifications:
+            return self._trust
         self._trust = min(MAX_TRUST, self._trust + TRUST_RECOVERY)
         if self._penalty:
             self._penalty *= 1.0 - AMORTIZATION_RATE
@@ -328,6 +400,16 @@ class PenaltyLedger:
         penalty = self._penalty
         trust = self._trust
         needed = 0
+        # A refuted book cannot climb: ``record_success`` stops adding trust
+        # once anything was falsified. Projecting a finite number of clean
+        # passes here would tell an operator that redemption is 50 runs away,
+        # which is exactly the false comfort this ledger refuses to sell.
+        if self._falsifications and state_for(penalty, trust) != target_state:
+            raise PenaltyError(
+                "target {!r} is unreachable: this book carries a refuted "
+                "commitment, and trust does not recover automatically after "
+                "one".format(target_state)
+            )
         # The horizon is bounded in practice (a geometric decay plus a linear
         # climb), but the loop must not depend on that being true.
         while state_for(penalty, trust) != target_state:
@@ -350,6 +432,7 @@ class PenaltyLedger:
             "penalty_state": self.get_state(),
             "violations": len(self._violations),
             "successes": self._successes,
+            "falsifications": self._falsifications,
             "penalty_base": self._base,
         }
 

@@ -44,15 +44,29 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# The membrane and the penalty ledger, straight from the pinned release tarball.
-# `test -f` makes a wrong tag or a moved archive fail the build here, instead of
-# failing at import with a message about a missing module.
+# The membrane and the penalty ledger.
+#
+# Default: the pinned release tarball, so a published image is reproducible and
+# cannot drift from the repository. But the core is also *code under change*,
+# and a service that calls a method the pinned core does not have would boot
+# fine and fail on the first request -- the worst possible time to find out.
+# So a build-context snapshot wins when present, and
+# `scripts/deploy_demo.sh` puts one there when the working tree's core differs
+# from the tag. See core_snapshot/README.md.
 ADD https://github.com/liao-zhizhi/agent-metabolism-os/archive/refs/tags/${CEL_CORE_REF}.tar.gz /tmp/core.tar.gz
-RUN mkdir -p /app/core \
-    && tar -xzf /tmp/core.tar.gz -C /app/core --strip-components=1 \
-    && rm -f /tmp/core.tar.gz \
-    && test -f /app/core/agent_metabolism/double_entry.py \
-    && echo "core ${CEL_CORE_REF} unpacked at /app/core"
+COPY core_snapshot /tmp/core_snapshot
+RUN set -e; \
+    mkdir -p /app/core; \
+    if [ -f /tmp/core_snapshot/agent_metabolism/double_entry.py ]; then \
+        cp -r /tmp/core_snapshot/agent_metabolism /app/core/agent_metabolism; \
+        echo "core: working-tree snapshot (unreleased changes)"; \
+    else \
+        tar -xzf /tmp/core.tar.gz -C /app/core --strip-components=1; \
+        echo "core: release ${CEL_CORE_REF}"; \
+    fi; \
+    rm -rf /tmp/core_snapshot /tmp/core.tar.gz; \
+    test -f /app/core/agent_metabolism/double_entry.py; \
+    test -f /app/core/agent_metabolism/penalty.py
 
 # A non-root user, with the uid Hugging Face Spaces runs containers as. The docs
 # are explicit ("the container runs with user ID 1000"), so any other uid risks

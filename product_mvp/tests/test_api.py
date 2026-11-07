@@ -483,5 +483,224 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(unlocked.status_code, 200)
 
 
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class FalsificationTests(unittest.TestCase):
+    """The a posteriori loop: the server cannot check at request time, so a
+    later physical observation is the only thing that can overturn a PASS.
+
+    These tests look at what is *on the chain* afterwards, not just at the
+    response body, because the load-bearing claim is that nothing was rewritten.
+    """
+
+    KEY = "test-key-not-a-real-secret-0123456789"
+
+    def setUp(self) -> None:
+        _reset()
+        self.client = TestClient(app)
+
+    def _book_a_commitment(self, agent: str = "honest", trace: str = "") -> dict:
+        """Book one PASS with a digest and return the verify response body."""
+        response = self.client.post(
+            "/api/v1/verify",
+            json=grounded(agent_id=agent, trace=trace or "falsify-{}".format(agent)),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["verdict"], "PASS")
+        return response.json()
+
+    def test_falsify_wipes_trust_and_appends_a_refutation(self) -> None:
+        """The headline behaviour: claim is cheap, refutation is terminal."""
+        booked = self._book_a_commitment()
+        self.assertEqual(booked["trust_score"], 100.0)
+        self.assertIsNone(booked["grounded"])
+        before = self.client.get("/api/v1/ledger").json()
+        self.assertEqual(before["total_entries"], 1)
+        self.assertFalse(before["entries"][0]["refuted"])
+
+        response = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "file_not_found",
+                "evidence": "ls on the share returned ENOENT; no vial file exists",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["verdict"], "REFUTED")
+        self.assertTrue(body["refuted"])
+        self.assertEqual(body["trust_score"], 0.0)
+        self.assertEqual(body["charged_as"], "FALSIFIED_COMMITMENT")
+        self.assertEqual(body["penalty_state"], "CRITICAL")
+        self.assertEqual(body["refutes_seq"], booked["seq"])
+
+        # A refutation is an appended entry, not an edit.
+        after = self.client.get("/api/v1/ledger").json()
+        self.assertEqual(after["total_entries"], 2)
+        self.assertEqual(after["refuted_commitments"], 1)
+        self.assertTrue(after["chain_ok"], "appending must not break the chain")
+
+        original = [e for e in after["entries"] if e["seq"] == booked["seq"]][0]
+        self.assertEqual(original["verdict"], "PASS", "history is not rewritten")
+        self.assertTrue(original["refuted"])
+        self.assertEqual(original["refuted_reason"], "file_not_found")
+        self.assertEqual(original["hash"], booked["chain_hash"])
+
+        refutation = [e for e in after["entries"] if e["verdict"] == "REFUTED"][0]
+        self.assertEqual(refutation["refutes_seq"], booked["seq"])
+        self.assertEqual(refutation["refutes_hash"], booked["chain_hash"])
+        # The refutation is the finding, not another refuted commitment. Marking
+        # it would claim the finding is also a finding against itself, and made
+        # the dashboard count every refutation twice.
+        self.assertFalse(refutation["refuted"])
+        self.assertNotIn("refuted_at_seq", refutation)
+        self.assertEqual(
+            [e["seq"] for e in after["entries"] if e["refuted"]], [booked["seq"]]
+        )
+
+    def test_falsify_requires_evidence(self) -> None:
+        """An empty refutation is an assertion, and the record has to audit it."""
+        booked = self._book_a_commitment()
+        response = self.client.post(
+            "/api/v1/falsify",
+            json={"trace_id": booked["trace_id"], "reason": "file_not_found"},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            self.client.get("/api/v1/ledger").json()["total_entries"],
+            1,
+            "a refused refutation must not book anything",
+        )
+
+    def test_falsify_unknown_trace_is_404(self) -> None:
+        response = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": "never-happened",
+                "reason": "file_not_found",
+                "evidence": "checked",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_falsify_twice_is_409(self) -> None:
+        """A second observer with no new evidence adds nothing and must not stack."""
+        booked = self._book_a_commitment()
+        payload = {
+            "trace_id": booked["trace_id"],
+            "reason": "file_not_found",
+            "evidence": "no file",
+        }
+        self.assertEqual(
+            self.client.post("/api/v1/falsify", json=payload).status_code, 200
+        )
+        second = self.client.post("/api/v1/falsify", json=payload)
+        self.assertEqual(second.status_code, 409)
+        self.assertFalse(second.json()["ledger_written"])
+
+    def test_hash_mismatch_requires_a_different_observed_hash(self) -> None:
+        booked = self._book_a_commitment()
+        # Missing observed_hash: the finding is incomplete.
+        missing = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "hash_mismatch",
+                "evidence": "recomputed from the real file",
+            },
+        )
+        self.assertEqual(missing.status_code, 422)
+
+        # Same digest as committed: that confirms, it does not refute.
+        same = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "hash_mismatch",
+                "evidence": "recomputed from the real file",
+                "observed_hash": TEST_HASH,
+            },
+        )
+        self.assertEqual(same.status_code, 422)
+
+        # A genuinely different digest refutes.
+        different = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "hash_mismatch",
+                "evidence": "recomputed from the real file",
+                "observed_hash": "sha256:" + "b" * 64,
+            },
+        )
+        self.assertEqual(different.status_code, 200)
+        self.assertEqual(different.json()["trust_score"], 0.0)
+
+    def test_falsify_requires_the_key(self) -> None:
+        """An open falsify would be a one-request way to ruin any agent's record."""
+        _reset()
+        configure_auth(self.KEY)
+        booked = self.client.post(
+            "/api/v1/verify",
+            json=grounded(agent_id="victim", trace="falsify-victim"),
+            headers={"X-API-Key": self.KEY},
+        ).json()
+        response = self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "file_not_found",
+                "evidence": "anonymous accusation",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            self.client.get("/api/v1/ledger").json()["total_entries"], 1
+        )
+
+    def test_refuted_agent_cannot_recover_by_passing_later(self) -> None:
+        """R2: the upslope out of a refutation is a wall, not a staircase."""
+        booked = self._book_a_commitment(agent="liar")
+        self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "file_not_found",
+                "evidence": "the vial does not exist",
+            },
+        )
+        for i in range(5):
+            later = self.client.post(
+                "/api/v1/verify",
+                json=grounded(agent_id="liar", trace="liar-after-{}".format(i)),
+            )
+            self.assertEqual(later.status_code, 200)
+            self.assertEqual(later.json()["verdict"], "PASS")
+            self.assertEqual(
+                later.json()["trust_score"],
+                0.0,
+                "clean passes must not buy back refuted trust",
+            )
+
+    def test_stats_survive_a_refutation(self) -> None:
+        """The headline count stays a count of PASSes; refutations are reported."""
+        booked = self._book_a_commitment()
+        self.client.post(
+            "/api/v1/falsify",
+            json={
+                "trace_id": booked["trace_id"],
+                "reason": "file_not_found",
+                "evidence": "gone",
+            },
+        )
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertEqual(stats["verified_passes"], 1)
+        self.assertEqual(stats["refuted_commitments"], 1)
+        self.assertEqual(stats["standing_passes"], 0)
+        self.assertEqual(stats["avg_trust_score"], 0.0)
+        agent = [a for a in stats["agents"] if a["agent_id"] == "honest"][0]
+        self.assertEqual(agent["falsified"], 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

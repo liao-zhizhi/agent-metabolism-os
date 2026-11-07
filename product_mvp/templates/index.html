@@ -90,6 +90,7 @@
       <span><b class="v-fail">FAIL</b> 声明 ≠ 见证</span>
       <span><b class="v-invalid">INVALID</b> 没有见证</span>
       <span><b class="v-refused">REFUSED</b> 已被隔离</span>
+      <span><b class="v-refuted">REFUTED</b> 事后核对推翻了承诺</span>
     </div>
   </section>
 
@@ -162,6 +163,61 @@
 </footer>
 
 <div id="alarm-toast" class="alarm-toast" hidden></div>
+
+<!-- ============ 事后对账（证伪） ============
+     对账是"回头查一遍"，不是"再断言一次"。弹窗只问两件事：你查到了什么，
+     以及你凭什么这么说。evidence 是必填的，因为服务器没有能力复核——
+     留下的是可被他人审计的说法，而不是一个无法追溯的结论。 -->
+<div id="falsify-backdrop" class="falsify-backdrop" hidden>
+  <div class="falsify-modal" role="dialog" aria-modal="true" aria-labelledby="fs-title">
+    <div class="falsify-head">
+      <h3 id="fs-title">事后对账 · 证伪一条承诺</h3>
+      <button id="fs-close" class="falsify-x" type="button" aria-label="关闭">✕</button>
+    </div>
+
+    <div class="falsify-target">
+      <div class="fs-row"><span>agent</span><code id="fs-agent">—</code></div>
+      <div class="fs-row"><span>trace</span><code id="fs-trace">—</code></div>
+      <div class="fs-row"><span>承诺摘要</span><code id="fs-hash">—</code></div>
+    </div>
+
+    <p class="falsify-warn">
+      服务器从未核实过这条摘要，它只记录了这份承诺。你现在的核对结论会被永久写进账本，
+      并把该智能体的信任分清零——<b>不可撤销、不可自动恢复</b>。
+    </p>
+
+    <fieldset class="falsify-reasons">
+      <legend>你查到了什么</legend>
+      <label class="fs-radio">
+        <input type="radio" name="fs-reason" value="file_not_found" checked />
+        <span>文件不存在<small>产物路径打开失败 / 早已不存在</small></span>
+      </label>
+      <label class="fs-radio">
+        <input type="radio" name="fs-reason" value="hash_mismatch" />
+        <span>摘要不一致<small>文件在，但内容与承诺的摘要不符</small></span>
+      </label>
+    </fieldset>
+
+    <label class="fs-field" id="fs-observed-wrap" hidden>
+      <span>实际算出的 SHA-256</span>
+      <input id="fs-observed" type="text" spellcheck="false" autocomplete="off"
+             placeholder="64 位十六进制，或 sha256:<64 位>" />
+    </label>
+
+    <label class="fs-field">
+      <span>依据 <b>（必填）</b></span>
+      <textarea id="fs-evidence" rows="3" spellcheck="false"
+                placeholder="例：在 /data/vials/42 上 ls 返回 ENOENT；共享盘无此文件。"></textarea>
+    </label>
+
+    <p id="fs-error" class="falsify-error" hidden></p>
+
+    <div class="falsify-actions">
+      <button id="fs-cancel" class="ghost-btn" type="button">取消</button>
+      <button id="fs-submit" class="refute-btn" type="button">提交证伪</button>
+    </div>
+  </div>
+</div>
 
 <script src="/static/app.js?v=__ASSET_V__"></script>
 </body>

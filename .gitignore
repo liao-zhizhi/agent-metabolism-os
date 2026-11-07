@@ -24,3 +24,6 @@ experiments/*_ledger.jsonl
 # Ad-hoc page exports used while reviewing a PDF; they are a screenshot of a
 # build artefact, not a source of it.
 experiments/cel_paper/screenshots/
+
+# Staged by scripts/deploy_demo.sh at build time; never committed.
+product_mvp/core_snapshot/agent_metabolism/

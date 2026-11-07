@@ -342,6 +342,11 @@ class _Book:
     energy: float = 0.0
     refusals: int = 0
     unlocked: int = 0
+    #: Commitments in this book that a *later* check proved false. Distinct
+    #: from ``refuted`` above, which counts contradictions caught at request
+    #: time (claim said pass, witness said otherwise). This one is retrospective
+    #: and comes from outside the request, so the two must not be summed.
+    falsified: int = 0
     #: Consecutive FAILs with no PASS between them. Reset by a PASS, which
     #: includes an honest failure -- an accurate bad report must not count
     #: toward the limit that stops the agent.
@@ -371,6 +376,7 @@ class _Book:
             "verified": self.verified,
             "honest_failure": self.honest_failure,
             "refuted": self.refuted,
+            "falsified": self.falsified,
             "under_claimed": self.under_claimed,
             "unwitnessed": self.unwitnessed,
             "energy": self.energy,
@@ -604,6 +610,51 @@ class DoubleEntryLedger:
                 "kind": kind,
             }
         )
+
+    def record_falsification(self, agent: str, reason: str = "") -> Dict[str, Any]:
+        """Apply a retrospective refutation to a book and its trust account.
+
+        This is the only entry point that can lower trust *after* a verdict was
+        already booked, and it exists because the verdict was booked on evidence
+        the system could not check at the time. Nothing is undone: the receipt
+        stays on the record with the verdict it had. What changes is the trust
+        position -- trust to zero, a fine past CRITICAL -- and a permanent count
+        of how many commitments from this book were shown to be false.
+
+        Deliberately not reachable from :meth:`record_transaction`. An agent
+        that could refute itself into a clean slate, or refute a rival, would
+        hold the power this method is meant to place outside the agent.
+
+        Args:
+            agent: whose book is being charged.
+            reason: what the refuting observer reports, kept verbatim.
+
+        Returns:
+            The package's view of the new position, for the caller to seal.
+
+        Raises:
+            DoubleEntryError: no book exists for ``agent``. Inventing one here
+                would let an attacker create a zero-trust ghost and then blame
+                it; a refutation must land on a record that exists.
+        """
+        book = self._books.get(agent)
+        if book is None:
+            raise DoubleEntryError(
+                "no book for {!r}; nothing to refute".format(agent)
+            )
+        ledger = self._ledger_for(agent, create=True)
+        if ledger is None:  # pragma: no cover - create=True always yields one
+            raise DoubleEntryError("no trust account for {!r}".format(agent))
+        violation = ledger.record_falsification(reason)
+        book.falsified += 1
+        return {
+            "agent": agent,
+            "falsified": book.falsified,
+            "trust_after": float(getattr(ledger, "trust_score", 0.0)),
+            "penalty": float(getattr(violation, "penalty", 0.0)),
+            "charged_as": "FALSIFIED_COMMITMENT",
+            "penalty_state": str(getattr(ledger, "penalty_state", "")),
+        }
 
     # -- the balance sheet ------------------------------------------------
 

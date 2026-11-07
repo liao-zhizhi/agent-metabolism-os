@@ -376,6 +376,9 @@ body {
 .v-fail    { color: var(--red); }
 .v-invalid { color: var(--amber); }
 .v-refused { color: #ff6fd8; }
+/* Refuted outranks FAIL in colour: a FAIL was caught at the door, a REFUTED was
+ * let through and then overturned. The second is the worse outcome. */
+.v-refuted { color: #ff2d4d; text-decoration: line-through; text-decoration-thickness: 1px; }
 .v-unlock  { color: var(--slate); }
 
 .term-agent { color: #e6fff2; font-weight: 600; }
@@ -403,9 +406,57 @@ body {
   border: 1px dashed rgba(255, 176, 32, 0.55);
 }
 .ev-none { color: var(--text-faint); border: 1px dotted rgba(255, 255, 255, 0.18); }
+/* A refuted promise keeps the digest visible but struck through: the claim was
+ * specific, and a reader has to be able to see *what* was claimed and failed. */
+.ev-refuted {
+  color: #ff2d4d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid rgba(255, 45, 77, 0.6);
+  background: rgba(255, 45, 77, 0.08);
+}
 
 .term-line.is-fail { background: linear-gradient(90deg, rgba(255, 59, 87, 0.07), transparent 70%); }
 .term-line.is-pass { background: linear-gradient(90deg, rgba(43, 255, 136, 0.045), transparent 70%); }
+/* Applied on top of is-pass: the line was a pass and is now a refutation, so it
+ * carries both its history and its current standing. */
+.term-line.is-refuted {
+  background: linear-gradient(90deg, rgba(255, 45, 77, 0.12), transparent 70%);
+  border-left: 2px solid rgba(255, 45, 77, 0.65);
+}
+.term-line.is-refuted .term-intent,
+.term-line.is-refuted .term-agent { opacity: 0.75; }
+
+.term-tail-red { color: #ff6b81; }
+
+/* The reconciliation affordance. Quiet, but not invisible: an opacity-0 button
+ * is undiscoverable (and untouchable for anyone not using a mouse), which for
+ * an audit control means it may as well not exist. Dim at rest, obvious on
+ * hover. It is still not a moderation tool -- it only appears where a
+ * refutation is actually possible. */
+.verify-btn {
+  flex: none;
+  margin-left: 4px;
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity .15s, color .15s, border-color .15s;
+}
+.term-line:hover .verify-btn,
+.verify-btn:focus-visible { opacity: 1; }
+.verify-btn:hover {
+  color: #ff6b81;
+  border-color: rgba(255, 45, 77, 0.55);
+}
+.verify-btn:focus-visible {
+  outline: 1px solid rgba(255, 45, 77, 0.7);
+  outline-offset: 1px;
+}
 
 .mark-new {
   flex: none;
@@ -767,3 +818,202 @@ body.alarm::after {
 }
 
 .sep { opacity: 0.4; }
+
+/* ---------- a posteriori reconciliation modal ----------
+ * The only control in this UI that destroys an existing record's standing.
+ * Styled to feel like a form you have to fill in, not a button you press:
+ * heavy border, explicit target recap, and the consequence stated in the body
+ * rather than in a tooltip nobody reads.
+ */
+
+.falsify-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 10, .78);
+  backdrop-filter: blur(3px);
+}
+.falsify-backdrop[hidden] { display: none; }
+
+.falsify-modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 18px 20px 16px;
+  border: 1px solid rgba(255, 45, 77, .45);
+  border-radius: 6px;
+  background: #070b10;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .75), 0 0 40px rgba(255, 45, 77, .12);
+  animation: toast-in .2s ease-out;
+}
+
+.falsify-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.falsify-head h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: .04em;
+  color: #ff8fa0;
+  text-transform: uppercase;
+}
+.falsify-x {
+  padding: 2px 7px;
+  font-size: 12px;
+  color: var(--text-faint);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.falsify-x:hover { color: #fff; border-color: rgba(255, 255, 255, .3); }
+
+.falsify-target {
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .02);
+}
+.fs-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+}
+.fs-row > span {
+  flex: none;
+  width: 62px;
+  color: var(--text-faint);
+}
+.fs-row > code {
+  color: #cfe9dc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.falsify-warn {
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #ffd9de;
+  border-left: 2px solid rgba(255, 45, 77, .7);
+  background: rgba(255, 45, 77, .07);
+}
+.falsify-warn b { color: #ff6b81; }
+
+.falsify-reasons {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.falsify-reasons legend {
+  padding: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.fs-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #dff2e8;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fs-radio:hover { border-color: rgba(255, 45, 77, .4); }
+.fs-radio:has(input:checked) {
+  border-color: rgba(255, 45, 77, .6);
+  background: rgba(255, 45, 77, .06);
+}
+.fs-radio input { margin-top: 2px; accent-color: #ff2d4d; }
+.fs-radio small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.fs-field {
+  display: block;
+  margin-bottom: 12px;
+}
+.fs-field > span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.fs-field b { color: #ff8fa0; }
+.fs-field input,
+.fs-field textarea {
+  width: 100%;
+  padding: 7px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #eafff3;
+  background: #04080d;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 4px;
+  resize: vertical;
+}
+.fs-field input:focus,
+.fs-field textarea:focus {
+  outline: none;
+  border-color: rgba(255, 45, 77, .6);
+}
+
+.falsify-error {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #ffd9de;
+  border: 1px solid rgba(255, 45, 77, .45);
+  border-radius: 4px;
+  background: rgba(255, 45, 77, .08);
+}
+.falsify-error[hidden] { display: none; }
+
+.falsify-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.refute-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  color: #fff;
+  background: linear-gradient(180deg, #a81730, #7d0f23);
+  border: 1px solid rgba(255, 45, 77, .6);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.refute-btn:hover { background: linear-gradient(180deg, #c01b38, #94112a); }
+.refute-btn:disabled { opacity: .55; cursor: default; }
+
+/* The PASS/FAIL/INVALID counter marks itself when something was refuted: a
+ * refutation that changes no visible number is a refutation nobody notices. */
+#m-verdicts.has-refuted { color: #ff6b81; }

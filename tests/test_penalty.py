@@ -538,5 +538,64 @@ class TestSentencesTheSystemCannotAfford(unittest.TestCase):
         self.assertEqual(scheduler.execute("hard", 0.95).mode, FAST)
 
 
+class FalsificationTests(unittest.TestCase):
+    """The a posteriori charge, and the asymmetry it is supposed to realize.
+
+    The claim under test (R2): a false success claim is cheap at the moment it
+    is made and terminal once it is refuted. If the upslope were merely steep
+    rather than closed, the cost of lying would be a function of how long the
+    liar keeps working afterwards -- which rewards exactly the persistence a
+    ledger should punish.
+    """
+
+    def test_refutation_zeroes_trust_regardless_of_prior_standing(self) -> None:
+        fresh = PenaltyLedger()
+        seasoned = PenaltyLedger()
+        for _ in range(3):
+            seasoned.record_success()
+
+        for ledger in (fresh, seasoned):
+            with self.subTest(trust_before=ledger.trust_score):
+                ledger.record_falsification("file_not_found")
+                self.assertEqual(ledger.trust_score, 0.0)
+                self.assertEqual(ledger.penalty_state, "CRITICAL")
+                # Not pro-rated by what was already owed: proof of a false
+                # record cannot be cheaper for an agent that was in good
+                # standing, which is precisely who gets the benefit of doubt.
+                self.assertGreaterEqual(ledger.total_penalty, 40.0)
+
+    def test_a_refuted_book_never_rebuilds_trust(self) -> None:
+        ledger = PenaltyLedger()
+        ledger.record_falsification("hash_mismatch")
+        for _ in range(200):
+            ledger.record_success()
+        self.assertEqual(ledger.trust_score, 0.0, "200 clean runs must buy nothing")
+        self.assertEqual(ledger.penalty_state, "CRITICAL")
+        self.assertTrue(ledger.is_falsified)
+
+    def test_recovery_projection_refuses_to_promise_a_way_back(self) -> None:
+        """A finite estimate here would be a false comfort: say so instead."""
+        ledger = PenaltyLedger()
+        ledger.record_falsification("file_not_found")
+        with self.assertRaises(Exception) as caught:
+            ledger.next_charges_until("HEALTHY")
+        self.assertIn("unreachable", str(caught.exception))
+
+    def test_the_latch_is_one_way(self) -> None:
+        ledger = PenaltyLedger()
+        self.assertFalse(ledger.is_falsified)
+        ledger.record_falsification("file_not_found")
+        self.assertTrue(ledger.is_falsified)
+        ledger.record_success()
+        self.assertTrue(ledger.is_falsified, "recovery must not clear the finding")
+        self.assertEqual(ledger.falsifications, 1)
+
+    def test_refutation_is_the_heaviest_charge_in_the_table(self) -> None:
+        from agent_metabolism.penalty import DEFAULT_WEIGHTS
+
+        heaviest = max(DEFAULT_WEIGHTS.items(), key=lambda kv: kv[1])
+        self.assertEqual(heaviest[0], "FALSIFIED_COMMITMENT")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -17,6 +17,11 @@ const KEY_STORAGE = "cel_api_key";
 const el = (id) => document.getElementById(id);
 
 let lastSeq = 0;
+/* Signature of which entries are refuted. A refutation does not add a seq to
+ * the refuted entry itself, so the "only render seq > lastSeq" incremental path
+ * would never repaint the line that turned red. Comparing a cheap signature is
+ * how the feed notices that *history* changed, not just that it grew. */
+let refutedSig = "";
 let polling = false;
 let booted = false;
 let authEnabled = false;
@@ -49,6 +54,20 @@ function clockOf(ts) {
 function fmt(n, digits = 0) {
   if (n === null || n === undefined) return "—";
   return Number(n).toFixed(digits);
+}
+
+/* Entry fields are attacker-controlled: an agent chooses its own `intent`, and
+ * an observer writes the `evidence` that gets rendered into a title attribute.
+ * Interpolating either into HTML unescaped turns the audit log into an
+ * injection point -- the one place where "it only displays strings" stops
+ * being reassuring. */
+function escapeAttr(value) {
+  return String(value === null || value === undefined ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /* Headers for a write. `X-API-Key` is omitted when no key is configured, which
@@ -102,7 +121,15 @@ function paintStats(s) {
 
   el("m-entries").textContent = s.total_entries ?? 0;
   const v = s.verdicts || {};
-  el("m-verdicts").textContent = `PASS ${v.pass ?? 0} · FAIL ${v.fail ?? 0} · INVALID ${v.invalid ?? 0}`;
+  const refuted = s.refuted_commitments ?? 0;
+  // Refutations are appended to the verdict line rather than folded into the
+  // PASS count. "PASS 5 · 其中 2 条已被推翻" is the auditable statement; showing
+  // "PASS 3" would silently delete the two findings.
+  el("m-verdicts").textContent =
+    `PASS ${v.pass ?? 0} · FAIL ${v.fail ?? 0} · INVALID ${v.invalid ?? 0}` +
+    (refuted ? ` · 已证伪 ${refuted}` : "");
+  if (refuted) el("m-verdicts").classList.add("has-refuted");
+  else el("m-verdicts").classList.remove("has-refuted");
 
   el("chain-head").textContent = shortHash(s.chain_head);
   el("uptime").textContent = "uptime " + Math.round(s.uptime_seconds ?? 0) + "s";
@@ -191,10 +218,28 @@ function evidenceTag(entry) {
   const artefact = String(entry.artefact || "");
   const hash = String(entry.witness_hash || "");
 
+  // A refutation outranks every other badge: the digest is still real, but the
+  // thing it was supposed to point at turned out not to be. Saying "commit"
+  // here would keep advertising a promise that has already been broken.
+  if (entry.refuted) {
+    const why = entry.refuted_reason === "hash_mismatch"
+      ? "内容与承诺不符"
+      : "产物不存在";
+    return `<span class="ev-tag ev-refuted" title="🎯 已被事后核对推翻（${escapeAttr(why)}）：${escapeAttr(entry.refuted_evidence || "")}">✖ refuted</span>`;
+  }
+
+  // The refutation record itself. It is the finding, not a claim: showing a
+  // digest badge here would read as "another commitment", when the line means
+  // the opposite -- this is where a commitment was destroyed.
+  if (entry.verdict === "REFUTED") {
+    const why = entry.falsify_reason === "hash_mismatch" ? "hash_mismatch" : "file_not_found";
+    return `<span class="ev-tag ev-refuted" title="推翻 #${escapeAttr(entry.refutes_seq)}：${escapeAttr(why)} — ${escapeAttr(entry.reason || "")}">🎯 refutes #${escapeAttr(entry.refutes_seq)}</span>`;
+  }
+
   // A simulated preset must never look like physical evidence. It says so on
   // the line itself, so a screenshot cannot be cropped into a claim.
   if (artefact.startsWith("simulated://")) {
-    return `<span class="ev-tag ev-sim" title="${artefact}">simulated://</span>`;
+    return `<span class="ev-tag ev-sim" title="${escapeAttr(artefact)}">simulated://</span>`;
   }
   // The badge names what was recorded, not what was proven. An earlier version
   // rendered a bare chain glyph, which made an invented digest and an honest
@@ -202,7 +247,7 @@ function evidenceTag(entry) {
   // is about. "commit" is the claim the server can actually stand behind.
   if (entry.verdict === "PASS" && entry.witness === true) {
     return hash
-      ? `<span class="ev-tag ev-hash" title="commitment recorded: sha256:${hash} · trace ${entry.trace_id || "—"} — the server cannot verify the file exists">⛓ commit ${shortHash(hash)}</span>`
+      ? `<span class="ev-tag ev-hash" title="commitment recorded: sha256:${escapeAttr(hash)} · trace ${escapeAttr(entry.trace_id || "—")} — the server cannot verify the file exists">⛓ commit ${shortHash(hash)}</span>`
       : `<span class="ev-tag ev-none">no digest</span>`;
   }
   if (entry.verdict === "PASS") {
@@ -217,27 +262,46 @@ function renderEntry(entry, isNew) {
   const line = document.createElement("div");
   const verdict = entry.verdict || "?";
   line.className = "term-line is-" + verdict.toLowerCase();
+  if (entry.refuted) line.classList.add("is-refuted");
 
   const trust = entry.trust_after === null || entry.trust_after === undefined
     ? "—" : fmt(entry.trust_after, 1);
 
   const detail =
-    verdict === "FAIL" ? `<span class="term-tail">[${entry.charged_as || "FAIL"} · trust ${trust}]</span>`
+    verdict === "REFUTED" ? `<span class="term-tail term-tail-red">[${escapeAttr(entry.falsify_reason || "refuted")} · trust ${trust}]</span>`
+    : verdict === "FAIL" ? `<span class="term-tail">[${entry.charged_as || "FAIL"} · trust ${trust}]</span>`
     : verdict === "REFUSED" ? `<span class="term-tail">[quarantined]</span>`
     : verdict === "UNLOCK" ? `<span class="term-tail">[manual release]</span>`
     : verdict === "INVALID" ? `<span class="term-tail">[no witness submitted]</span>`
+    : entry.refuted ? `<span class="term-tail term-tail-red">[refuted → trust ${trust} at seal]</span>`
     : `<span class="term-tail">[trust ${trust}]</span>`;
+
+  // The reconciliation affordance. Deliberately quiet and only present where it
+  // can do something: a standing commitment with a digest, not yet refuted.
+  // Putting it on FAIL or INVALID rows would imply those could be refuted,
+  // and a refutation of an honest failure would be refuting the truth.
+  const canRefute =
+    verdict === "PASS" && entry.witness === true &&
+    entry.witness_hash && !entry.refuted && entry.trace_id;
+
+  const verifyBtn = canRefute
+    ? `<button class="verify-btn" type="button" data-trace="${escapeAttr(entry.trace_id)}" data-agent="${escapeAttr(entry.agent_id)}" data-hash="${escapeAttr(entry.witness_hash)}" title="事后对账：拿到真实产物后回头核验这条承诺">对账</button>`
+    : "";
 
   line.innerHTML = `
     <span class="seq">#${String(entry.seq).padStart(3, "0")}</span>
     <span class="t">${clockOf(entry.ts)}</span>
     <span class="v-tag v-${verdict.toLowerCase()}">${verdict}</span>
     ${evidenceTag(entry)}
-    <span class="term-agent">${entry.agent_id}</span>
-    <span class="term-intent">${entry.intent}</span>
+    <span class="term-agent">${escapeAttr(entry.agent_id)}</span>
+    <span class="term-intent">${escapeAttr(entry.intent)}</span>
     ${detail}
+    ${verifyBtn}
     ${isNew ? '<span class="mark-new">NEW</span>' : ""}
   `;
+
+  const btn = line.querySelector(".verify-btn");
+  if (btn) btn.addEventListener("click", () => openFalsify(btn.dataset));
 
   term.appendChild(line);
 
@@ -254,6 +318,23 @@ function paintLedger(data) {
   state.textContent = data.chain_ok ? "chain ✓ sealed" : "chain ✗ TAMPERED";
   state.style.color = data.chain_ok ? "var(--green-dim)" : "var(--red)";
 
+  // A refutation is a change to *existing* history, so it has to be detected
+  // separately from "a new seq arrived". Without this the original line keeps
+  // rendering as a green PASS forever, and the dashboard would be silently
+  // disagreeing with the chain it is reading.
+  //
+  // The signature is always updated, including on the first paint: leaving it
+  // stale means every later poll thinks history just changed and repaints the
+  // whole feed, which would also steal the operator's scroll position.
+  const sig = data.entries.filter((e) => e.refuted).map((e) => e.seq).join(",");
+  if (sig !== refutedSig) {
+    refutedSig = sig;
+    if (booted) {
+      booted = false;  // force a full repaint from the current entry set
+      lastSeq = 0;
+    }
+  }
+
   const fresh = data.entries.filter((e) => e.seq > lastSeq);
   if (!fresh.length) return;
 
@@ -267,6 +348,123 @@ function paintLedger(data) {
   }
 
   lastSeq = fresh[fresh.length - 1].seq;
+}
+
+/* --------------------------------------------------------- falsification */
+
+/* The reconciliation loop, client side. Everything here is deliberately
+ * awkward on purpose: this is the only control on the page that destroys a
+ * record's standing, and it acts on a claim the server already accepted.
+ * A one-click "refute" next to every line would turn the audit trail into a
+ * moderation tool.
+ */
+let falsifyTarget = null;
+
+function openFalsify(dataset) {
+  falsifyTarget = {
+    trace_id: dataset.trace || "",
+    agent_id: dataset.agent || "",
+    witness_hash: dataset.hash || "",
+  };
+  el("fs-agent").textContent = falsifyTarget.agent_id || "—";
+  el("fs-trace").textContent = falsifyTarget.trace_id || "—";
+  el("fs-hash").textContent = falsifyTarget.witness_hash || "—";
+  el("fs-hash").title = falsifyTarget.witness_hash || "";
+  el("fs-evidence").value = "";
+  el("fs-observed").value = "";
+  el("fs-error").hidden = true;
+  el("fs-observed-wrap").hidden = true;
+  document.querySelector('input[name="fs-reason"][value="file_not_found"]').checked = true;
+  el("falsify-backdrop").hidden = false;
+  el("fs-evidence").focus();
+}
+
+function closeFalsify() {
+  el("falsify-backdrop").hidden = true;
+  falsifyTarget = null;
+}
+
+async function submitFalsify() {
+  if (!falsifyTarget) return;
+
+  // Same pre-flight as verify: a 403 after the operator typed a paragraph of
+  // evidence wastes the paragraph. Fail before the round trip.
+  if (authEnabled && !apiKey) {
+    toast("证伪是写操作：先填写 X-API-Key", "warn");
+    el("api-key").focus();
+    return;
+  }
+
+  const reason = document.querySelector('input[name="fs-reason"]:checked').value;
+  const evidence = el("fs-evidence").value.trim();
+  const observed = el("fs-observed").value.trim();
+
+  // Mirrors the server's own refusals so the operator learns the rule before
+  // the round trip. The server still enforces every one of these.
+  const fail = (msg) => {
+    const box = el("fs-error");
+    box.textContent = msg;
+    box.hidden = false;
+  };
+  if (!evidence) {
+    fail("必须写下你查了什么、看到了什么。没有依据的证伪只是一句断言。");
+    return;
+  }
+  if (reason === "hash_mismatch") {
+    if (!observed) {
+      fail("摘要不一致需要填写你实际算出的 SHA-256。");
+      return;
+    }
+    if (observed === falsifyTarget.witness_hash) {
+      fail("你填的摘要与承诺一致——那是确认，不是证伪。");
+      return;
+    }
+  }
+
+  const payload = { trace_id: falsifyTarget.trace_id, reason, evidence };
+  if (reason === "hash_mismatch") payload.observed_hash = observed;
+
+  const button = el("fs-submit");
+  button.disabled = true;
+  button.textContent = "提交中…";
+  try {
+    const res = await fetch("/api/v1/falsify", {
+      method: "POST",
+      headers: writeHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (res.status === 403) {
+      authEnabled = true;
+      keyRejected = true;
+      paintAuth(authEnabled);
+      fail("403：这颗 key 无权证伪，或服务器启用了别的凭据。");
+      return;
+    }
+    if (!res.ok) {
+      fail(String(data.detail || "证伪被拒绝（" + res.status + "）").split(".")[0]);
+      return;
+    }
+
+    closeFalsify();
+    flashAlarm();
+    toast(
+      `🎯 已证伪：${data.agent_id} · 信任分 ${fmt(data.trust_score, 1)} · ${data.message}`,
+      "warn"
+    );
+    // Full repaint: the line that turned red is an *old* seq, so the
+    // incremental path would leave it green until the next reload.
+    refutedSig = "";
+    booted = false;
+    lastSeq = 0;
+    await tick();
+  } catch (err) {
+    fail("无法连接网关：" + err.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "提交证伪";
+  }
 }
 
 /* ---------------------------------------------------------------- polling */
@@ -495,6 +693,29 @@ document.addEventListener("DOMContentLoaded", () => {
     el("terminal").innerHTML =
       '<div class="term-line term-boot"><span class="t">[clear]</span> display cleared · chain untouched</div>';
     booted = true;
+  });
+
+  // -- falsification modal ------------------------------------------------
+  el("fs-close").addEventListener("click", closeFalsify);
+  el("fs-cancel").addEventListener("click", closeFalsify);
+  el("fs-submit").addEventListener("click", submitFalsify);
+
+  // Clicking the backdrop closes it, clicking inside does not. Without the
+  // stopPropagation a click on the textarea would dismiss a half-written
+  // evidence paragraph.
+  el("falsify-backdrop").addEventListener("click", (e) => {
+    if (e.target === el("falsify-backdrop")) closeFalsify();
+  });
+  document.querySelectorAll('input[name="fs-reason"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      const isMismatch =
+        document.querySelector('input[name="fs-reason"]:checked').value === "hash_mismatch";
+      el("fs-observed-wrap").hidden = !isMismatch;
+      if (isMismatch) el("fs-observed").focus();
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el("falsify-backdrop").hidden) closeFalsify();
   });
 
   const saveKey = () => {

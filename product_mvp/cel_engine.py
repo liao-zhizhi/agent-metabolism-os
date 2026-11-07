@@ -193,6 +193,29 @@ class UnwitnessedClaim(VerifyError):
         super().__init__(message, status_code)
 
 
+class FalsificationError(VerifyError):
+    """A refutation cannot be applied as given.
+
+    Status codes carry meaning here, and the dashboard depends on the split:
+
+    * ``404``  no PASS commitment carries that ``trace_id``. There is nothing
+      to refute, and pretending otherwise would let a refutation invent a
+      history.
+    * ``409``  the commitment was already refuted (a second observer), or the
+      entry is an honest failure with no digest -- refuting it would be
+      refuting a true statement.
+    * ``422``  the payload contradicts itself, e.g. ``hash_mismatch`` with no
+      observed digest, or an observed digest equal to the committed one.
+    """
+
+
+#: The two ways an observer can find a commitment false. Both are physical
+#: observations; neither is inferred by the server.
+FALSIFY_FILE_NOT_FOUND = "file_not_found"
+FALSIFY_HASH_MISMATCH = "hash_mismatch"
+FALSIFY_REASONS = (FALSIFY_FILE_NOT_FOUND, FALSIFY_HASH_MISMATCH)
+
+
 #: A witness digest is a SHA-256, bare or scheme-prefixed. Anything else is a
 #: sentence wearing a hash's clothes.
 _SHA256_BARE = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -258,6 +281,13 @@ class CelGateway:
         #: a ledger where one physical action can be booked twice measures the
         #: number of requests, not the number of things that occurred.
         self._trace_ids: Dict[str, str] = {}
+        #: ``trace_id`` -> the sealed refutation that overturned it. Kept as a
+        #: separate map rather than by rewriting the original entry: the chain
+        #: hash covers the entry body, so editing a PASS into a REFUTED in place
+        #: would make ``verify_chain()`` fail -- the tamper evidence would be
+        #: destroyed by the very act of correcting the record. A refutation is
+        #: therefore an *appended* entry that points back at the original.
+        self._refuted: Dict[str, Dict[str, Any]] = {}
         #: Submissions refused before they became entries. Kept separately
         #: because they are **not** on the chain -- by construction there is no
         #: entry to derive them from -- and an operator still needs to see that
@@ -551,6 +581,182 @@ class CelGateway:
             "message": "拦截：该智能体已被隔离，本次尝试未获记账",
         }
 
+    def falsify(
+        self,
+        *,
+        trace_id: str,
+        reason: str,
+        evidence: str = "",
+        observed_hash: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Overturn a booked PASS after the fact, and charge the liar for it.
+
+        The server could not check the artefact when the claim arrived (see
+        ``WitnessHashLimits``), so the claim was booked as a *commitment*. This
+        is the other half of that bargain: an observer who later checks the
+        physical artefact can report what they found, and the commitment is
+        marked false.
+
+        Two properties are load-bearing:
+
+        * **Nothing is rewritten.** The original entry keeps its verdict and its
+          chain hash; a ``REFUTED`` entry is appended pointing at
+          ``refutes_seq``. Editing the original would break ``verify_chain()``
+          and destroy the tamper evidence that makes the ledger worth keeping.
+        * **The charge is not proportional.** Trust goes to zero and stays
+          there (``PenaltyLedger.record_falsification``). This realizes the R2
+          asymmetry: a claim costs one request, a refutation is terminal.
+
+        What this does **not** establish: that the refuter is honest. A
+        falsification is a second unverifiable claim, now in the opposite
+        direction. The difference is that it is attributable -- it is sealed
+        with an observer id and the evidence they report, so a false accusation
+        is itself on the record. See ``FalsificationLimits``.
+
+        Raises:
+            FalsificationError: 404 unknown trace, 409 already refuted, 422
+                self-contradictory payload.
+        """
+        trace = trace_id.strip() if isinstance(trace_id, str) else ""
+        if not trace:
+            raise FalsificationError("trace_id must be a non-empty string", 400)
+        if reason not in FALSIFY_REASONS:
+            raise FalsificationError(
+                "reason must be one of {}; got {!r}".format(
+                    ", ".join(FALSIFY_REASONS), reason
+                ),
+                422,
+            )
+        note = evidence.strip() if isinstance(evidence, str) else ""
+        if not note:
+            # Not bureaucracy: the evidence string is the only thing a later
+            # reviewer has to judge the refutation by. An empty one is an
+            # assertion with no way to audit it.
+            raise FalsificationError(
+                "evidence must say what was checked and what was seen; an "
+                "empty refutation is an assertion, not a finding",
+                422,
+            )
+
+        observed = normalise_witness_hash(observed_hash) if observed_hash else None
+        if observed_hash not in (None, "") and observed is None:
+            raise FalsificationError(
+                "observed_hash must be 64 hex characters or 'sha256:<64 hex>'",
+                422,
+            )
+
+        with self._lock:
+            if trace in self._refuted:
+                prior = self._refuted[trace]
+                raise FalsificationError(
+                    "trace_id {!r} was already refuted at entry {}; a second "
+                    "observer adds nothing without new evidence".format(
+                        trace, prior["seq"]
+                    ),
+                    409,
+                )
+
+            target = self._find_commitment(trace)
+            if target is None:
+                raise FalsificationError(
+                    "no PASS commitment carries trace_id {!r}; there is nothing "
+                    "to refute".format(trace),
+                    404,
+                )
+            if not target.get("witness_hash"):
+                raise FalsificationError(
+                    "entry {} carries no digest, so it recorded no commitment "
+                    "to refute".format(target["seq"]),
+                    409,
+                )
+
+            committed = str(target["witness_hash"])
+            if reason == FALSIFY_HASH_MISMATCH:
+                if observed is None:
+                    raise FalsificationError(
+                        "reason 'hash_mismatch' requires observed_hash: the "
+                        "digest actually computed from the artefact",
+                        422,
+                    )
+                if observed == committed:
+                    raise FalsificationError(
+                        "observed digest equals the committed digest; that "
+                        "confirms the entry, it does not refute it",
+                        422,
+                    )
+
+            agent = str(target["agent"])
+            charge = self._books.record_falsification(agent, note)
+
+            sealed = self._append(
+                {
+                    "agent": agent,
+                    "intent": "falsification of entry {}".format(target["seq"]),
+                    "check": target["check"],
+                    "witness": target["witness"],
+                    "verdict": "REFUTED",
+                    "artefact": target.get("artefact", ""),
+                    "witness_hash": committed,
+                    "trace_id": trace,
+                    "cost": 0.0,
+                    "trust_after": charge["trust_after"],
+                    "penalty": charge["penalty"],
+                    "charged_as": charge["charged_as"],
+                    "book_locked": False,
+                    "reason": note,
+                    # The pointers that make this a refutation and not a new
+                    # verdict: which entry, what was claimed, what was seen.
+                    "refutes_seq": target["seq"],
+                    "refutes_hash": target["hash"],
+                    "falsify_reason": reason,
+                    "observed_hash": observed or "",
+                    "evidence": note,
+                }
+            )
+            self._refuted[trace] = {
+                "seq": sealed["seq"],
+                "ts": sealed["ts"],
+                "reason": reason,
+                "evidence": note,
+                "observed_hash": observed or "",
+                "refutes_seq": target["seq"],
+            }
+            self._note_rejection(agent, trace, "commitment refuted after the fact")
+
+            state = self._state_of(agent)
+            return {
+                "verdict": "REFUTED",
+                "refuted": True,
+                "trace_id": trace,
+                "agent_id": agent,
+                "refutes_seq": target["seq"],
+                "refutes_hash": target["hash"],
+                "reason": reason,
+                "evidence": note,
+                "observed_hash": observed or "",
+                "committed_hash": committed,
+                "trust_score": charge["trust_after"],
+                "penalty_state": state,
+                "inflamed": state == CRITICAL,
+                "penalty": charge["penalty"],
+                "charged_as": charge["charged_as"],
+                "locked": self._books.is_locked(agent),
+                "seq": sealed["seq"],
+                "ts": sealed["ts"],
+                "chain_hash": sealed["hash"],
+                "prev_hash": sealed["prev_hash"],
+                "message": "证伪：承诺已被物理核对推翻，信任清零",
+            }
+
+    def _find_commitment(self, trace: str) -> Optional[Dict[str, Any]]:
+        """The most recent PASS entry booked under ``trace``, if any."""
+        for entry in reversed(self._entries):
+            if entry.get("trace_id") != trace:
+                continue
+            if entry["verdict"] == PASS:
+                return entry
+        return None
+
     def unlock(self, agent_id: str, reason: str = "") -> Dict[str, Any]:
         """Human-supervised release. Unreachable from ``verify`` by design."""
         with self._lock:
@@ -622,6 +828,10 @@ class CelGateway:
                         "locked": is_locked,
                         "verified": book["verified"],
                         "refuted": book["refuted"],
+                        # Retrospective refutations, kept apart from the
+                        # request-time contradictions above. An operator asking
+                        # "who lied and got caught later" reads this one.
+                        "falsified": book.get("falsified", 0),
                         "unwitnessed": book["unwitnessed"],
                         "fail_streak": book["fail_streak"],
                     }
@@ -638,6 +848,7 @@ class CelGateway:
             )
             refused = sum(1 for e in self._entries if e["verdict"] == REFUSED)
             passed = sum(1 for e in self._entries if e["verdict"] == PASS)
+            refuted_commitments = len(self._refuted)
 
             worst = HEALTHY
             for name in agents:
@@ -657,6 +868,12 @@ class CelGateway:
                 "rejected_unwitnessed": len(self._rejections),
                 "refused_attempts": refused,
                 "verified_passes": passed,
+                #: PASSes that a later physical check overturned. Reported
+                #: alongside the raw count instead of mutating it: "12 passes,
+                #: 2 refuted" is the auditable statement, and collapsing it to
+                #: "10 passes" would erase the finding.
+                "refuted_commitments": refuted_commitments,
+                "standing_passes": passed - refuted_commitments,
                 "avg_trust_score": avg_trust,
                 "inflamed_agents": inflamed,
                 "locked_agents": locked,
@@ -675,7 +892,15 @@ class CelGateway:
             }
 
     def ledger(self, limit: int = 50) -> Dict[str, Any]:
-        """The newest ``limit`` sealed entries, oldest-first for a terminal feed."""
+        """The newest ``limit`` sealed entries, oldest-first for a terminal feed.
+
+        Each entry is annotated with its refutation, if it has one. The original
+        ``verdict`` is *not* rewritten: it is what the system concluded at the
+        time, on the evidence it had. ``refuted`` is what a later check found,
+        and both belong on the line -- a dashboard that shows only the second
+        loses the fact that the system said PASS, which is the part being
+        audited.
+        """
         with self._lock:
             limit = max(1, min(int(limit), 500))
             window = self._entries[-limit:]
@@ -684,7 +909,20 @@ class CelGateway:
                 "total_entries": len(self._entries),
                 "chain_head": self._chain_head,
                 "chain_ok": self.verify_chain(),
-                "entries": [_public(e) for e in window],
+                "refuted_commitments": len(self._refuted),
+                "entries": [
+                    # The refutation entry is not itself a refuted commitment --
+                    # it *is* the refutation. Annotating it would make the
+                    # ledger claim every finding is also a finding against
+                    # itself, which also doubled the count on the dashboard.
+                    _public(
+                        e,
+                        None
+                        if e["verdict"] == "REFUTED"
+                        else self._refuted.get(e.get("trace_id", "")),
+                    )
+                    for e in window
+                ],
             }
 
 
@@ -697,9 +935,15 @@ class _Refused(Exception):
         self.sealed = sealed
 
 
-def _public(entry: Dict[str, Any]) -> Dict[str, Any]:
-    """The wire shape of one chained entry. Hashes are kept; `reason` trimmed."""
-    return {
+def _public(
+    entry: Dict[str, Any], refutation: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """The wire shape of one chained entry. Hashes are kept; `reason` trimmed.
+
+    ``refutation`` is passed in rather than stored on the entry, because the
+    entry's body is covered by its chain hash and must not change after sealing.
+    """
+    wire = {
         "seq": entry["seq"],
         "ts": entry["ts"],
         "agent_id": entry["agent"],
@@ -717,7 +961,21 @@ def _public(entry: Dict[str, Any]) -> Dict[str, Any]:
         "reason": entry.get("reason", ""),
         "hash": entry["hash"],
         "prev_hash": entry["prev_hash"],
+        "refuted": refutation is not None,
     }
+    # A REFUTED entry must keep its pointers back to what it overturns, or the
+    # reader has a red line with no referent. These are part of the sealed body,
+    # so they are copied through rather than recomputed.
+    for key in ("refutes_seq", "refutes_hash", "falsify_reason", "observed_hash"):
+        if key in entry:
+            wire[key] = entry[key]
+    if refutation is not None:
+        wire["refuted_at_seq"] = refutation["seq"]
+        wire["refuted_ts"] = refutation["ts"]
+        wire["refuted_reason"] = refutation["reason"]
+        wire["refuted_evidence"] = refutation["evidence"]
+        wire["observed_hash"] = refutation["observed_hash"]
+    return wire
 
 
 def _explain(verdict: str, receipt: Dict[str, Any], state: str) -> str:
