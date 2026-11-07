@@ -34,6 +34,27 @@
 
 <main class="shell">
 
+  <!-- ============ 开发者入口 Banner ============
+       大屏是一根"看"的管子，不是一个"跑"的地方：个人开发者不会、也不该把
+       自己的代码交到我们的服务器上执行。所以这一屏的存在方式是——上面看效果，
+       下面拿走工具。文案里的 "zero data leaves your machine" 不是装饰，是这个
+       产品的架构事实：判据、见证、账本全在本地进程里。 -->
+  <section class="portal" aria-labelledby="portal-title">
+    <div class="portal-eyebrow">Developer Portal · 本地优先</div>
+    <h2 id="portal-title" class="portal-title">Audit your own agents locally.</h2>
+    <p class="portal-sub">
+      <b>Zero data leaves your machine.</b>
+      在本地审计你的 Agent —— 判据、见证、账本都跑在你自己的进程里，
+      我们看不到你的代码、看不到你的产物，也看不到你 Agent 的证据。
+    </p>
+    <div class="portal-actions">
+      <a class="portal-btn portal-btn-primary" href="#dev-portal">接入方式 ↓</a>
+      <a class="portal-btn" href="https://github.com/liao-zhizhi/causal-evolution-paper"
+         target="_blank" rel="noopener noreferrer">开源仓库 ↗</a>
+      <span class="portal-meta" id="portal-meta">云端试用：读取 —</span>
+    </div>
+  </section>
+
   <!-- ============ 核心指标 ============ -->
   <section class="panel metrics" aria-labelledby="metrics-title">
     <div class="panel-head">
@@ -102,6 +123,22 @@
 
     <p class="hint">把一条故意矛盾的证据提交给网关，看它是否敢于亮红灯。</p>
 
+    <!-- 试用额度条：数字来自 /api/v1/stats 的 write_policy，不写死在页面里。
+         页面里的"1 次 / 5 分钟"会在第一次改环境变量时变成谎话。 -->
+    <div id="trial-note" class="trial-note" hidden>
+      <span id="trial-text">云端试用中</span>
+      <a href="#dev-portal" class="trial-link">获取本地无限额度 ↓</a>
+    </div>
+
+    <div id="trial-exhausted" class="trial-exhausted" hidden>
+      <strong>试用额度已用尽</strong>
+      <p>
+        匿名判定不写入公共账本，也不会累积信任分——它只是让你先看清楚判决长什么样。
+        To get more quota or use it in production, install our sidecar locally.
+      </p>
+      <a href="#dev-portal" class="portal-btn portal-btn-primary">本地安装 ↓</a>
+    </div>
+
     <div id="auth-banner" class="auth-banner" hidden>
       <strong>⚠ 鉴权未启用</strong>
       <span>未设置 <code>CEL_API_KEY</code>：任何人都能写入这本账。公网部署前必须设置。</span>
@@ -149,6 +186,89 @@
       <ul id="agents-list" class="agents-list">
         <li class="agents-empty">尚无智能体提交过事务</li>
       </ul>
+    </div>
+  </section>
+
+  <!-- ============ 开发者接入 ============
+       三段式：装上 → 接进 Cursor/Claude → 读结论。每一段都有一个能复制的
+       命令或配置，因为"教一个开发者接入"的失败模式永远是最后一步：他复制了
+       一段看起来对的 JSON，把路径写成了自己的家目录，然后 MCP 启动失败而
+       没有报错。所以下面的配置里写的是绝对路径占位符，不是 ".". -->
+  <section class="panel dev-portal" id="dev-portal" aria-labelledby="dev-title">
+    <div class="panel-head">
+      <h2 id="dev-title"><span class="tick">▚</span> 开发者接入 · Developer Portal</h2>
+      <span class="meta">local-first · MIT</span>
+    </div>
+
+    <p class="dev-lead">
+      Audit your own agents locally. <b>Zero data leaves your machine.</b>
+      上面这块大屏是云端展示；真正的审计跑在你自己的机器上，判据、见证、账本都在本地进程里。
+    </p>
+
+    <!-- 1. 安装 -->
+    <div class="dev-step">
+      <div class="dev-step-head">
+        <span class="dev-step-no">01</span>
+        <h3>安装 sidecar</h3>
+        <button class="copy-btn" type="button" data-copy-target="install-cmd">复制</button>
+      </div>
+      <pre class="codeblock"><code id="install-cmd">pip install "git+https://github.com/liao-zhizhi/harness-audit-sidecar.git"</code></pre>
+      <p class="dev-note">
+        PyPI 上尚未发布，所以上面的命令走 git，今天就能装。
+        发布后命令会简化为 <code>pip install harness-audit-sidecar</code>。
+        装完应该有一个可执行文件：
+        <code>harness-audit-server --help</code>。
+      </p>
+    </div>
+
+    <!-- 2. MCP 配置 -->
+    <div class="dev-step">
+      <div class="dev-step-head">
+        <span class="dev-step-no">02</span>
+        <h3>接进 Cursor / Claude（MCP）</h3>
+        <button class="copy-btn" type="button" data-copy-target="mcp-cmd">复制 JSON</button>
+      </div>
+
+      <details class="mcp-details">
+        <summary>展开 <code>mcp_config.json</code> 配置</summary>
+        <pre class="codeblock"><code id="mcp-cmd">{
+  "mcpServers": {
+    "harness-audit": {
+      "command": "harness-audit-server",
+      "args": ["--cwd", "/absolute/path/to/your/project", "--quiet"]
+    }
+  }
+}</code></pre>
+        <ul class="dev-list">
+          <li><code>--cwd</code> 必须写<b>被审计项目</b>的绝对路径，不是 sidecar 自己的目录。</li>
+          <li>结论写进 <code>audit_trace.jsonl</code>；<b>不要</b>从 stdout 取判决，那里只有 Agent 被允许看到的东西。</li>
+          <li>账本默认就在项目目录里。如果被审计的 Agent 能写这个目录，它也能删——需要抗篡改就指向它写不到的位置。</li>
+        </ul>
+      </details>
+    </div>
+
+    <!-- 3. 仓库 -->
+    <div class="dev-step">
+      <div class="dev-step-head">
+        <span class="dev-step-no">03</span>
+        <h3>读源码与形式化证明</h3>
+      </div>
+      <ul class="dev-list dev-links">
+        <li>
+          <a href="https://github.com/liao-zhizhi/causal-evolution-paper"
+             target="_blank" rel="noopener noreferrer">causal-evolution-paper</a>
+          — 论文、Lean 4 形式化、审计日志
+        </li>
+        <li>
+          <a href="https://github.com/liao-zhizhi/harness-audit-sidecar"
+             target="_blank" rel="noopener noreferrer">harness-audit-sidecar</a>
+          — sidecar 本体（MCP stdio server）
+        </li>
+      </ul>
+      <p class="dev-note">
+        云端这台实例只做三件事：展示判决、提供匿名试用、给你命令。
+        它不接收你的代码，也没有渠道接收——没有上传接口，没有执行接口。
+      </p>
     </div>
   </section>
 

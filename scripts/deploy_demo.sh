@@ -34,6 +34,14 @@ DRY=0
 RATE_LIMIT="${CEL_DEPLOY_RATE_LIMIT:-10}"
 RATE_WINDOW="${CEL_DEPLOY_RATE_WINDOW:-60}"
 
+#: The anonymous trial: how much a visitor may do *without* a key. 1 per 5
+#: minutes is the funnel, not a mistake -- the second click has to be the moment
+#: the page offers the local install. It is a separate knob from RATE_LIMIT so
+#: that turning the funnel off (CEL_DEPLOY_ANON_LIMIT=0) does not also tighten
+#: the budget for callers who brought a key.
+ANON_LIMIT="${CEL_DEPLOY_ANON_LIMIT:-1}"
+ANON_WINDOW="${CEL_DEPLOY_ANON_WINDOW:-300}"
+
 #: The origin is reached only through the Cloudflare tunnel (cloudflared runs
 #: --network host and dials 127.0.0.1:80), so the published port is bound to
 #: loopback. This, not an iptables rule, is what makes the origin unreachable
@@ -134,9 +142,10 @@ print('   image verified: falsify route + record_falsification')
     -p $PUBLISH -v /opt/cel_data:/data \
     -e CEL_API_KEY=\"\$KEY\" -e CEL_LEDGER_LOG=/data/ledger.jsonl \
     -e CEL_RATE_LIMIT=$RATE_LIMIT -e CEL_RATE_WINDOW=$RATE_WINDOW \
+    -e CEL_ANON_LIMIT=$ANON_LIMIT -e CEL_ANON_WINDOW=$ANON_WINDOW \
     -e CEL_TRUST_PROXY=1 \
     cel-dashboard:$TAG >/dev/null
-  echo \"   image cel-dashboard:$TAG (listen $PUBLISH, ${RATE_LIMIT} writes/${RATE_WINDOW}s per IP)\""
+  echo \"   image cel-dashboard:$TAG (listen $PUBLISH, ${RATE_LIMIT} writes/${RATE_WINDOW}s per IP, anonymous trial ${ANON_LIMIT}/${ANON_WINDOW}s)\""
 
 echo "== 5/6 health gate =="
 for i in $(seq 1 30); do
@@ -163,6 +172,15 @@ echo "   public schema: witness_hash + trace_id + falsify endpoint present"
 HTML=$(curl -s --max-time 20 "$URL/")
 grep -qE '/static/app\.js\?v=[0-9a-f]{10}' <<<"$HTML" \
   || { echo "   FATAL: asset URL is not versioned; the CDN will serve a stale bundle" >&2; exit 1; }
+# The landing page is now the product's front door. Check that the three things
+# it promises are actually in the served HTML: nobody installs a tool they
+# cannot find a command for.
+for marker in "Audit your own agents locally" "Zero data leaves your machine" \
+              "harness-audit-sidecar" '"mcpServers"' "causal-evolution-paper"; do
+  grep -qF "$marker" <<<"$HTML" \
+    || { echo "   FATAL: served landing page is missing: $marker" >&2; exit 1; }
+done
+echo "   public page: hero copy, install command, MCP config, repo links present"
 JSV=$(grep -oE '/static/app\.js\?v=[0-9a-f]{10}' <<<"$HTML")
 JS=$(curl -s --max-time 20 "$URL$JSV")
 # Check for the wording, not just for the feature. A bundle that still renders a
@@ -193,6 +211,46 @@ print(json.load(sys.stdin).get('rate_limit',{}).get('limit'))")
 [[ "$LIMIT" == "$RATE_LIMIT" ]] \
   || { echo "   FATAL: live rate limit is $LIMIT, expected $RATE_LIMIT" >&2; exit 1; }
 echo "   live budget: $LIMIT writes per ${RATE_WINDOW}s per client IP"
+
+# The trial has to be *observed*, not assumed. Two anonymous writes: the first
+# must be judged without being sealed, the second must be refused with the
+# funnel's 429. A deploy that only checks the stats block would pass while the
+# endpoint still demanded a key, and the page would then be advertising a trial
+# that does not exist.
+TRIAL_BODY='{"agent_id":"deploy_probe","intent":"deploy verification","check":true,"witness":false}'
+FIRST=$(curl -s --max-time 20 -o /tmp/cel_trial_probe.json -w '%{http_code}' \
+  -X POST "$URL/api/v1/verify" -H 'Content-Type: application/json' -d "$TRIAL_BODY")
+if [[ "$ANON_LIMIT" != "0" ]]; then
+  [[ "$FIRST" == "200" ]] \
+    || { echo "   FATAL: anonymous trial returned $FIRST, expected 200" >&2; exit 1; }
+  python3 - <<'PY' || { echo "   FATAL: anonymous response claimed to be sealed" >&2; exit 1; }
+import json, sys
+body = json.load(open("/tmp/cel_trial_probe.json"))
+sys.exit(0 if body.get("sealed") is False and body.get("channel") == "anonymous_trial" else 1)
+PY
+  SECOND=$(curl -s --max-time 20 -o /dev/null -w '%{http_code}' \
+    -X POST "$URL/api/v1/verify" -H 'Content-Type: application/json' -d "$TRIAL_BODY")
+  [[ "$SECOND" == "429" ]] \
+    || { echo "   FATAL: second anonymous write returned $SECOND, expected the trial's 429" >&2; exit 1; }
+  echo "   anonymous trial: 1st write judged (unsealed), 2nd refused 429 -- funnel is live"
+else
+  [[ "$FIRST" == "403" ]] \
+    || { echo "   FATAL: trial disabled but anonymous write returned $FIRST" >&2; exit 1; }
+  echo "   anonymous trial: disabled (403), as configured"
+fi
+
+# And the production ledger must not have grown from those two probes: an
+# anonymous row on the chain would mean the funnel is writing evidence nobody
+# can be held to.
+STATS_JSON=$(curl -s --max-time 20 "$URL/api/v1/stats")
+grep -q "deploy_probe" <<<"$STATS_JSON" \
+  && { echo "   FATAL: the anonymous probe was booked as an agent; the trial is sealing" >&2; exit 1; }
+SEALS=$(python3 -c "
+import json,sys
+print(json.loads(sys.argv[1])['write_policy']['anonymous']['seals'])" "$STATS_JSON")
+[[ "$SEALS" == "False" ]] \
+  || { echo "   FATAL: stats claims the anonymous tier seals entries" >&2; exit 1; }
+echo "   trial probe left no agent on the production chain"
 echo
 echo "deployed: $TAG"
 echo "rollback: docker tag cel-dashboard:rollback-* cel-dashboard:latest && restart"

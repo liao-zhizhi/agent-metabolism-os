@@ -26,6 +26,10 @@ let polling = false;
 let booted = false;
 let authEnabled = false;
 
+/* The anonymous-trial policy as the server last reported it. Kept so the 429
+ * handler can quote the real quota instead of a number typed into this file. */
+let trialPolicy = null;
+
 /* Set when the server answered 403 to the stored key. Kept as state rather than
  * written straight into the DOM, because ``paintAuth`` runs on every 2s poll and
  * would otherwise wipe the rejection notice back to "saved" before the operator
@@ -91,6 +95,57 @@ function rateLimitToast(res) {
   );
 }
 
+/* Seconds -> the shortest honest unit. "1 次 / 300 秒" is technically true and
+ * reads like a machine; the funnel copy has to read like a person wrote it. */
+function humanWindow(seconds) {
+  const s = Number(seconds) || 0;
+  if (s >= 3600 && s % 3600 === 0) return `${s / 3600} 小时`;
+  if (s >= 60 && s % 60 === 0) return `${s / 60} 分钟`;
+  return `${s} 秒`;
+}
+
+/* Copy, with a fallback. navigator.clipboard only exists in a secure context,
+ * and a demo served over plain http on an IP is not one -- the primary path
+ * silently vanishing there would look like a broken button rather than a
+ * missing API. */
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.top = "-1000px";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } finally {
+    document.body.removeChild(ta);
+  }
+  if (!ok) throw new Error("execCommand('copy') returned false");
+}
+
+/* Select an element's text without innerHTML tricks. Used only when the
+ * clipboard is unavailable, so the recovery is "press Ctrl+C" rather than
+ * "please re-select this 70-character URL by hand". */
+function selectNodeText(node) {
+  if (!node) return;
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } catch (err) {
+    /* a selection failure is not worth a toast: the text is still readable */
+  }
+}
+
 async function getJSON(url) {
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -154,7 +209,71 @@ function paintStats(s) {
   el("health-text").textContent = (s.health_state || "HEALTHY");
 
   paintAuth(Boolean(s.auth_enabled));
+  paintTrial(s.write_policy);
   paintAgents(s.agents || []);
+}
+
+/* The trial quota, rendered from the server's own numbers.
+ *
+ * Why not hard-code "1 per 5 minutes" here: the page would then be advertising
+ * a limit the limiter no longer enforces the first time CEL_ANON_LIMIT changes,
+ * and a landing page that lies about its own quota is the smallest version of
+ * the exact bug this product exists to catch.
+ *
+ * `remaining` is computed server-side for *this* caller, so "you have 1 left"
+ * is true for the person reading it without the page having to track anything.
+ */
+function paintTrial(policy) {
+  const anon = (policy && policy.anonymous) || {};
+  trialPolicy = anon;
+  const note = el("trial-note");
+  const exhausted = el("trial-exhausted");
+  const meta = el("portal-meta");
+
+  // A saved key means this browser is not on the trial at all.
+  const onTrial = Boolean(anon.enabled) && !apiKey;
+
+  if (!onTrial) {
+    note.hidden = true;
+    exhausted.hidden = true;
+    meta.textContent = apiKey
+      ? "云端写入：已用 key（入公共账本）"
+      : "云端匿名写入：已关闭";
+    return;
+  }
+
+  const seconds = humanWindow(anon.window_seconds);
+  const remaining = anon.remaining;
+  const left = remaining === undefined ? "" : remaining > 0 ? `剩余 ${remaining} 次` : "已用尽";
+
+  note.hidden = false;
+  note.className = "trial-note" + (remaining === 0 ? " is-spent" : "");
+  el("trial-text").textContent =
+    `云端试用：每个 IP 每 ${seconds} ${anon.limit} 次判定 · ${left} · 不入公共账本`;
+
+  exhausted.hidden = remaining !== 0;
+  meta.textContent = `云端试用：${anon.limit} 次 / ${seconds}${left ? " · " + left : ""}`;
+}
+
+/* A trial verdict was judged but not sealed. Render it on the operator's own
+ * screen, dashed and labelled, because the one thing it must never look like is
+ * a row on the chain. */
+function renderTrial(data, intent) {
+  const term = el("terminal");
+  const line = document.createElement("div");
+  const verdict = String(data.verdict || "?").toUpperCase();
+  line.className = "term-line is-trial is-" + verdict.toLowerCase();
+  line.innerHTML = `
+    <span class="seq">TRIAL</span>
+    <span class="t">${clockOf(Date.now() / 1000)}</span>
+    <span class="v-tag v-${verdict.toLowerCase()}">${verdict}</span>
+    <span class="term-agent">${escapeAttr(data.agent_id || "anonymous")}</span>
+    <span class="term-intent">${escapeAttr(intent || "")}</span>
+    <span class="term-tail term-tail-trial">[not sealed · 匿名试用]</span>
+  `;
+  term.appendChild(line);
+  while (term.children.length > MAX_LINES) term.removeChild(term.firstChild);
+  term.scrollTop = term.scrollHeight;
 }
 
 /* The server tells us which mode it is in; the page must never guess. An
@@ -174,7 +293,7 @@ function paintAuth(enabled) {
 
   state.hidden = false;
   if (!apiKey) {
-    state.textContent = "未填写 key：模拟按钮会被 403 拒绝。粘贴服务器的 CEL_API_KEY 后点「保存」。";
+    state.textContent = "未填写 key：当前走匿名云端试用——判定是真的，但不写入公共账本。粘贴 CEL_API_KEY 后点「保存」可入账。";
     state.className = "key-state is-warn";
   } else if (keyRejected) {
     state.textContent = "这颗 key 被服务器拒绝（403）。核对后重新粘贴并保存。";
@@ -568,12 +687,10 @@ const SCENARIOS = {
 };
 
 async function submit(payload, button) {
-  // Fail before the round trip, so the operator gets a sentence instead of a 403.
-  if (authEnabled && !apiKey) {
-    toast("先填写 X-API-Key：这台服务器已启用鉴权，匿名写入会被 403 拒绝", "warn");
-    el("api-key").focus();
-    return;
-  }
+  // No pre-flight refusal for a missing key any more: that gap *is* the trial.
+  // Only the destructive paths (falsify, unlock) still need one, because they
+  // have no anonymous tier at all.
+  const keyed = Boolean(apiKey);
 
   if (button) button.disabled = true;
   try {
@@ -585,7 +702,26 @@ async function submit(payload, button) {
     const data = await res.json();
 
     if (res.status === 429) {
-      rateLimitToast(res);
+      // Keyed callers hit the ordinary write budget; trial callers hit the
+      // funnel. Same status, two different next steps.
+      if (keyed) {
+        rateLimitToast(res);
+      } else {
+        // Not the server's English sentence: the page already knows the quota
+        // from write_policy, so it can say it in the page's own voice without
+        // truncating a log line at the first full stop.
+        el("trial-exhausted").hidden = false;
+        el("trial-note").classList.add("is-spent");
+        toast(
+          "试用额度已用尽" +
+            (trialPolicy && trialPolicy.limit
+              ? `（每 ${humanWindow(trialPolicy.window_seconds)} ${trialPolicy.limit} 次）`
+              : "") +
+            "。本地安装可无限使用，数据不出你的机器。",
+          "warn"
+        );
+        await pollStats();  // pick up the server's own retry_after
+      }
       return;
     }
     if (res.status === 403) {
@@ -612,6 +748,22 @@ async function submit(payload, button) {
     }
 
     showVerdict(data);
+
+    // `sealed: false` is the trial. Judged by the same engine, not on the chain.
+    // It gets its own line and its own sentence, and the shared feed is left
+    // alone: a ledger entry nobody can attribute must not appear where the
+    // evidence lives.
+    if (data.sealed === false) {
+      renderTrial(data, payload.intent);
+      if (data.verdict === "FAIL") flashAlarm();
+      toast(
+        `⚡ 试用判定 ${data.verdict}：${data.agent_id} · ${data.message}（未入账）`,
+        data.verdict === "FAIL" ? "fail" : "warn"
+      );
+      await pollStats();  // refresh the remaining-quota line
+      return;
+    }
+
     if (data.verdict === "FAIL") {
       flashAlarm();
       toast(`⛔ 拦截假完成：${data.agent_id} · ${data.message}`);
@@ -718,6 +870,37 @@ document.addEventListener("DOMContentLoaded", () => {
     el("terminal").innerHTML =
       '<div class="term-line term-boot"><span class="t">[clear]</span> display cleared · chain untouched</div>';
     booted = true;
+  });
+
+  // -- copy buttons -------------------------------------------------------
+  // The label says what happened, not "copied!" unconditionally: a clipboard
+  // write can fail (permissions, insecure context, a browser that blocks it),
+  // and a button that claims success on failure is worse than no button.
+  document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const target = el(btn.dataset.copyTarget);
+      const text = target ? target.textContent.trim() : "";
+      const original = btn.textContent;
+      btn.disabled = true;
+      try {
+        await copyText(text);
+        btn.textContent = "已复制 ✓";
+        btn.classList.add("is-copied");
+      } catch (err) {
+        // Say so, and make the sentence true: leave the text selected so the
+        // one action the button promises ("手动选中") costs a Ctrl+C, not a
+        // careful drag across a 70-character URL.
+        selectNodeText(target);
+        btn.textContent = "已选中，按 Ctrl+C";
+        btn.classList.add("is-failed");
+      } finally {
+        setTimeout(() => {
+          btn.textContent = original;
+          btn.disabled = false;
+          btn.classList.remove("is-copied", "is-failed");
+        }, 1900);
+      }
+    });
   });
 
   // -- falsification modal ------------------------------------------------

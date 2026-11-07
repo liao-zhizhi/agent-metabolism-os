@@ -48,6 +48,12 @@ def _reset() -> None:
     os.environ["CEL_RATE_LIMIT"] = str(UNLIMITED_FOR_TESTS)
     api_server.configure_rate_limit()
     os.environ.pop("CEL_RATE_LIMIT", None)
+    # The trial counters and the trial ledger are process-global too. Leaving
+    # them dirty would make "the second anonymous request is 429" depend on
+    # which test ran first, which is the kind of failure that looks like a
+    # limiter bug for an afternoon.
+    api_server.reset_trial()
+    api_server.configure_anon_limit()
 
 
 #: Large enough that no behavioural test can spend it by accident.
@@ -409,18 +415,36 @@ class AuthTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_missing_header_is_403(self) -> None:
+    def test_missing_header_is_the_anonymous_trial_not_a_403(self) -> None:
+        """No credential is not a rejected credential.
+
+        The contract changed with the developer-portal funnel: a caller with no
+        key at all gets the anonymous trial (judged, unsealed), while a caller
+        that presented a *wrong* key still gets 403. Collapsing the two would
+        make "I forgot the header" and "I guessed the key" the same event.
+        """
         _reset()
         configure_auth(self.KEY)
-        self.assertEqual(self.client.post("/api/v1/verify", json=self._body()).status_code, 403)
+        response = self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["channel"], "anonymous_trial")
+        self.assertFalse(body["sealed"])
+        self.assertEqual(body["verdict"], "FAIL")
 
-    def test_empty_header_is_403(self) -> None:
+    def test_empty_header_is_the_anonymous_trial_too(self) -> None:
+        """``X-API-Key:`` with no value is a missing credential, not a wrong one.
+
+        Browsers and proxies emit the empty header routinely; treating it as a
+        failed guess would 403 a visitor whose only sin was a default header.
+        """
         _reset()
         configure_auth(self.KEY)
         response = self.client.post(
             "/api/v1/verify", json=self._body(), headers={"X-API-Key": ""}
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["channel"], "anonymous_trial")
 
     def test_a_prefix_of_the_key_is_403(self) -> None:
         """Off-by-one on the comparison is how a "secret" leaks one char at a time."""
@@ -747,12 +771,16 @@ class RateLimitTests(unittest.TestCase):
         os.environ["CEL_RATE_WINDOW"] = "60"
         os.environ.pop("CEL_TRUST_PROXY", None)
         api_server.configure_rate_limit()
+        api_server.reset_trial()
+        api_server.configure_anon_limit()
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
-        for name in ("CEL_RATE_LIMIT", "CEL_RATE_WINDOW", "CEL_TRUST_PROXY"):
+        for name in ("CEL_RATE_LIMIT", "CEL_RATE_WINDOW", "CEL_TRUST_PROXY",
+                     "CEL_ANON_LIMIT", "CEL_ANON_WINDOW"):
             os.environ.pop(name, None)
         api_server.configure_rate_limit()
+        api_server.configure_anon_limit()
 
     # -- helpers ---------------------------------------------------------
 
@@ -972,6 +1000,170 @@ class RateLimiterWindowTests(unittest.TestCase):
             self.limiter.hit("a")
         self.assertFalse(self.limiter.hit("a")[0])
         self.assertTrue(self.limiter.hit("b")[0])
+
+
+@unittest.skipUnless(HAVE_WEB, "fastapi/httpx not installed")
+class AnonymousTrialTests(unittest.TestCase):
+    """The developer-portal trial: judged by the same engine, sealed nowhere.
+
+    The security boundary this class exists to hold: an anonymous caller may
+    *see a verdict* and may not *change state*. No production chain entry, no
+    trust movement, no refutation, no unlock.
+    """
+
+    KEY = "trial-suite-key-not-a-real-secret"
+
+    def setUp(self) -> None:
+        _reset()
+        configure_auth(self.KEY)
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        os.environ.pop("CEL_API_KEY", None)
+        for name in ("CEL_ANON_LIMIT", "CEL_ANON_WINDOW"):
+            os.environ.pop(name, None)
+        api_server.configure_auth()
+        api_server.configure_anon_limit()
+
+    def _body(self, **overrides) -> dict:
+        body = {
+            "agent_id": "anonymous_probe",
+            "intent": "write to database",
+            "check": True,
+            "witness": False,
+        }
+        body.update(overrides)
+        return body
+
+    # -- it really judges ---------------------------------------------------
+
+    def test_anonymous_write_returns_a_real_verdict(self) -> None:
+        response = self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["verdict"], "FAIL")
+        self.assertEqual(body["charged_as"], "FALSE_COMPLETION")
+        self.assertEqual(body["channel"], "anonymous_trial")
+        self.assertFalse(body["sealed"])
+        self.assertFalse(body["ledger_written"])
+
+    def test_the_response_carries_no_chain_coordinates(self) -> None:
+        """A trial row must not look like a receipt for a sealed entry.
+
+        ``seq``/``chain_hash`` are the trial ledger's own coordinates and mean
+        nothing in the public chain; a screenshot of them would read as proof
+        that something was sealed.
+        """
+        body = self.client.post("/api/v1/verify", json=self._body()).json()
+        for key in ("seq", "chain_hash", "prev_hash"):
+            self.assertNotIn(key, body, key)
+        self.assertIn("not sealed", body["detail"])
+
+    def test_the_production_chain_is_untouched(self) -> None:
+        for _ in range(2):
+            self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(self.client.get("/api/v1/ledger").json()["total_entries"], 0)
+        stats = self.client.get("/api/v1/stats").json()
+        self.assertEqual(stats["agents_total"], 0)
+        self.assertEqual(stats["avg_trust_score"], 100.0)
+
+    def test_the_trial_never_locks_shut(self) -> None:
+        """Three FAILs would quarantine an identified agent. The funnel must not
+        dead-end on a 423 a visitor cannot clear without a key they do not have.
+        """
+        os.environ["CEL_ANON_LIMIT"] = "10"
+        api_server.configure_anon_limit()
+        codes = [
+            self.client.post("/api/v1/verify", json=self._body()).status_code
+            for _ in range(5)
+        ]
+        self.assertEqual(codes, [200] * 5, codes)
+
+    # -- it cannot destroy state -------------------------------------------
+
+    def test_anonymous_cannot_falsify(self) -> None:
+        response = self.client.post(
+            "/api/v1/falsify",
+            json={"trace_id": "t", "reason": "file_not_found", "evidence": "x"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("cannot falsify", response.json()["detail"])
+
+    def test_anonymous_cannot_unlock(self) -> None:
+        response = self.client.post(
+            "/api/v1/agents/some_agent/unlock", json={"reason": "please"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("cannot falsify", response.json()["detail"])
+
+    # -- its budget ---------------------------------------------------------
+
+    def test_the_second_write_in_the_window_is_429_with_the_funnel_cta(self) -> None:
+        self.assertEqual(self.client.post("/api/v1/verify", json=self._body()).status_code, 200)
+        response = self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(response.status_code, 429)
+        detail = response.json()["detail"]
+        self.assertIn("cloud trial", detail)
+        self.assertIn("install the sidecar locally", detail)
+        self.assertEqual(response.headers["X-Trial-Remaining"], "0")
+
+    def test_a_keyed_caller_is_not_held_to_the_trial_budget(self) -> None:
+        """The funnel must not throttle the customer it is converting."""
+        self.assertEqual(self.client.post("/api/v1/verify", json=self._body()).status_code, 200)
+        for i in range(3):
+            response = self.client.post(
+                "/api/v1/verify",
+                json=self._body(agent_id="paying_{}".format(i)),
+                headers={"X-API-Key": self.KEY},
+            )
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertTrue(response.json()["sealed"])
+
+    def test_a_wrong_key_does_not_fall_back_to_the_trial(self) -> None:
+        """Downgrading a bad credential would make a gate advisory."""
+        response = self.client.post(
+            "/api/v1/verify", json=self._body(), headers={"X-API-Key": "guess"}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("does not fall back", response.json()["detail"])
+
+    def test_zero_disables_the_trial(self) -> None:
+        os.environ["CEL_ANON_LIMIT"] = "0"
+        api_server.configure_anon_limit()
+        response = self.client.post("/api/v1/verify", json=self._body())
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("trial is disabled", response.json()["detail"])
+
+    # -- the page can read the policy instead of hard-coding it -------------
+
+    def test_stats_publishes_the_policy_and_this_callers_remaining(self) -> None:
+        policy = self.client.get("/api/v1/stats").json()["write_policy"]
+        anon = policy["anonymous"]
+        self.assertTrue(anon["enabled"])
+        self.assertEqual(anon["limit"], 1)
+        self.assertEqual(anon["window_seconds"], 300.0)
+        self.assertEqual(anon["remaining"], 1)
+        self.assertFalse(anon["seals"])
+        self.assertFalse(anon["can_falsify"])
+        self.assertTrue(policy["keyed"]["seals"])
+
+        self.client.post("/api/v1/verify", json=self._body())
+        after = self.client.get("/api/v1/stats").json()["write_policy"]["anonymous"]
+        self.assertEqual(after["remaining"], 0)
+        self.assertGreater(after["retry_after"], 0)
+
+    def test_stats_install_block_matches_a_command_that_works(self) -> None:
+        """The CTA is data, and it points at a package that exists.
+
+        ``pip install harness-audit-sidecar`` is the marketing name and it is
+        **not** on PyPI yet; a landing page whose hero command 404s is the exact
+        failure this project is about, so the published command is the VCS one
+        that resolves today.
+        """
+        install = self.client.get("/api/v1/stats").json()["write_policy"]["install"]
+        self.assertIn("git+https://github.com/liao-zhizhi/harness-audit-sidecar", install["pip"])
+        self.assertEqual(install["mcp_server"], "harness-audit-server")
+        self.assertIn("causal-evolution-paper", install["spec_repo"])
 
 
 if __name__ == "__main__":

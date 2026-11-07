@@ -10,9 +10,22 @@ Plus ``GET /`` which serves the dashboard, and ``GET /healthz``.
 
 Two gates stand in front of the write path, in this order: a per-client-IP
 sliding-window budget (``CEL_RATE_LIMIT`` writes per ``CEL_RATE_WINDOW``
-seconds, ``429`` with ``Retry-After`` when spent) and the shared
-``X-API-Key`` (``403``). Reads are anonymous and never rate-limited: the
-dashboard polls them every two seconds.
+seconds, ``429`` with ``Retry-After`` when spent) and the identity check. Reads
+are anonymous and never rate-limited: the dashboard polls them every two
+seconds.
+
+Identity has three outcomes, and the middle one is the product's funnel:
+
+* ``X-API-Key`` valid -> the entry is **sealed into the production chain**;
+* no credential at all -> the **anonymous trial** judges the same payload with
+  the same engine against a disposable in-memory ledger, at
+  ``CEL_ANON_LIMIT``/``CEL_ANON_WINDOW`` (default 1 per 300s). It cannot
+  falsify or unlock, and it does not touch the chain;
+* an invalid key -> ``403``, with no downgrade to the trial.
+
+The trial never enters the production chain on purpose. Every entry there is a
+claim with an author behind it; an anonymous row has none, so it is not a weaker
+entry, it is a different kind of object.
 
 Run::
 
@@ -38,7 +51,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -116,30 +129,128 @@ class ApiKeyAuth:
 
 AUTH = ApiKeyAuth()
 
+#: Access tiers for a write. The tier is decided once per request by
+#: :func:`require_verify_access` / :func:`require_keyed_access` and stashed on
+#: ``request.state`` so the handler does not re-derive it (a second derivation
+#: is a second place for the two answers to disagree).
+TIER_OPEN = "open"            # no CEL_API_KEY configured: local demo, no gate
+TIER_KEYED = "keyed"          # a valid X-API-Key was presented
+TIER_ANONYMOUS = "anonymous"  # no credential: read-only trial, judged but unsealed
 
-def require_api_key(
-    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
-) -> None:
-    """FastAPI dependency for every endpoint that **writes** to the ledger.
+_ANON_FORBIDDEN = (
+    "forbidden: no X-API-Key. The cloud trial may judge a submission, but it "
+    "cannot falsify a committed record or release a quarantine -- both destroy "
+    "state that only an identified operator may destroy. Set X-API-Key, or run "
+    "the sidecar locally where your own audit trail is yours to write."
+)
 
-    403 rather than 401 on purpose, as specified: the key is not a user
-    credential, so there is no ``WWW-Authenticate`` challenge to offer and no
-    browser login prompt to trigger. (Strictly, RFC 7235 reserves 401 for a
-    missing credential and 403 for one that was presented and rejected; this
-    endpoint returns 403 for both, because telling an anonymous prober which of
-    the two it was is information it does not need.)
+_INVALID_KEY = (
+    "forbidden: invalid X-API-Key. This endpoint writes to the trust ledger, so "
+    "it requires the shared key configured in the server's {}. A rejected key "
+    "does not fall back to the anonymous trial: a caller that guessed once gets "
+    "the same answer as a caller that guessed a thousand times."
+    .format(API_KEY_ENV)
+)
+
+
+def _presented_key(request: Request) -> str:
+    """The X-API-Key header, or ``""``. Whitespace-only counts as absent."""
+    return (request.headers.get("x-api-key") or "").strip()
+
+
+def _caller_of(request: Request) -> str:
+    """The resolved client address, computed once by ``enforce_write_rate``.
+
+    Falls back to recomputing, so a dependency wired without the rate limit
+    (a test, or a future read path) still gets a usable identity instead of a
+    ``KeyError`` at the exact moment it is refusing someone.
     """
-    if not AUTH.check(x_api_key):
+    cached = getattr(request.state, "client_ip", None)
+    return cached if cached else _client_ip(request)
+
+
+def require_keyed_access(request: Request) -> str:
+    """Gate for the writes that **destroy** state: falsify, unlock.
+
+    No anonymous path, and no fallback: a wrong key is 403, never a downgrade to
+    the trial tier. Downgrading on a bad credential would make "the key did not
+    work" indistinguishable from "the key did not matter", and it would let a
+    caller probe for a key while still doing useful work.
+    """
+    presented = _presented_key(request)
+    if AUTH.check(presented or None):
+        tier = TIER_KEYED if AUTH.enabled else TIER_OPEN
+        request.state.write_tier = tier
+        return tier
+    # Distinguish "no credential" from "a credential that failed". Both are 403,
+    # but only one of them is a guess, and the sentence a developer reads should
+    # be different: "you need a key, here is why this endpoint is keyed" versus
+    # "that key is wrong".
+    raise HTTPException(
+        status_code=403,
+        detail=_ANON_FORBIDDEN if not presented else _INVALID_KEY,
+    )
+
+
+def require_verify_access(request: Request) -> str:
+    """Gate for ``/api/v1/verify``: identified callers, or the anonymous trial.
+
+    Three outcomes, and the middle one is the new product decision:
+
+    * a valid key -> full budget, sealed into the production chain;
+    * **no credential at all -> the anonymous trial**: judged by the same
+      engine, but against a disposable in-memory ledger (see ``trial_gateway``),
+      so a stranger's row never enters the chain whose whole claim is
+      attribution. This is the funnel: see the verdict, then install locally to
+      keep the record;
+    * an invalid key -> 403. Not the trial -- a wrong key is a failed attempt,
+      and rewarding it with a downgrade is how a gate becomes advisory.
+
+    403 rather than 401 throughout, as before: the key is not a user credential,
+    so there is no ``WWW-Authenticate`` challenge to offer.
+    """
+    presented = _presented_key(request)
+    if AUTH.check(presented or None):
+        tier = TIER_KEYED if AUTH.enabled else TIER_OPEN
+        request.state.write_tier = tier
+        return tier
+    if presented:
+        raise HTTPException(status_code=403, detail=_INVALID_KEY)
+    if ANON_LIMITER.limit <= 0:
         raise HTTPException(
             status_code=403,
             detail=(
-                "forbidden: missing or invalid X-API-Key. "
-                "This endpoint writes to the trust ledger, so it requires the "
-                "shared key configured in the server's {}. The dashboard's "
-                "simulate button needs the same key pasted into its key field."
-                .format(API_KEY_ENV)
+                "forbidden: the anonymous cloud trial is disabled on this "
+                "instance ({}={}). Set X-API-Key, or run the sidecar locally."
+                .format(ANON_LIMIT_ENV, ANON_LIMITER.limit)
             ),
         )
+    allowed, retry_after = ANON_LIMITER.hit(_caller_of(request))
+    if not allowed:
+        retry = max(1, int(retry_after + 0.999))
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "the anonymous cloud trial allows {} write{} per {:g} seconds "
+                "from this address, and you have used {} of them. Retry in {}s. "
+                "To get more quota or use it in production, install the sidecar "
+                "locally (see /api/v1/stats -> write_policy.install) -- your "
+                "data never leaves your machine. Reads stay free."
+                .format(
+                    ANON_LIMITER.limit,
+                    "" if ANON_LIMITER.limit == 1 else "s",
+                    ANON_LIMITER.window,
+                    ANON_LIMITER.limit,
+                    retry,
+                )
+            ),
+            headers={
+                "Retry-After": str(retry),
+                "X-Trial-Remaining": "0",
+            },
+        )
+    request.state.write_tier = TIER_ANONYMOUS
+    return TIER_ANONYMOUS
 
 
 def configure_auth() -> ApiKeyAuth:
@@ -161,6 +272,18 @@ TRUST_PROXY_ENV = "CEL_TRUST_PROXY"
 
 DEFAULT_RATE_LIMIT = 5
 DEFAULT_RATE_WINDOW = 60.0
+
+#: The anonymous trial's budget, deliberately a different order of magnitude
+#: from the keyed one. ``CEL_ANON_LIMIT=0`` refuses anonymous writes outright,
+#: which is the setting a customer who wants no public writes at all will use.
+ANON_LIMIT_ENV = "CEL_ANON_LIMIT"
+ANON_WINDOW_ENV = "CEL_ANON_WINDOW"
+DEFAULT_ANON_LIMIT = 1
+DEFAULT_ANON_WINDOW = 300.0
+
+#: Where the anonymous trial's rows go: nowhere the production chain can see
+#: them. See ``trial_gateway`` for why this is a second gateway and not a flag.
+TRIAL_MAX_ENTRIES = 500
 
 #: Stop the per-key dictionary from growing without bound on a public instance.
 RATE_SWEEP_AT = 4096
@@ -242,6 +365,28 @@ class RateLimiter:
                     del self._hits[stale]
             return True, 0.0
 
+    def peek(self, key: str) -> Tuple[int, float]:
+        """``(remaining, retry_after)`` **without** spending an attempt.
+
+        The console needs to say "N trial writes left" *before* the button is
+        pressed. Asking that question must not consume the budget it reports,
+        or the page would spend a write every time it polled its own counter.
+        """
+        if self.limit <= 0:
+            return 0, 0.0
+        now = self._clock()
+        cutoff = now - self.window
+        with self._lock:
+            bucket = self._hits.get(key)
+            if not bucket:
+                return self.limit, 0.0
+            while bucket and bucket[0] <= cutoff:
+                bucket.popleft()
+            used = len(bucket)
+            if used >= self.limit:
+                return 0, max(bucket[0] + self.window - now, 0.0)
+            return self.limit - used, 0.0
+
 
 def _client_ip(request: Request) -> str:
     """The identity the budget is spent against.
@@ -319,6 +464,7 @@ def enforce_write_rate(request: Request) -> None:
     that is the correct trade, and the 403 tests reset the budget before use.
     """
     caller = _client_ip(request)
+    request.state.client_ip = caller
     allowed, retry_after = WRITE_LIMITER.hit(caller)
     if allowed:
         return
@@ -354,9 +500,91 @@ def enforce_write_rate(request: Request) -> None:
     )
 
 
-#: Every endpoint that **writes** to the ledger. Rate limit first (it is the
-#: cheap check and it gates key guessing), then the key itself.
-WRITE_ACCESS = [Depends(enforce_write_rate), Depends(require_api_key)]
+#: Every endpoint that writes to the **production** chain and destroys state.
+#: Rate limit first (cheap, and it gates key guessing), then the key.
+WRITE_ACCESS = [Depends(enforce_write_rate), Depends(require_keyed_access)]
+
+#: ``/verify`` additionally admits the anonymous trial. Same global budget
+#: first, then the tier decision, which may spend the much smaller trial
+#: budget. Ordering is what keeps key guessing capped at the keyed rate.
+VERIFY_ACCESS = [Depends(enforce_write_rate), Depends(require_verify_access)]
+
+
+def _anon_knobs() -> Tuple[int, float]:
+    """``(limit, window)`` for the anonymous trial; ``0`` means "refuse"."""
+    limit = int(_env_number(ANON_LIMIT_ENV, DEFAULT_ANON_LIMIT, int))
+    window = _env_number(ANON_WINDOW_ENV, DEFAULT_ANON_WINDOW, float)
+    if limit > 0 and window <= 0:
+        raise SystemExit(
+            "{}={} needs {} > 0; use {}={} to disable the anonymous trial"
+            .format(ANON_LIMIT_ENV, limit, ANON_WINDOW_ENV, ANON_LIMIT_ENV, 0)
+        )
+    return limit, window
+
+
+_initial_anon_limit, _initial_anon_window = _anon_knobs()
+
+ANON_LIMITER = RateLimiter(
+    limit=_initial_anon_limit, window=_initial_anon_window
+)
+
+
+def configure_anon_limit() -> RateLimiter:
+    """Re-read the trial knobs and clear the counters. Used by tests."""
+    ANON_LIMITER.limit, ANON_LIMITER.window = _anon_knobs()
+    ANON_LIMITER.reset()
+    return ANON_LIMITER
+
+
+# ---------------------------------------------------------------------------
+# the anonymous trial's ledger
+# ---------------------------------------------------------------------------
+#: A second gateway, not a flag on the first one.
+#:
+#: Why not let a trial row into the production chain, namespaced or otherwise:
+#: every entry in that chain is a claim with an author behind it -- that is the
+#: product. An anonymous row has no author, so it is not a weaker entry, it is a
+#: different kind of object. Putting one on the chain would mean the audit trail
+#: can be written by anyone who can reach the port, and "tamper-evident" would
+#: then be describing a log that strangers can append to at will.
+#:
+#: Why a separate gateway rather than "judge but do not book": the engine books
+#: as it judges (trust and penalty ledgers move, the chain is sealed). A
+#: judge-only path would mean threading a dry-run flag through the audited core,
+#: and every such flag is a new way for the two modes to disagree. A second
+#: instance costs one object and keeps the judged semantics identical -- same
+#: class, same code, different book.
+#:
+#: ``fail_limit`` is effectively infinite so the trial cannot reach the
+#: quarantine state. A visitor who fails three times should not be met with a
+#: 423 they cannot clear without a key they do not have: that is a dead end
+#: dressed as a lesson, and the lesson (quarantine) is available locally.
+_trial_lock = threading.Lock()
+_trial_gateway: Optional[CelGateway] = None
+_trial_dropped = 0
+
+
+def trial_gateway() -> CelGateway:
+    """The disposable in-memory gateway the anonymous trial writes to."""
+    global _trial_gateway, _trial_dropped
+    with _trial_lock:
+        if _trial_gateway is None:
+            _trial_gateway = CelGateway(fail_limit=10**9, ledger_log=None)
+            return _trial_gateway
+        # Bound the memory a public endpoint can cost. Resetting is honest --
+        # nobody was ever promised a durable record here -- and it is the only
+        # cap that holds when the input is "one stranger per address".
+        if _trial_gateway.ledger(limit=1)["total_entries"] >= TRIAL_MAX_ENTRIES:
+            _trial_dropped += 1
+            _trial_gateway = CelGateway(fail_limit=10**9, ledger_log=None)
+        return _trial_gateway
+
+
+def reset_trial() -> None:
+    """Drop the trial ledger. Tests call this; a deploy does not need to."""
+    global _trial_gateway
+    with _trial_lock:
+        _trial_gateway = None
 
 
 def _log_line(message: str, level: int) -> None:
@@ -389,6 +617,24 @@ def _announce_auth() -> None:
             ),
             logging.INFO,
         )
+        if ANON_LIMITER.limit > 0:
+            _log_line(
+                "trial: anonymous /api/v1/verify is OPEN at {} write(s) per "
+                "{:g}s per IP, judged but NOT sealed into the chain; falsify and "
+                "unlock still need the key. Disable with {}={}.".format(
+                    ANON_LIMITER.limit,
+                    ANON_LIMITER.window,
+                    ANON_LIMIT_ENV,
+                    0,
+                ),
+                logging.INFO,
+            )
+        else:
+            _log_line(
+                "trial: anonymous writes DISABLED ({}={}); every write needs the "
+                "key.".format(ANON_LIMIT_ENV, ANON_LIMITER.limit),
+                logging.INFO,
+            )
     else:
         _log_line(
             "auth: DISABLED -- {} is not set. Anyone who can reach this port can "
@@ -617,16 +863,23 @@ def healthz_head() -> Response:
 # ---------------------------------------------------------------------------
 
 
-@app.post("/api/v1/verify", dependencies=WRITE_ACCESS)
-def verify(body: VerifyRequest) -> JSONResponse:
+@app.post("/api/v1/verify", dependencies=VERIFY_ACCESS)
+def verify(body: VerifyRequest, request: Request) -> JSONResponse:
     """Judge one entry and book it.
 
-    Requires ``X-API-Key`` when the server has ``CEL_API_KEY`` set: this is the
-    endpoint that spends trust, so it is the one an attacker would use.
+    Two ways in, and the difference is *which book* the result lands in:
+
+    * with ``X-API-Key`` (when the server has ``CEL_API_KEY`` set) the entry is
+      sealed into the production chain;
+    * with no credential at all the **anonymous trial** judges the same payload
+      with the same engine but books it to a disposable in-memory ledger, and
+      the response says ``sealed: false`` / ``channel: "anonymous_trial"``. The
+      production chain is not touched, because a row with no author behind it is
+      not evidence -- see ``trial_gateway``.
 
     A FAIL is a **successful audit**, not an API error: it returns 200 with
     ``verdict: "FAIL"``. Only a closed book returns 423, because nothing was
-    judged.
+    judged -- and a trial book never closes, so the funnel has no dead end.
 
     A success claim without a usable digest -- or one that replays an already
     used ``trace_id`` -- returns 422 or 409 with ``verdict: "INVALID"`` and
@@ -635,8 +888,11 @@ def verify(body: VerifyRequest) -> JSONResponse:
     for a client bug would punish the wrong party.
     """
     agent_id = (body.agent_id or body.agent or "").strip()
+    tier = getattr(request.state, "write_tier", TIER_KEYED)
+    anonymous = tier == TIER_ANONYMOUS
+    book = trial_gateway() if anonymous else GATEWAY
     try:
-        result = GATEWAY.verify(
+        result = book.verify(
             agent_id=agent_id,
             intent=body.intent,
             check=body.check,
@@ -647,7 +903,7 @@ def verify(body: VerifyRequest) -> JSONResponse:
             trace_id=body.trace_id,
         )
     except _Refused as refused:
-        return JSONResponse(status_code=423, content=GATEWAY.settle_refusal(refused))
+        return JSONResponse(status_code=423, content=book.settle_refusal(refused))
     except VerifyError as error:
         # Refused at the door. The body names the ledger state explicitly so a
         # client cannot read "no error object" as "probably recorded".
@@ -661,9 +917,42 @@ def verify(body: VerifyRequest) -> JSONResponse:
                 "trace_id": body.trace_id or "",
                 "witness": body.witness,
                 "witness_hash": body.witness_hash or "",
+                "channel": tier,
+                "sealed": False,
             },
         )
-    return JSONResponse(status_code=200, content=result)
+    if not anonymous:
+        # ``sealed`` on the keyed path too. A client should be able to read
+        # "this landed in the chain" from the response instead of inferring it
+        # from which credential it happened to send.
+        result["sealed"] = True
+        result["channel"] = tier
+        return JSONResponse(status_code=200, content=result)
+
+    # The trial's verdict is real; its *record* is not. Stripping the chain
+    # fields is the difference between "here is a judgement" and "here is a
+    # receipt for a sealed entry", and a client that screenshots the response
+    # must not be able to mistake one for the other. ``seq``/``chain_hash`` are
+    # the trial ledger's own coordinates, which mean nothing outside it.
+    trial = {
+        k: v
+        for k, v in result.items()
+        if k not in ("seq", "chain_hash", "prev_hash")
+    }
+    trial["ledger_written"] = False
+    trial["sealed"] = False
+    trial["channel"] = "anonymous_trial"
+    trial["detail"] = (
+        "judged by the same engine, not sealed: no credential, so this row has "
+        "no author and does not enter the public chain. Run the sidecar locally "
+        "to keep an audit trail that is yours."
+    )
+    remaining, _ = ANON_LIMITER.peek(_caller_of(request))
+    return JSONResponse(
+        status_code=200,
+        content=trial,
+        headers={"X-Trial-Remaining": str(remaining)},
+    )
 
 
 @app.post("/api/v1/falsify", dependencies=WRITE_ACCESS)
@@ -715,7 +1004,7 @@ def falsify(body: FalsifyRequest) -> JSONResponse:
 
 
 @app.get("/api/v1/stats")
-def stats() -> Dict[str, Any]:
+def stats(request: Request) -> Dict[str, Any]:
     """Global state: what was intercepted, how trusted, who is inflamed.
 
     Anonymous by design: it is what the dashboard polls, and a monitoring page
@@ -726,6 +1015,12 @@ def stats() -> Dict[str, Any]:
     from a protected one instead of assuming. ``rate_limit`` reports the write
     budget for the same reason: a console that cannot see the ceiling shows a
     429 as a mystery rather than as policy.
+
+    ``write_policy`` is the machine-readable version of the funnel copy, and
+    ``trial_remaining`` is this caller's own count. The console renders both
+    rather than hard-coding "1 per 5 minutes" into the page: a number in the
+    HTML is a number that goes stale the first time the environment changes,
+    and it would be the page contradicting the limiter it is advertising.
     """
     data = GATEWAY.stats()
     data["auth_enabled"] = AUTH.enabled
@@ -734,6 +1029,41 @@ def stats() -> Dict[str, Any]:
         "window_seconds": WRITE_LIMITER.window,
         "scope": "writes only, per client IP",
     }
+    data["write_policy"] = {
+        "anonymous": {
+            "enabled": ANON_LIMITER.limit > 0,
+            "limit": ANON_LIMITER.limit,
+            "window_seconds": ANON_LIMITER.window,
+            "endpoints": ["/api/v1/verify"],
+            "seals": False,
+            "can_falsify": False,
+            "can_unlock": False,
+            "detail": "judged by the same engine against a disposable ledger; "
+                      "nothing is sealed, so a row with no author never enters "
+                      "the public chain",
+        },
+        "keyed": {
+            "limit": WRITE_LIMITER.limit,
+            "window_seconds": WRITE_LIMITER.window,
+            "seals": True,
+            "can_falsify": True,
+            "can_unlock": True,
+        },
+        "install": {
+            "pip": 'pip install "git+https://github.com/liao-zhizhi/'
+                   'harness-audit-sidecar.git"',
+            "mcp_server": "harness-audit-server",
+            "repo": "https://github.com/liao-zhizhi/harness-audit-sidecar",
+            "spec_repo": "https://github.com/liao-zhizhi/causal-evolution-paper",
+        },
+    }
+    # This caller's own remaining trial writes. Per-caller by construction --
+    # it is computed from the address the budget is spent against, so it reveals
+    # nothing about anyone else.
+    if ANON_LIMITER.limit > 0:
+        remaining, retry = ANON_LIMITER.peek(_client_ip(request))
+        data["write_policy"]["anonymous"]["remaining"] = remaining
+        data["write_policy"]["anonymous"]["retry_after"] = int(retry + 0.999)
     return data
 
 

@@ -1017,3 +1017,295 @@ body.alarm::after {
 /* The PASS/FAIL/INVALID counter marks itself when something was refuted: a
  * refutation that changes no visible number is a refutation nobody notices. */
 #m-verdicts.has-refuted { color: #ff6b81; }
+
+/* ==========================================================================
+   Developer portal
+   --------------------------------------------------------------------------
+   The landing surface is deliberately *not* a second dashboard. A dashboard
+   sells certainty; a developer portal sells a tool, so the visual weight is on
+   the command and on the fact that nothing is uploaded. The copy buttons exist
+   because a command nobody can copy is a command nobody runs.
+   ========================================================================== */
+
+.portal {
+  /* Full width, like .metrics. Without this the hero lands in the left column
+   * of the two-column shell and the page reads as "a banner squeezed over the
+   * feed" instead of "this page is a landing page". */
+  grid-column: 1 / -1;
+  position: relative;
+  border: 1px solid var(--line-bright);
+  border-left: 3px solid var(--green);
+  border-radius: 10px;
+  padding: 18px 20px 16px;
+  background:
+    radial-gradient(620px 200px at 0% 0%, rgba(43, 255, 136, 0.10), transparent 70%),
+    linear-gradient(180deg, #08120d, #050a08);
+  overflow: hidden;
+}
+
+.portal-eyebrow {
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--green-dim);
+}
+
+.portal-title {
+  margin: 6px 0 4px;
+  font-size: 25px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: #eafff3;
+  text-shadow: 0 0 22px rgba(43, 255, 136, 0.22);
+}
+
+.portal-sub {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+.portal-sub b { color: var(--text); font-weight: 600; }
+
+.portal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 13px;
+}
+
+.portal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--line-bright);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.portal-btn:hover {
+  color: #eafff3;
+  border-color: var(--green-dim);
+  background: #0d1714;
+}
+
+.portal-btn-primary {
+  color: #04120a;
+  font-weight: 600;
+  background: linear-gradient(180deg, #35ff9a, #17c96b);
+  border-color: transparent;
+}
+.portal-btn-primary:hover {
+  color: #04120a;
+  background: linear-gradient(180deg, #52ffae, #22dd78);
+}
+
+.portal-meta {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+/* ---------- developer section ---------- */
+
+.dev-portal {
+  grid-column: 1 / -1;
+  scroll-margin-top: 14px;
+}
+
+.dev-lead {
+  margin: 0 0 14px;
+  max-width: 90ch;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.dev-lead b { color: var(--text); }
+
+.dev-step {
+  padding: 12px 0 4px;
+  border-top: 1px dashed var(--line);
+}
+.dev-step:first-of-type { border-top: none; }
+
+.dev-step-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.dev-step-no {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--green-dim);
+  border: 1px solid var(--line-bright);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.dev-step-head h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+.copy-btn {
+  margin-left: auto;
+  flex: none;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--line-bright);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.copy-btn:hover { color: var(--green); border-color: var(--green-dim); }
+.copy-btn.is-copied {
+  color: var(--green);
+  border-color: var(--green-dim);
+}
+.copy-btn.is-failed { color: var(--red); border-color: var(--red-dim); }
+
+.codeblock {
+  margin: 0;
+  padding: 11px 13px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d7ffe8;
+  background: #030806;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  tab-size: 2;
+}
+.codeblock code { font: inherit; white-space: pre; }
+
+.dev-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-faint);
+}
+.dev-note code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(43, 255, 136, 0.09);
+  color: var(--text-dim);
+}
+
+.dev-list {
+  margin: 9px 0 0;
+  padding-left: 17px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--text-faint);
+}
+.dev-list li { margin: 2px 0; }
+.dev-list b { color: var(--text-dim); }
+.dev-list code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(43, 255, 136, 0.09);
+  color: var(--text-dim);
+}
+.dev-links a { color: var(--green-dim); text-decoration: none; }
+.dev-links a:hover { color: var(--green); text-decoration: underline; }
+
+.mcp-details summary {
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  padding: 3px 0 9px;
+  list-style: none;
+}
+.mcp-details summary::-webkit-details-marker { display: none; }
+.mcp-details summary::before {
+  content: "▸ ";
+  color: var(--green-dim);
+}
+.mcp-details[open] summary::before { content: "▾ "; }
+.mcp-details summary code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: rgba(43, 255, 136, 0.09);
+}
+
+/* ---------- trial quota ---------- */
+
+.trial-note {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 11px;
+  color: rgba(200, 255, 226, 0.8);
+  border: 1px solid rgba(43, 255, 136, 0.24);
+  border-left-width: 3px;
+  border-radius: 4px;
+  background: rgba(43, 255, 136, 0.05);
+}
+.trial-note[hidden] { display: none; }
+.trial-note.is-spent {
+  color: rgba(255, 230, 184, 0.85);
+  border-color: rgba(255, 176, 32, 0.34);
+  background: rgba(255, 176, 32, 0.06);
+}
+.trial-link {
+  margin-left: auto;
+  color: var(--green-dim);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.trial-link:hover { color: var(--green); text-decoration: underline; }
+
+.trial-exhausted {
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 176, 32, 0.42);
+  border-left-width: 3px;
+  border-radius: 5px;
+  background: rgba(255, 176, 32, 0.06);
+}
+.trial-exhausted[hidden] { display: none; }
+.trial-exhausted strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+}
+.trial-exhausted p {
+  margin: 0 0 9px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: rgba(255, 230, 184, 0.8);
+}
+
+/* A trial verdict was judged but not sealed. It must not look like a chain
+ * entry: dashed, dimmed, and labelled in the line itself. */
+.term-line.is-trial {
+  border-left: 2px dashed rgba(255, 176, 32, 0.55);
+  padding-left: 6px;
+  opacity: 0.9;
+}
+.term-tail-trial { color: var(--amber); }
+
+@media (max-width: 620px) {
+  .portal-title { font-size: 20px; }
+  .portal-meta { margin-left: 0; width: 100%; }
+}

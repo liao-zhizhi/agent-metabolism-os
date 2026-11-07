@@ -37,6 +37,28 @@ CEL_RATE_WINDOW=60                        # window length in seconds (sliding)
 CEL_TRUST_PROXY=1                         # ONLY behind a reverse proxy you control
 ```
 
+The landing page also sells a **cloud trial**: an anonymous caller may POST
+`/api/v1/verify` a very small number of times so they can see a verdict before
+installing anything locally.
+
+```bash
+CEL_ANON_LIMIT=1                          # anonymous writes per IP per window; 0 = off
+CEL_ANON_WINDOW=300                       # 1 write per 5 minutes by default
+```
+
+The trial is deliberately the weakest of the three identities. It judges with
+the same engine but books into a **disposable in-memory gateway**, so the
+response says `sealed: false` and the production chain never grows a row whose
+author nobody can name — an unattributable entry is not weaker evidence, it is a
+different kind of object, and admitting one would contradict the chain's whole
+claim. It cannot falsify or unlock either (both destroy state). A *wrong* key
+does not fall back to the trial: it is `403`, so guessing is never rewarded with
+a downgrade. The trial's book never quarantines, so the funnel has no dead end
+that only a key could clear.
+
+Turn the whole funnel off with `CEL_ANON_LIMIT=0`; the page reads the live policy
+from `/api/v1/stats` → `write_policy` and stops advertising it.
+
 The key answers "who may write"; the budget answers "how often". Without it a
 single caller holding the key (or any caller, on an instance where the key is
 unset) can use `/api/v1/verify` as a load generator, and every one of those
