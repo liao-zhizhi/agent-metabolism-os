@@ -37,7 +37,7 @@
 > Nothing in this notice excludes or limits any liability that cannot be excluded
 > or limited under applicable law. This notice is a condition of use.
 
-- `Embodied data contract (v1)`: [https://github.com/liao-zhizhi/embodied-physics-contract](https://github.com/liao-zhizhi/embodied-physics-contract)
+- `Embodied data contract (v1)`: [https://github.com/liao-zhizhi/embodied-physics-contract](https://github.com/liao-zhizhi/embodied-physics-contract) — 契约已迁至该仓库；本仓库不再放契约副本。参考审计器不在本仓库。
 
 A zero-dependency prototype that puts metabolic regulation **outside** a large
 language model, by treating the model as a stateless CPU.
