@@ -1,0 +1,40 @@
+{
+  "schema_id": "gradia.embodied_physics.v1",
+  "source": "schema.example",
+  "dt_sec": 0.05,
+  "frames": [
+    {
+      "t": 0,
+      "object_xyz": [0.00, 0.00, 0.08],
+      "object_aabb": {
+        "min": [-0.04, -0.04, 0.04],
+        "max": [0.04, 0.04, 0.12]
+      },
+      "hand_xyz": [-0.06, 0.00, 0.08],
+      "contact": false,
+      "contact_force_n": 0.0
+    },
+    {
+      "t": 1,
+      "object_xyz": [0.01, 0.00, 0.08],
+      "object_aabb": {
+        "min": [-0.03, -0.04, 0.04],
+        "max": [0.05, 0.04, 0.12]
+      },
+      "hand_xyz": [-0.05, 0.00, 0.08],
+      "contact": false,
+      "contact_force_n": 0.0
+    },
+    {
+      "t": 2,
+      "object_xyz": [0.02, 0.00, 0.08],
+      "object_aabb": {
+        "min": [-0.02, -0.04, 0.04],
+        "max": [0.06, 0.04, 0.12]
+      },
+      "hand_xyz": [-0.04, 0.00, 0.08],
+      "contact": false,
+      "contact_force_n": 0.0
+    }
+  ]
+}
